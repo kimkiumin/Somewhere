@@ -1,0 +1,41 @@
+@media (min-width: 768px) {
+  #app {
+    display: grid;
+    place-items: center;
+    padding: var(--space-8);
+  }
+
+  .app-frame {
+    min-height: min(760px, calc(100svh - 64px));
+  }
+}
+
+@media (max-width: 390px) {
+  #app {
+    padding: var(--space-2);
+  }
+
+  .app-frame {
+    min-height: calc(100svh - 16px);
+    padding: var(--space-4);
+  }
+
+  .action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
