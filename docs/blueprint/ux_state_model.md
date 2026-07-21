@@ -1,6 +1,6 @@
 # UX State Model
 
-Status: approved design, pending written-spec review
+Status: approved written blueprint (2026-07-21)
 
 ## Principles
 
@@ -17,10 +17,10 @@ Status: approved design, pending written-spec review
 | `S0 Onboarding` | Explain the service and request required permissions in context | product promise, data controls | continue |
 | `S1 Constraints` | Capture non-negotiable conditions | category, maximum distance/time, budget, dietary/accessibility limits, disclosure setting | find one place |
 | `S2 Finding` | Build and validate the candidate pool | calm progress state; no candidates | success or recoverable failure |
-| `S3 One Place Ready` | Present one acceptable hidden place | distance, representative menu, price band | commit or stop |
+| `S3 One Place Ready` | Present one evidence-qualified hidden place | distance, representative menu, price band | commit or stop |
 | `S4 Committed` | Mark explicit acceptance | short transition into guidance | following |
 | `S5 Following` | Guide without a visible map | route-aware compass and three-row display | near, reveal, route recovery, or stop |
-| `S6 Route Recovery` | Handle low-confidence guidance | recalibration, reroute, or external map fallback | following or stop |
+| `S6 Route Recovery` | Handle technical guidance failure | recalibration, reroute, cached route, or user-selected external map | following or stop |
 | `S7 Near` | Indicate proximity | compass, remaining distance, near signal | arrived or recovery |
 | `S8 Arrived` | Confirm arrival without demanding immediate rating | arrival confirmation | feedback pending |
 | `S9 Feedback Pending` | Wait until the visit can be judged | no blocking UI | notification or next launch after 60 minutes |
@@ -49,7 +49,9 @@ Always hidden by default:
 - exact address or map position
 - photos
 - reviews and ratings
-- distinctive copy that trivially identifies the venue
+- distinctive menu names or copy that trivially identifies the venue
+
+Distinctive menu names are normalized to a supported broad dish category. If no faithful broad category can be derived from source data, the menu row falls back to the venue's broad category. The LLM may classify supported source text but may not invent a replacement menu. This disclosure rule applies consistently to the app, physical display, notifications, logs, study screenshots, and map-handoff warnings.
 
 ## Compass Display
 
@@ -63,7 +65,17 @@ price band
 - The menu row moves continuously in one direction and loops without reversing.
 - One menu remains the priority; a second menu is optional.
 - Text speed, pixel density, Korean readability, and power impact are hardware-test variables.
-- Continuous movement is an approved visual direction. Reduced walking-time gaze is not used as the deciding criterion for this row.
+- Continuous movement is the prototype baseline. Final hardware use remains conditional on legibility, walking safety, reduced-motion, display-technology, and power tests.
+
+## Connection and Direction Status
+
+- Use familiar cellular-antenna and Wi-Fi icons for network state.
+- Use the familiar Bluetooth icon for the phone-to-compass connection.
+- Keep these icons in a small status area separate from the three information rows.
+- If network, device connection, or direction calculation is unavailable, suppress the directional claim and rotate the compass slowly without pointing to a bearing.
+- When trustworthy data returns, recompute the route-relative direction before the needle points again.
+- During a user-requested pause or confirmed stop, the needle stays still or is hidden. It does not use the error rotation.
+- Do not invent a novel icon when a conventional platform symbol communicates the state.
 
 ## Destination Reveal
 
@@ -79,15 +91,17 @@ price band
 ```text
 Following
 → tap Stop
+→ all directional guidance pauses immediately
 → warning: 정말 중단할까요?
-→ press the same control again to confirm
-→ guidance ends immediately
-→ stop reason appears
-→ reason saved locally and, only with consent, anonymously uploaded
+→ choose Continue or Confirm stop
+→ Continue resumes the same guidance session
+→ Confirm stop ends guidance
+→ stop reason appears with Skip
+→ reason saved locally and, only with separate consent, included in minimized product-improvement upload
 → stopped
 ```
 
-The second press confirms stop; it does not delay route termination after confirmation. The reason screen follows the stop and never blocks the safety action.
+The same physical control may act as `Confirm stop` after the warning, but the confirmation interface must also make `Continue` understandable. The reason screen follows every confirmed stop, including a safety stop, and never blocks exit.
 
 Initial stop reasons:
 
@@ -104,6 +118,8 @@ The taxonomy must remain short and mutually understandable. It is versioned so l
 
 There is no active Reroll control.
 
+The five-minute rule applies only when the user requests a new recommendation after the journey has ended. It never delays pause, confirmed stop, reveal, external-map access, or another safety action.
+
 If the user requests a new recommendation within five minutes of stop confirmation:
 
 1. Reopen constraints.
@@ -114,7 +130,8 @@ If the user requests a new recommendation within five minutes of stop confirmati
 
 Reason-specific behavior:
 
-- Route/safety problem: attempt route recovery or external map before replacing a valid destination.
+- Safety concern: keep guidance ended and never automatically resume the same place or route or open an external map. Offer only user-controlled choices: finish, reveal the destination, open an external map, or request a new recommendation.
+- Route or sensor problem: offer recalibration, reroute, cached-route recovery, or a user-selected external map before replacing a still-valid destination.
 - Condition/venue problem: change the relevant condition before a new recommendation.
 - Simple change of mind: review all constraints before a new recommendation.
 - Schedule change: finish the adventure.

@@ -1,6 +1,6 @@
 # Validation Plan
 
-Status: approved design, pending written-spec review
+Status: approved written blueprint (2026-07-21)
 
 ## Research Claims
 
@@ -17,10 +17,11 @@ No single score represents all six claims.
 
 ## Study Sequence
 
-### Phase 1: 5-8 Participants
+### Study A / Roadmap Phase 3: 5-8 Test Sessions
 
 Purpose: find severe usability and technical defects.
 
+- Use dyads for the core shared-selection sessions; additional individual physical-handling sessions do not redefine the product audience.
 - Include the first restaurant and cafe scenarios.
 - Observe constraint setup, commit, compass use, Stop, reveal, recovery, and arrival.
 - Test the high-fidelity physical mockup separately and, where possible, alongside the iOS experience.
@@ -35,27 +36,40 @@ Outputs:
 - route-confidence thresholds
 - provider feasibility findings
 - physical form selection
-- frozen Phase 2 protocol and success thresholds
+- frozen Study B / Roadmap Phase 4 protocol and decision thresholds
 
-### Phase 2: 20-30 Participants
+### Study B / Roadmap Phase 4: 10-15 Dyads, 20-30 People
 
 Purpose: compare Somewhere with normal map/search behavior.
 
-Use a within-participant, counterbalanced design:
+Use a within-dyad, counterbalanced design with the dyad as the primary analysis unit:
 
-- Each participant completes one matched decision using their normal map/search method.
-- Each participant completes one matched decision using Somewhere.
+- Each dyad completes one matched decision using its normal map/search method.
+- Each dyad completes one matched decision using Somewhere.
 - Half use Somewhere first; half use the baseline first.
+- Match category, area, budget, time window, and pair composition across conditions.
+- Use non-overlapping eligible venue pools or another frozen carryover control.
+- Record prior familiarity with the area, venue, and product condition.
 - Restaurant and cafe results are analyzed separately.
 - Party size is recorded but not used as a permanent product restriction.
 
 The study remains exploratory at this sample size. Report paired differences, distributions, confidence intervals where appropriate, and qualitative failure causes. Do not claim population-wide market validation.
 
+The comparison tests the Somewhere bundle against normal search. It does not identify the isolated causal effect of hidden identity, random selection, the five-minute rule, the compass, or any other single component without a separate experiment.
+
 ## Operational Definitions
 
-### Selection Started
+### Decision Started
 
-The user confirms one destination and begins movement.
+The dyad begins the assigned place-selection task after the scenario and required constraints are understood.
+
+### Destination Committed
+
+The dyad explicitly accepts one destination and stops candidate comparison.
+
+### Movement Started
+
+The dyad begins physical travel after commitment. This is measured separately from destination commitment.
 
 ### Selection Maintained
 
@@ -78,6 +92,7 @@ Minimum versioned events:
 ```text
 session_started
 consent_updated
+decision_started
 constraints_confirmed
 recommendation_requested
 recommendation_ready
@@ -89,8 +104,11 @@ route_confidence_low
 reroute_requested
 external_map_opened
 stop_requested
+guidance_paused
+stop_cancelled
 stop_confirmed
 stop_reason_recorded
+stop_reason_skipped
 recovery_requested
 constraints_reopened
 near_entered
@@ -101,7 +119,7 @@ feedback_prompted
 place_reaction_recorded
 ```
 
-Each event schema has a version. Consented analytics exclude exact route geometry and raw location history.
+Each event schema has a version. Product-improvement upload excludes exact origin and destination coordinates, venue ID, route geometry, raw location history, and stable cross-session identifiers. Study records use separately governed participant codes and are not silently joined to product analytics.
 
 ## Metrics
 
@@ -113,6 +131,8 @@ Each event schema has a version. Consented analytics exclude exact route geometr
 - movement-start rate
 - selection-maintained rate
 - selection-reopened rate
+
+The primary Study B endpoint is the paired dyad-level difference in time from `decision_started` to `destination_committed`. The practical-difference threshold and decision rule are frozen after Study A and before Study B enrollment.
 
 ### Navigation Quality
 
@@ -151,19 +171,24 @@ Each event schema has a version. Consented analytics exclude exact route geometr
 
 ## Analysis Rules
 
-- Freeze the Phase 2 metrics and thresholds after Phase 1 and before Phase 2 enrollment.
+- Freeze the Study B metrics, practical-difference threshold, and decision rule after Study A and before Study B enrollment.
 - Preserve all exclusions and reasons; do not silently remove failures.
 - Analyze restaurant and cafe sessions separately before combining.
 - Separate preference-driven restart from external interruption.
 - Separate place quality from navigation quality and selection efficiency.
 - Report missing feedback rather than treating it as neutral.
 - Do not infer relationship improvement from the two-person scenario.
+- Treat the dyad as the primary unit for paired inference; person-level reactions may be reported separately without pretending independence.
+- Do not attribute a bundle-level difference to one component without a separate component study.
 
 ## Consent and Safety
 
-- Location authorization is separate from anonymous improvement-data consent.
+- Location authorization is separate from minimized product-improvement upload consent.
 - Improvement upload is off by default.
+- First-use consent summarizes the versioned pilot data contract in [Recommendation and Data Architecture](recommendation_and_data.md); it remains editable in Settings.
+- Exact origin and destination coordinates, venue ID, route geometry, raw location, and stable cross-session identifiers are prohibited from product-improvement upload.
 - On-device history can be reset.
+- If the documented deletion path is unavailable, improvement upload remains disabled.
 - Participants can reveal the destination or stop at any time.
 - Stop guidance before asking a reason.
 - A moderator has an external map and direct destination access during supervised tests.
@@ -171,7 +196,7 @@ Each event schema has a version. Consented analytics exclude exact route geometr
 
 ## Advancement Gates
 
-Phase 2 cannot start until:
+Study B / Roadmap Phase 4 cannot start until:
 
 - critical Stop and reveal paths work without moderator help
 - provider terms and route access are documented
@@ -180,4 +205,6 @@ Phase 2 cannot start until:
 - the physical mockup can be understood and handled in realistic conditions
 - metrics, exclusions, and thresholds are frozen
 
-BLE functionality is not a Phase 2 requirement unless the stretch track is ready and separately validated.
+The physical-product claim also requires an embodied interaction test using BLE, a wired prototype, or Wizard-of-Oz control. A visual animation alone can validate layout and appearance but not live pointing, connection recovery, or the value of handling a physical compass.
+
+BLE functionality is not a Study B requirement when a wired or Wizard-of-Oz setup can validly test the physical interaction and its limitations are reported.

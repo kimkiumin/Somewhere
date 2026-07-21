@@ -1,6 +1,6 @@
 # Product Contract
 
-Status: approved design, pending written-spec review
+Status: approved written blueprint (2026-07-21)
 
 Owner: Somewhere project
 
@@ -8,22 +8,22 @@ Owner: Somewhere project
 
 People do not struggle with place selection only because information is missing. Candidate comparison, companion coordination, and responsibility for the final choice can keep the decision open even after many acceptable places have been found.
 
-Existing map and recommendation products commonly return multiple candidates and leave the final comparison to the user. Somewhere tests a different promise: choose one acceptable place within agreed constraints and move directly to departure.
+Existing map and recommendation products commonly return multiple candidates and leave the final comparison to the user. Somewhere tests a different promise: choose one evidence-qualified place within agreed constraints and move directly to departure.
 
 ## Solution
 
 > 조건을 충족하는 장소 하나를 확정하고, 정확한 장소는 잠시 숨긴 채, 비교 없이 이동을 시작하게 한다.
 
-The product does not claim to find the objectively best place. It creates a qualified pool in which every destination is acceptable, then selects one uniformly at random.
+The product does not claim to find the objectively best place. It creates a frozen pool of provider-retrieved venues that pass the current evidence policy, then selects one uniformly at random from that pool. Qualification means that the recorded evidence passed a versioned policy; it is not a guarantee of future quality, availability, or personal satisfaction.
 
 ## Target Context
 
 - Product audience: not limited by party size.
-- First validation context: two close participants.
+- First validation unit: one dyad of two close participants making one shared decision.
 - First categories: restaurants and cafes, analyzed separately.
 - Expansion hypotheses: solo users and small groups.
 
-Two-person use is a research priority, not a permanent product restriction.
+Two-person use is a research priority, not a permanent product restriction. Shared confirmation by both participants is a study hypothesis, not a permanent product rule.
 
 ## User Inputs
 
@@ -52,7 +52,7 @@ The project must not claim arrival as the unique product advantage. Arrival can 
 
 ## Initial Survey Evidence
 
-The current survey is directional evidence, not market proof:
+The current survey is directional evidence, not market proof. The figures below are author-reported summaries from the project materials; an independently auditable raw or de-identified response table, questionnaire, missing-data rules, and calculation record are not yet included:
 
 - 21 responses; 20 respondents were 18-29 and one was 30-39.
 - 13/21 reported appointments, dates, or gatherings as the main place-decision context.
@@ -72,9 +72,12 @@ The sample is small, young, and convenience-based. It narrows the first test but
 - Reveal only bounded information before arrival.
 - Keep a secondary destination reveal for safety and trust.
 - Remove immediate Reroll from the active experience.
-- Stop guidance immediately when a stop is confirmed.
-- Ask the stop reason immediately after guidance stops.
+- Pause all directional guidance immediately when the user first presses Stop.
+- Offer `Continue` and `Confirm stop`; continuing resumes the same session and confirming ends it.
+- Show the stop-reason step after every confirmed stop, with a visible Skip action that never blocks exit.
 - Apply recovery friction to a new recommendation, not to the safety stop itself.
+- Apply the five-minute rule only to a new recommendation after an ended journey; never delay pause, stop, reveal, or another safety action.
+- Treat a safety concern differently from a route or sensor failure: do not automatically resume, reroute, or open a map after a safety stop.
 - Treat the physical compass as the final product form, not optional decoration.
 
 ## Non-Goals

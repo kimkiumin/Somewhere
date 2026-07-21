@@ -1,6 +1,6 @@
 # Physical Product Blueprint
 
-Status: approved design, pending written-spec review
+Status: approved written blueprint (2026-07-21)
 
 ## Product Role
 
@@ -27,15 +27,16 @@ The required mockup does not have to receive live BLE data.
 
 ## Stretch Outcome: BLE Functional Prototype
 
-The stretch prototype connects to the iPhone and receives a minimal state contract:
+The stretch prototype connects to the iPhone with a minimal state contract. The orientation fields depend on the architecture selected before BLE implementation:
 
 ```text
 session state
-relative bearing
+absolute route bearing + north reference, or device-relative bearing after device heading input
 remaining distance
 representative menu text
 price band
 confidence/recovery state
+message timestamp and sequence
 ```
 
 The phone retains GPS, route, recommendation, network, and notification responsibilities. Standalone cellular and onboard LLM processing are out of scope.
@@ -69,6 +70,18 @@ The exact display technology is not selected. LCD, OLED, electronic paper, and s
 
 Continuous menu motion is an approved interaction direction. Walking-time gaze reduction is not the primary selection criterion for that motion, but safety and legibility still require field observation.
 
+Final hardware lock requires legibility, walking-safety, reduced-motion, display-technology, and power tests. Failure on those tests can replace or disable continuous movement without changing the fixed three-row information hierarchy.
+
+## Status and Error Behavior
+
+- Use conventional cellular-antenna and Wi-Fi icons for network state.
+- Use the conventional Bluetooth icon for phone-to-compass connection.
+- Place connection state in a small lower-center channel, separate from distance, menu, and price, near the conventional brand-mark position on an analog dial.
+- Suppress the precise arrow when bearing data is stale or low confidence.
+- For network, connection, or direction-calculation failure, rotate the compass slowly without pointing.
+- For a user pause or confirmed stop, keep the needle stationary or hide it; do not use the error rotation.
+- On recovery, recompute orientation before resuming directional pointing.
+
 ## Control Exploration
 
 Control placement is a physical-design task, not yet a locked electronics layout. The prototypes must explore:
@@ -80,6 +93,8 @@ Control placement is a physical-design task, not yet a locked electronics layout
 - an accessible alternative to any gesture or timing interaction
 
 A button sequence or needle-alignment mini-game is a deferred hypothesis. It is excluded from the baseline until it proves meaningful rather than punitive.
+
+The baseline Stop interaction pauses guidance on the first press, then presents `Continue` and `Confirm stop`. The same physical control may confirm after the warning, but continuing must be understandable and accessible. A confirmed stop always leads to a skippable reason step.
 
 ## Parallel Product-Design Track
 
@@ -102,7 +117,7 @@ A button sequence or needle-alignment mini-game is a deferred hypothesis. It is 
 - selected form
 - CMF and assembly intent
 - final interaction storyboard
-- evidence from 5-8 participant handling tests
+- evidence from Study A handling sessions within the 5-8-session test round
 
 ### P3: BLE Stretch
 
@@ -110,6 +125,8 @@ A button sequence or needle-alignment mini-game is a deferred hypothesis. It is 
 - BLE service contract
 - battery and enclosure feasibility
 - integrated field demonstration if time and budget permit
+
+If BLE cannot be completed, physical interaction claims still require an embodied test through a wired prototype or Wizard-of-Oz setup. A screen animation alone supports visual and ergonomic design claims, not claims about live physical navigation.
 
 ## Physical Test Measures
 
@@ -121,5 +138,7 @@ A button sequence or needle-alignment mini-game is a deferred hypothesis. It is 
 - carry comfort
 - perceived product character
 - preference for physical compass versus phone compass
+- correct distinction among pointing, technical-error rotation, pause, and stop
+- magnetic interference, stale-message, reconnect, and latency behavior for connected prototypes
 
 The physical product does not need to prove mass-manufacturing readiness. It must prove product intent, interaction plausibility, and a credible path to BLE functionality.

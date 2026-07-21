@@ -1,6 +1,6 @@
 # Somewhere Full Development Blueprint
 
-Status: written design draft for user review
+Status: approved written blueprint (2026-07-21)
 
 Approved conversation date: 2026-07-21
 
@@ -16,7 +16,7 @@ The product is not defined by a fixed party size. The first field validation pri
 
 Somewhere is responsible for two outcomes:
 
-1. Select one acceptable destination quickly within non-negotiable constraints.
+1. Select one evidence-qualified destination quickly within non-negotiable constraints.
 2. Move the user from comparison to departure without presenting a candidate list.
 
 Arrival and destination satisfaction matter, but they are service-quality outcomes after the core promise. They must be measured separately so route failures, schedule changes, and destination quality do not get confused with selection speed.
@@ -26,8 +26,9 @@ Arrival and destination satisfaction matter, but they are service-quality outcom
 ```text
 Set minimum constraints
 → collect and validate live place data
+→ resolve duplicate provider records into canonical venues
 → build a qualified destination pool
-→ select one destination uniformly at random
+→ select one destination uniformly at random from the frozen retrieved pool
 → show distance, representative menu, and price band
 → explicit commit
 → route-aware compass guidance
@@ -50,6 +51,7 @@ The final project is a physical compass product supported by a companion service
 ```text
 Place provider adapters
 → normalized place candidates
+→ canonical venue resolution and deduplication
 → deterministic hard filters
 → evidence enrichment
 → LLM merit interpretation
@@ -61,7 +63,8 @@ Place provider adapters
 Walking route provider
 → normalized route geometry
 → iOS guidance engine
-→ relative bearing and distance
+→ absolute route bearing plus north reference
+→ device-relative bearing computed from the physical device heading
 → compass UI
 → optional BLE display contract
 ```
@@ -98,7 +101,7 @@ recommendation ready
 
 ## 8. Decision Status
 
-This blueprint records approved product design, not completed implementation. It intentionally separates:
+This blueprint records the product direction approved by the user on 2026-07-21, not completed implementation. It intentionally separates:
 
 - `Decision`: approved direction.
 - `Evidence`: survey, external research, or official technical documentation.
@@ -106,6 +109,10 @@ This blueprint records approved product design, not completed implementation. It
 - `Gate`: unresolved dependency that blocks a later phase.
 
 Before vNext implementation begins, the current v0.1 `AGENTS.md`, README, prototype requirements, and test contracts must be reconciled with this blueprint. Until that explicit reconciliation, the current prototype remains a v0.1 historical implementation rather than evidence that the blueprint is complete.
+
+The survey figures in this blueprint are author-reported summaries from the current project materials. They have not yet been independently recalculated from a de-identified response table, instrument, missing-data rules, and calculation record. Linked research and technical sources are cited evidence, not a guarantee that a provider, law, or platform behavior remains unchanged; dated capability, rights, legal, and field checks remain phase gates.
+
+Review provenance: Browser GPT provided a bounded second-model critique of the supplied blueprint packet, Codex reconciled that critique against the local files, and the user approved the resulting changes. Browser GPT did not independently inspect the repository, recompute the survey, or verify every cited source.
 
 ## 9. Non-Goals
 
@@ -122,7 +129,7 @@ Before vNext implementation begins, the current v0.1 `AGENTS.md`, README, protot
 
 The next work is not broad feature implementation. It is the feasibility and evidence package defined in the roadmap:
 
-1. Reconcile project instructions with this blueprint after written approval.
+1. Reconcile project instructions and v0.1 contracts with this approved blueprint.
 2. Compare place and walking-route providers.
 3. Verify menu, price, hours, and route data rights.
 4. Run web sensor and iOS Core Location spikes.

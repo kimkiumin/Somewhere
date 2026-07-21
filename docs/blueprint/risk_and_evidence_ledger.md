@@ -1,14 +1,14 @@
 # Risk and Evidence Ledger
 
-Status: living evidence record
+Status: approved blueprint evidence record with living gates
 
 Last reviewed: 2026-07-21
 
 ## Evidence Labels
 
 - `D`: direct user-approved product decision
-- `S`: current survey evidence
-- `E`: external research or official documentation
+- `S`: author-reported current survey summary
+- `E`: cited external research or official documentation
 - `H`: hypothesis requiring validation
 - `G`: dependency or gate that can block a phase
 
@@ -27,7 +27,9 @@ Last reviewed: 2026-07-21
 | Walking routing may require partnership | E/G | Kakao Mobility walking API is partner-only | other providers may differ | provider-neutral route adapter and fallback plan |
 | iOS exposes location, heading, notifications, and BLE | E | Apple official documentation | capability does not prove field accuracy | native spike and field calibration required |
 
-## Verified External Research
+The survey summary has not yet been independently recalculated from a de-identified response table, instrument, missing-data rules, and calculation record. The links below establish cited support and implementation leads, not continuing verification of provider coverage, legal permission, or field performance.
+
+## Cited Research and Scope Limits
 
 1. van Lieshout, de Lange, & Cools (2021), *Uncertainty increases curiosity, but decreases happiness*. DOI: https://doi.org/10.1038/s41598-021-93464-6
    - Supports treating uncertainty as a controlled ingredient rather than maximizing it.
@@ -47,7 +49,7 @@ Last reviewed: 2026-07-21
 6. Aron et al. (2000), *Couples' shared participation in novel and arousing activities and experienced relationship quality*. DOI: https://doi.org/10.1037/0022-3514.78.2.273
    - Only a conditional supporting reason for first testing close pairs. It does not justify relationship-improvement claims.
 
-## Official Technical Sources
+## Cited Technical and Legal Sources
 
 ### Place and Route Providers
 
@@ -80,16 +82,21 @@ The blueprint is not legal advice. A current legal and platform-policy review is
 | menu, price, hours, or constraints cannot be verified | invalid recommendation | provider capability spike | lawful enrichment; limited-region manually verified pilot data; otherwise fail closed | before live recommendation |
 | route access is unavailable or contractually unsuitable | no in-app compass route | provider/legal review | alternative provider, limited test area, external map fallback | before supervised field test |
 | LLM fabricates or overstates merit | unsafe or low-quality pool | source-linked evaluation set | structured output, deterministic evidence gate, no unsupported fact | before live recommendation |
+| duplicate venue records distort the random pool | unequal effective probability | canonicalization fixtures and snapshot audit | versioned entity resolution, branch-aware deduplication, ordered-set digest | before live recommendation |
+| retrieved pool is mistaken for all real-world venues | overstated randomness claim | copy and receipt review | limit uniformity claim to the frozen provider-retrieved qualified snapshot | before public claims |
+| high-consequence condition is unknown or stale | medical or accessibility harm | source/freshness audit and adversarial benchmark | fail closed, no-fit, or supervised manually verified pilot | before live recommendation |
 | GPS or heading is unstable | misleading arrow | device logs and route replay | confidence state, smoothing, reroute, stop guidance | before unsupervised test |
-| destination concealment causes anxiety | abandonment or distrust | reveal and stop behavior, interview | secondary reveal, bounded information, neutral stop | Phase 1 |
+| phone heading is used for a separately held compass | systematically wrong physical pointing | bench and walking orientation tests | device heading or absolute-bearing contract; stale-message and interference handling | before BLE field test |
+| destination concealment causes anxiety | abandonment or distrust | reveal and stop behavior, interview | secondary reveal, bounded information, neutral stop | Study A / Phase 3 |
 | route geometry exposes the endpoint to a technical user | secrecy claim is overstated | client data-flow inspection | describe concealment as UI-level; evaluate segmented route delivery only if needed | before public claims |
-| recovery friction feels punitive | dark-pattern criticism | stop usability observation | immediate stop, reason after stop, friction only on new recommendation | Phase 1 |
-| five-minute rule is ineffective or frustrating | repeated reroll or resentment | recovery timing distribution | revise timer after frozen experiment | after Phase 1 |
+| recovery friction feels punitive | dark-pattern criticism | stop usability observation | immediate pause, skippable reason after confirmed stop, friction only on new recommendation | Study A / Phase 3 |
+| five-minute rule is ineffective or frustrating | repeated reroll or resentment | recovery timing distribution | revise timer after frozen experiment | after Study A / Phase 3 |
 | physical display is unreadable | product-form failure | full-scale outdoor mock test | revise window, type, motion, or display technology | before final mockup |
 | physical product adds no value over phone | weak product-design justification | comparative handling and preference study | revise interaction role; document negative result honestly | before BLE stretch |
-| selection time does not improve | core value unsupported | counterbalanced Phase 2 comparison | revise inputs and commit flow or reconsider thesis | after Phase 2 |
+| selection time does not improve | core value unsupported | counterbalanced Study B comparison | revise inputs and commit flow or reconsider thesis | after Study B / Phase 4 |
 | destination reactions are poor | merit gate failure | place reaction distribution | revise evidence and merit policy, not compass UI by default | after field test |
-| anonymous analytics can be reidentified | privacy harm | data-flow review | off by default, coarse events, no raw route, retention limits | before analytics upload |
+| minimized analytics can still be reidentified | privacy harm | field-level data-flow and join review | explicit consent, short identifier lifetime, coarse timing/context, exclusions, retention and deletion limits | before analytics upload |
+| distinctive menu text reveals the venue | concealment failure | cross-channel leakage cases | source-supported broad category fallback across app, hardware, logs, notifications, and study media | before field test |
 
 ## Superseded v0.1 Decisions
 
@@ -102,7 +109,7 @@ The current implementation remains valid as v0.1 history, but these product deci
 | general hidden-adventure framing | fast one-place selection plus hidden following |
 | process and place questions | one delayed place reaction; process measured behaviorally |
 | hardware as later optional hypothesis | physical high-fidelity mockup is a required final outcome |
-| gaze reduction as broad priority | low-map product form remains, but continuous menu motion is accepted and gaze is not its deciding criterion |
+| gaze reduction as broad priority | low-map product form remains; continuous menu motion is the prototype baseline and final hardware use depends on safety, legibility, reduced-motion, display, and power tests |
 
 ## Open Gates
 
@@ -110,6 +117,7 @@ The current implementation remains valid as v0.1 history, but these product deci
 - Legally usable evidence source for menu, price, hours, atmosphere, and critical negative signals.
 - Walking-route provider and commercial/research access.
 - Exact iOS location/background authorization strategy.
+- User, legal, and technical approval of the proposed pilot analytics parameters and deletion path.
 - Physical display technology and realistic power behavior.
-- Frozen Phase 2 success thresholds after Phase 1.
+- Frozen Study B / Phase 4 endpoint, practical-difference threshold, and decision rule after Study A / Phase 3.
 - Budget, schedule, fabrication method, and available hardware skills.
