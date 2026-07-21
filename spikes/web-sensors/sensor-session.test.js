@@ -118,3 +118,47 @@ test("does not install an orientation listener after stop during a permission pr
   assert.equal(calls.listeners.length, 0);
   assert.deepEqual(calls.clearWatch, [42]);
 });
+
+test("does not publish a denied permission result after stop", async () => {
+  let resolvePermission;
+  const permission = new Promise((resolve) => {
+    resolvePermission = resolve;
+  });
+  const readings = [];
+  const { globalObject, navigatorObject } = createDependencies();
+  globalObject.DeviceOrientationEvent.requestPermission = () => permission;
+  const session = createSensorSession({
+    globalObject,
+    navigatorObject,
+    onReading: (reading) => readings.push(reading),
+  });
+
+  const start = session.start();
+  session.stop();
+  resolvePermission("denied");
+  await start;
+
+  assert.deepEqual(readings, []);
+});
+
+test("does not publish a rejected permission result after stop", async () => {
+  let rejectPermission;
+  const permission = new Promise((_, reject) => {
+    rejectPermission = reject;
+  });
+  const readings = [];
+  const { globalObject, navigatorObject } = createDependencies();
+  globalObject.DeviceOrientationEvent.requestPermission = () => permission;
+  const session = createSensorSession({
+    globalObject,
+    navigatorObject,
+    onReading: (reading) => readings.push(reading),
+  });
+
+  const start = session.start();
+  session.stop();
+  rejectPermission(new Error("permission prompt closed"));
+  await start;
+
+  assert.deepEqual(readings, []);
+});

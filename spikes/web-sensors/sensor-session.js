@@ -44,23 +44,29 @@
       onReading(readings);
     }
 
-    function startGeolocation() {
+    function publishForRun(startedRunId, kind, value) {
+      if (running && startedRunId === runId) {
+        publish(kind, value);
+      }
+    }
+
+    function startGeolocation(startedRunId) {
       const geolocation = navigatorObject && navigatorObject.geolocation;
       if (!geolocation || typeof geolocation.watchPosition !== "function") {
-        publish("location", { error: "unsupported" });
+        publishForRun(startedRunId, "location", { error: "unsupported" });
         return;
       }
 
       watchId = geolocation.watchPosition(
         (position) => {
-          publish("location", {
+          publishForRun(startedRunId, "location", {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracyM: position.coords.accuracy,
             timestampMs: position.timestamp,
           });
         },
-        (error) => publish("location", geolocationError(error)),
+        (error) => publishForRun(startedRunId, "location", geolocationError(error)),
         { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 },
       );
     }
@@ -69,7 +75,7 @@
       const orientationEvent = globalObject && globalObject.DeviceOrientationEvent;
       const canListen = globalObject && typeof globalObject.addEventListener === "function";
       if (!orientationEvent || !canListen) {
-        publish("orientation", { error: "unsupported" });
+        publishForRun(startedRunId, "orientation", { error: "unsupported" });
         return;
       }
 
@@ -77,11 +83,11 @@
         try {
           const permission = await orientationEvent.requestPermission();
           if (permission !== "granted") {
-            publish("orientation", { error: "permission-denied" });
+            publishForRun(startedRunId, "orientation", { error: "permission-denied" });
             return;
           }
         } catch {
-          publish("orientation", { error: "permission-denied" });
+          publishForRun(startedRunId, "orientation", { error: "permission-denied" });
           return;
         }
       }
@@ -91,7 +97,7 @@
       }
 
       orientationListener = (event) => {
-        publish("orientation", {
+        publishForRun(startedRunId, "orientation", {
           alpha: event.alpha,
           beta: event.beta,
           gamma: event.gamma,
@@ -114,7 +120,7 @@
 
         running = true;
         const startedRunId = ++runId;
-        startGeolocation();
+        startGeolocation(startedRunId);
         await startOrientation(startedRunId);
       },
 

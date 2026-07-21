@@ -1,34 +1,72 @@
 "use strict";
 
-const output = document.querySelector("#output");
-const startButton = document.querySelector("#start");
-const stopButton = document.querySelector("#stop");
+(function attachSensorApp(root, factory) {
+  const api = factory();
 
-function render(readings) {
-  output.textContent = JSON.stringify(readings, null, 2);
-}
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+    return;
+  }
 
-if (!globalThis.SensorSession) {
-  render({ error: "sensor-session-unavailable" });
-} else {
-  const session = globalThis.SensorSession.createSensorSession({
-    globalObject: globalThis,
-    navigatorObject: globalThis.navigator,
+  if (!root) {
+    return;
+  }
+
+  root.SensorApp = api;
+
+  const output = root.document.querySelector("#output");
+  const startButton = root.document.querySelector("#start");
+  const stopButton = root.document.querySelector("#stop");
+  const render = (readings) => {
+    output.textContent = JSON.stringify(readings, null, 2);
+  };
+
+  if (!root.SensorSession) {
+    render({ error: "sensor-session-unavailable" });
+    return;
+  }
+
+  const session = root.SensorSession.createSensorSession({
+    globalObject: root,
+    navigatorObject: root.navigator,
     onReading: render,
   });
 
-  startButton.addEventListener("click", async () => {
-    await session.start();
-    startButton.disabled = session.isRunning;
-    stopButton.disabled = !session.isRunning;
+  api.bindSensorControls({
+    globalObject: root,
+    render,
+    session,
+    startButton,
+    stopButton,
   });
+})(typeof globalThis === "undefined" ? undefined : globalThis, function createApi() {
+  function bindSensorControls({ globalObject, render, session, startButton, stopButton }) {
+    function syncControls() {
+      startButton.disabled = session.isRunning;
+      stopButton.disabled = !session.isRunning;
+    }
 
-  stopButton.addEventListener("click", () => {
-    session.stop();
-    startButton.disabled = false;
-    stopButton.disabled = true;
-    render({ status: "stopped" });
-  });
+    function stopAndRender() {
+      session.stop();
+      syncControls();
+      render({ status: "stopped" });
+    }
 
-  globalThis.addEventListener("pagehide", () => session.stop(), { once: true });
-}
+    startButton.addEventListener("click", () => {
+      let startPromise;
+      try {
+        startPromise = session.start();
+      } finally {
+        syncControls();
+      }
+
+      Promise.resolve(startPromise).then(syncControls, syncControls);
+    });
+
+    stopButton.addEventListener("click", stopAndRender);
+    globalObject.addEventListener("pagehide", stopAndRender);
+    syncControls();
+  }
+
+  return { bindSensorControls };
+});
