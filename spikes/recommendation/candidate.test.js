@@ -67,6 +67,83 @@ test("dedupe keeps records with incomplete branch identity separate", () => {
   assert.equal(result.mergedRecords.length, 0);
 });
 
+test("blank and null numeric fields remain unknown", () => {
+  for (const unknownValue of ["", "   ", null, undefined]) {
+    const candidate = normalizeCandidate({
+      ...base,
+      latitude: unknownValue,
+      longitude: unknownValue,
+      priceBand: unknownValue,
+    });
+
+    assert.ok(Number.isNaN(candidate.latitude));
+    assert.ok(Number.isNaN(candidate.longitude));
+    assert.ok(Number.isNaN(candidate.priceBand));
+  }
+});
+
+test("conflicting high-consequence evidence fails closed in either input order", () => {
+  const request = {
+    category: "restaurant",
+    maxWalkingDistanceM: 1200,
+    maxWalkingDurationS: 1200,
+    maxPriceBand: 2,
+    requiredEvidence: ["allergy:nut-free"],
+  };
+  const routeFacts = {
+    walkingDistanceM: 800,
+    walkingDurationS: 700,
+    openAtEtaWithBuffer: true,
+  };
+  const confirmed = normalizeCandidate({
+    ...base,
+    evidence: { "allergy:nut-free": true },
+  });
+  const contradicted = normalizeCandidate({
+    ...base,
+    provider: "other",
+    providerPlaceId: "b-9",
+    evidence: { "allergy:nut-free": false },
+  });
+
+  for (const records of [
+    [confirmed, contradicted],
+    [contradicted, confirmed],
+  ]) {
+    const result = dedupeCandidates(records);
+    const qualification = evaluateHardFilters(result.candidates[0], request, routeFacts);
+
+    assert.notEqual(result.candidates[0].evidence["allergy:nut-free"], true);
+    assert.equal(qualification.pass, false);
+    assert.deepEqual(qualification.unknowns, ["allergy:nut-free"]);
+  }
+});
+
+test("conflicting route evidence cannot override candidate evidence", () => {
+  const result = evaluateHardFilters(
+    normalizeCandidate({
+      ...base,
+      evidence: { "allergy:nut-free": false },
+    }),
+    {
+      category: "restaurant",
+      maxWalkingDistanceM: 1200,
+      maxWalkingDurationS: 1200,
+      maxPriceBand: 2,
+      requiredEvidence: ["allergy:nut-free"],
+    },
+    {
+      walkingDistanceM: 800,
+      walkingDurationS: 700,
+      openAtEtaWithBuffer: true,
+      evidence: { "allergy:nut-free": true },
+    },
+  );
+
+  assert.equal(result.pass, false);
+  assert.deepEqual(result.unknowns, ["allergy:nut-free"]);
+});
+
 test("route facts and high-consequence unknowns fail closed", () => {
   const candidate = normalizeCandidate(base);
   const request = {

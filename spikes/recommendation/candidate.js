@@ -7,6 +7,14 @@ function clean(value) {
     .replace(/\s+/g, " ");
 }
 
+function finiteNumber(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+  if (typeof value !== "string" || value.trim() === "") return NaN;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
 function normalizeCandidate(raw) {
   return {
     provider: clean(raw.provider),
@@ -14,10 +22,10 @@ function normalizeCandidate(raw) {
     name: clean(raw.name),
     branchName: clean(raw.branchName),
     address: clean(raw.address),
-    latitude: Number(raw.latitude),
-    longitude: Number(raw.longitude),
+    latitude: finiteNumber(raw.latitude),
+    longitude: finiteNumber(raw.longitude),
     category: clean(raw.category),
-    priceBand: Number(raw.priceBand),
+    priceBand: finiteNumber(raw.priceBand),
     sourceTimestamp: clean(raw.sourceTimestamp),
     evidence: { ...(raw.evidence || {}) },
   };
@@ -55,6 +63,23 @@ function dedupeKey(candidate, index) {
   return `unresolved:${index}`;
 }
 
+function mergeEvidence(currentEvidence, incomingEvidence) {
+  const merged = { ...currentEvidence };
+
+  for (const [key, value] of Object.entries(incomingEvidence)) {
+    if (value == null) continue;
+    if (!Object.hasOwn(merged, key)) {
+      merged[key] = value;
+      continue;
+    }
+    if (merged[key] === null || !Object.is(merged[key], value)) {
+      merged[key] = null;
+    }
+  }
+
+  return merged;
+}
+
 function dedupeCandidates(candidates) {
   const byKey = new Map();
   const mergedRecords = [];
@@ -72,7 +97,7 @@ function dedupeCandidates(candidates) {
 
     const current = byKey.get(key);
     current.sources = [...new Set([...current.sources, candidate.provider])].sort();
-    current.evidence = { ...current.evidence, ...candidate.evidence };
+    current.evidence = mergeEvidence(current.evidence, candidate.evidence);
     mergedRecords.push({
       key,
       provider: candidate.provider,
@@ -113,7 +138,7 @@ function evaluateHardFilters(candidate, request, routeFacts) {
     reasons.push("opening-at-eta-not-proven");
   }
 
-  const evidence = { ...candidate.evidence, ...(routeFacts.evidence || {}) };
+  const evidence = mergeEvidence(candidate.evidence, routeFacts.evidence || {});
   for (const key of request.requiredEvidence || []) {
     if (evidence[key] !== true) unknowns.push(key);
   }
