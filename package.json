@@ -1,0 +1,13 @@
+{
+  "name": "somewhere-vnext",
+  "private": true,
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check:prototype": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File harness/check-prototype-contract.ps1",
+    "verify": "npm test && npm run check:prototype"
+  }
+}
