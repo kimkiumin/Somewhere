@@ -72,6 +72,68 @@ function compareCanonicalIds(left, right) {
   return 0;
 }
 
+function rejectNonJsonCandidate() {
+  throw new TypeError("candidate must be recursively JSON-like");
+}
+
+function cloneJsonCandidate(value, ancestors = new Set()) {
+  if (value === null || typeof value === "boolean" || typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) rejectNonJsonCandidate();
+    return value;
+  }
+  if (typeof value !== "object" || ancestors.has(value)) rejectNonJsonCandidate();
+
+  if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype) rejectNonJsonCandidate();
+    const propertyNames = Object.getOwnPropertyNames(value);
+    if (propertyNames.length !== value.length + 1 || !propertyNames.includes("length")) {
+      rejectNonJsonCandidate();
+    }
+    if (Object.getOwnPropertySymbols(value).length > 0) rejectNonJsonCandidate();
+
+    ancestors.add(value);
+    const clone = new Array(value.length);
+    for (let index = 0; index < value.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
+        rejectNonJsonCandidate();
+      }
+      Object.defineProperty(clone, String(index), {
+        value: cloneJsonCandidate(descriptor.value, ancestors),
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+    }
+    ancestors.delete(value);
+    return clone;
+  }
+
+  if (!isPlainObject(value) || Object.getOwnPropertySymbols(value).length > 0) {
+    rejectNonJsonCandidate();
+  }
+
+  ancestors.add(value);
+  const clone = Object.create(Object.getPrototypeOf(value));
+  for (const key of Object.getOwnPropertyNames(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
+      rejectNonJsonCandidate();
+    }
+    Object.defineProperty(clone, key, {
+      value: cloneJsonCandidate(descriptor.value, ancestors),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
+  ancestors.delete(value);
+  return clone;
+}
+
 function deepFreeze(value, seen = new Set()) {
   if (value === null || typeof value !== "object" || seen.has(value)) return value;
 
@@ -83,11 +145,35 @@ function deepFreeze(value, seen = new Set()) {
 }
 
 function createFrozenSnapshot(candidate) {
-  try {
-    return deepFreeze(structuredClone(candidate));
-  } catch {
-    throw new TypeError("candidate must be deep-cloneable and immutable");
-  }
+  return deepFreeze(cloneJsonCandidate(candidate));
+}
+
+function createReadOnlyValidatorView(value, proxies = new WeakMap()) {
+  if (value === null || typeof value !== "object") return value;
+  if (proxies.has(value)) return proxies.get(value);
+
+  const proxy = new Proxy(value, {
+    get(target, property, receiver) {
+      return createReadOnlyValidatorView(Reflect.get(target, property, receiver), proxies);
+    },
+    set() {
+      throw new TypeError("candidate snapshot is read-only");
+    },
+    defineProperty() {
+      throw new TypeError("candidate snapshot is read-only");
+    },
+    deleteProperty() {
+      throw new TypeError("candidate snapshot is read-only");
+    },
+    setPrototypeOf() {
+      throw new TypeError("candidate snapshot is read-only");
+    },
+    preventExtensions() {
+      throw new TypeError("candidate snapshot is read-only");
+    },
+  });
+  proxies.set(value, proxy);
+  return proxy;
 }
 
 function validateAndOrderCandidates(candidates) {
@@ -95,18 +181,15 @@ function validateAndOrderCandidates(candidates) {
 
   const ids = new Set();
   const ordered = candidates.map((candidate) => {
-    if (!isPlainObject(candidate)) {
-      throw new TypeError("candidate must be an object with canonicalVenueId");
-    }
-
-    const id = candidate.canonicalVenueId;
+    const snapshot = createFrozenSnapshot(candidate);
+    const id = Object.getOwnPropertyDescriptor(snapshot, "canonicalVenueId")?.value;
     if (typeof id !== "string" || id === "" || id.trim() !== id) {
       throw new TypeError("candidate.canonicalVenueId must be a non-empty canonical string");
     }
     if (ids.has(id)) throw new TypeError("candidate.canonicalVenueId must be unique");
 
     ids.add(id);
-    return createFrozenSnapshot(candidate);
+    return snapshot;
   });
 
   return ordered.sort((left, right) => compareCanonicalIds(
@@ -177,7 +260,10 @@ function selectUniformly(
     const { selectedIndex, rawDraws } = drawUniformIndex(pool.length, nextUint32);
     const candidate = pool[selectedIndex];
     const selectedCanonicalVenueId = candidate.canonicalVenueId;
-    const finalValidation = normalizeFinalValidation(finalValidate, candidate);
+    const finalValidation = normalizeFinalValidation(
+      finalValidate,
+      createReadOnlyValidatorView(candidate),
+    );
 
     receipt.attempts.push({
       rawDraws,

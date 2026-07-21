@@ -159,6 +159,33 @@ test("validator mutation throws fail closed and is recorded before reselection",
   });
 });
 
+test("non-strict validator mutation throws fail closed and leaves the receipt intact", () => {
+  const nonStrictValidator = Function("candidate", `
+    if (candidate.canonicalVenueId === "venue:a") {
+      candidate.evidence.sourceIds[0] = "source:tampered";
+    }
+    return { pass: true, reasons: [] };
+  `);
+  const result = selectUniformly(
+    [
+      { canonicalVenueId: "venue:a", evidence: { sourceIds: ["source:1"] } },
+      { canonicalVenueId: "venue:b", evidence: { sourceIds: ["source:2"] } },
+    ],
+    metadata(),
+    () => 0,
+    nonStrictValidator,
+  );
+
+  assert.equal(result.selected.canonicalVenueId, "venue:b");
+  assert.deepEqual(result.receipt.attempts[0], {
+    rawDraws: [0],
+    remainingPoolSize: 2,
+    selectedIndex: 0,
+    selectedCanonicalVenueId: "venue:a",
+    finalValidation: { pass: false, reasons: ["final-validation-threw"] },
+  });
+});
+
 test("validator mutation cannot alter the frozen snapshot, receipt, digest, or returned candidate", () => {
   const candidate = {
     canonicalVenueId: "venue:a",
@@ -246,6 +273,79 @@ test("duplicate or malformed canonical venue IDs are rejected before a receipt i
       /canonicalVenueId/,
     );
   }
+});
+
+test("candidate snapshots reject mutable built-ins", () => {
+  for (const invalidValue of [
+    new Map([["source", "1"]]),
+    new Set(["source:1"]),
+    new Date("2026-07-21T09:00:00Z"),
+  ]) {
+    assert.throws(
+      () => selectUniformly([{ canonicalVenueId: "venue:a", invalidValue }], metadata()),
+      /candidate must be recursively JSON-like/,
+    );
+  }
+});
+
+test("candidate snapshots reject non-JSON values and cycles", () => {
+  const cyclic = { canonicalVenueId: "venue:cycle" };
+  cyclic.self = cyclic;
+  const customPrototype = Object.create({ inherited: true });
+  customPrototype.canonicalVenueId = "venue:prototype";
+
+  for (const candidate of [
+    { canonicalVenueId: "venue:undefined", invalidValue: undefined },
+    { canonicalVenueId: "venue:function", invalidValue: () => {} },
+    { canonicalVenueId: "venue:bigint", invalidValue: 1n },
+    { canonicalVenueId: "venue:infinity", invalidValue: Infinity },
+    { canonicalVenueId: "venue:nan", invalidValue: Number.NaN },
+    { canonicalVenueId: "venue:symbol-value", invalidValue: Symbol("value") },
+    Object.assign({ canonicalVenueId: "venue:symbol-key" }, { [Symbol("key")]: "value" }),
+    customPrototype,
+    cyclic,
+  ]) {
+    assert.throws(
+      () => selectUniformly([candidate], metadata()),
+      /candidate must be recursively JSON-like/,
+    );
+  }
+});
+
+test("candidate snapshots reject accessors without invoking them", () => {
+  let getterCalls = 0;
+  const candidate = { canonicalVenueId: "venue:a" };
+  Object.defineProperty(candidate, "evidence", {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return { sourceIds: ["source:1"] };
+    },
+  });
+
+  assert.throws(
+    () => selectUniformly([candidate], metadata()),
+    /candidate must be recursively JSON-like/,
+  );
+  assert.equal(getterCalls, 0);
+});
+
+test("stateful canonical ID accessors cannot change the selected identity", () => {
+  let getterCalls = 0;
+  const candidate = {};
+  Object.defineProperty(candidate, "canonicalVenueId", {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return getterCalls === 1 ? "venue:a" : "venue:tampered";
+    },
+  });
+
+  assert.throws(
+    () => selectUniformly([candidate], metadata()),
+    /candidate must be recursively JSON-like/,
+  );
+  assert.equal(getterCalls, 0);
 });
 
 test("receipt contains a digest rather than the qualified pool", () => {
