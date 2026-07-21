@@ -50,13 +50,20 @@ function isSnapshotTimestamp(value) {
 function validateMetadata(metadata) {
   if (!isPlainObject(metadata)) throw new TypeError("metadata must be an object");
 
+  const metadataSnapshot = cloneJsonDto(metadata, "metadata");
   const receiptMetadata = {};
   for (const field of REQUIRED_METADATA_FIELDS) {
-    const value = metadata[field];
+    const descriptor = Object.getOwnPropertyDescriptor(metadataSnapshot, field);
+    const value = descriptor?.value;
     if (typeof value !== "string" || value.trim() === "") {
       throw new TypeError(`metadata.${field} must be a non-empty string`);
     }
-    receiptMetadata[field] = value;
+    Object.defineProperty(receiptMetadata, field, {
+      value,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
   }
 
   if (!isSnapshotTimestamp(receiptMetadata.snapshotTimestamp)) {
@@ -72,37 +79,37 @@ function compareCanonicalIds(left, right) {
   return 0;
 }
 
-function rejectNonJsonCandidate() {
-  throw new TypeError("candidate must be recursively JSON-like");
+function rejectNonJsonDto(name) {
+  throw new TypeError(`${name} must be recursively JSON-like`);
 }
 
-function cloneJsonCandidate(value, ancestors = new Set()) {
+function cloneJsonDto(value, name, ancestors = new Set()) {
   if (value === null || typeof value === "boolean" || typeof value === "string") {
     return value;
   }
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) rejectNonJsonCandidate();
+    if (!Number.isFinite(value)) rejectNonJsonDto(name);
     return value;
   }
-  if (typeof value !== "object" || ancestors.has(value)) rejectNonJsonCandidate();
+  if (typeof value !== "object" || ancestors.has(value)) rejectNonJsonDto(name);
 
   if (Array.isArray(value)) {
-    if (Object.getPrototypeOf(value) !== Array.prototype) rejectNonJsonCandidate();
+    if (Object.getPrototypeOf(value) !== Array.prototype) rejectNonJsonDto(name);
     const propertyNames = Object.getOwnPropertyNames(value);
     if (propertyNames.length !== value.length + 1 || !propertyNames.includes("length")) {
-      rejectNonJsonCandidate();
+      rejectNonJsonDto(name);
     }
-    if (Object.getOwnPropertySymbols(value).length > 0) rejectNonJsonCandidate();
+    if (Object.getOwnPropertySymbols(value).length > 0) rejectNonJsonDto(name);
 
     ancestors.add(value);
     const clone = new Array(value.length);
     for (let index = 0; index < value.length; index += 1) {
       const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
       if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
-        rejectNonJsonCandidate();
+        rejectNonJsonDto(name);
       }
       Object.defineProperty(clone, String(index), {
-        value: cloneJsonCandidate(descriptor.value, ancestors),
+        value: cloneJsonDto(descriptor.value, name, ancestors),
         enumerable: true,
         configurable: true,
         writable: true,
@@ -113,7 +120,7 @@ function cloneJsonCandidate(value, ancestors = new Set()) {
   }
 
   if (!isPlainObject(value) || Object.getOwnPropertySymbols(value).length > 0) {
-    rejectNonJsonCandidate();
+    rejectNonJsonDto(name);
   }
 
   ancestors.add(value);
@@ -121,10 +128,10 @@ function cloneJsonCandidate(value, ancestors = new Set()) {
   for (const key of Object.getOwnPropertyNames(value)) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
-      rejectNonJsonCandidate();
+      rejectNonJsonDto(name);
     }
     Object.defineProperty(clone, key, {
-      value: cloneJsonCandidate(descriptor.value, ancestors),
+      value: cloneJsonDto(descriptor.value, name, ancestors),
       enumerable: true,
       configurable: true,
       writable: true,
@@ -132,6 +139,24 @@ function cloneJsonCandidate(value, ancestors = new Set()) {
   }
   ancestors.delete(value);
   return clone;
+}
+
+function jsonDtosEqual(left, right) {
+  if (left === null || right === null || typeof left !== "object" || typeof right !== "object") {
+    return Object.is(left, right);
+  }
+  if (Array.isArray(left) !== Array.isArray(right)) return false;
+
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+
+  return leftKeys.every((key) => {
+    if (!Object.hasOwn(right, key)) return false;
+    const leftDescriptor = Object.getOwnPropertyDescriptor(left, key);
+    const rightDescriptor = Object.getOwnPropertyDescriptor(right, key);
+    return jsonDtosEqual(leftDescriptor.value, rightDescriptor.value);
+  });
 }
 
 function deepFreeze(value, seen = new Set()) {
@@ -145,7 +170,7 @@ function deepFreeze(value, seen = new Set()) {
 }
 
 function createCandidateSnapshot(candidate) {
-  return deepFreeze(cloneJsonCandidate(candidate));
+  return deepFreeze(cloneJsonDto(candidate, "candidate"));
 }
 
 function validateAndOrderCandidates(candidates) {
@@ -193,26 +218,32 @@ function drawUniformIndex(poolSize, nextUint32) {
 
 function normalizeFinalValidation(finalValidate, candidate) {
   try {
-    const beforeValidation = JSON.stringify(candidate);
-    const validationCandidate = JSON.parse(beforeValidation);
+    const validationCandidate = cloneJsonDto(candidate, "candidate");
     const result = finalValidate(validationCandidate);
-    if (JSON.stringify(validationCandidate) !== beforeValidation) {
+    const sanitizedCandidate = cloneJsonDto(validationCandidate, "candidate");
+    if (!jsonDtosEqual(sanitizedCandidate, candidate)) {
       return { pass: false, reasons: ["final-validation-threw"] };
     }
 
-    const validationSnapshot = cloneJsonCandidate(result);
+    const validationSnapshot = cloneJsonDto(result, "final validation result");
+    const passDescriptor = Object.getOwnPropertyDescriptor(validationSnapshot, "pass");
+    const reasonsDescriptor = Object.getOwnPropertyDescriptor(validationSnapshot, "reasons");
     if (
       !isPlainObject(validationSnapshot) ||
-      typeof validationSnapshot.pass !== "boolean" ||
-      !Array.isArray(validationSnapshot.reasons) ||
-      !validationSnapshot.reasons.every(
+      !passDescriptor ||
+      !("value" in passDescriptor) ||
+      typeof passDescriptor.value !== "boolean" ||
+      !reasonsDescriptor ||
+      !("value" in reasonsDescriptor) ||
+      !Array.isArray(reasonsDescriptor.value) ||
+      !reasonsDescriptor.value.every(
         (reason) => typeof reason === "string" && reason.trim() !== "",
       )
     ) {
       return { pass: false, reasons: ["final-validation-malformed"] };
     }
 
-    return { pass: validationSnapshot.pass, reasons: [...validationSnapshot.reasons] };
+    return { pass: passDescriptor.value, reasons: [...reasonsDescriptor.value] };
   } catch {
     return { pass: false, reasons: ["final-validation-threw"] };
   }

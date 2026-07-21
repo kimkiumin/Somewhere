@@ -80,6 +80,33 @@ test("missing or blank provider identity is rejected", () => {
   }
 });
 
+test("required provider metadata must not be inherited", () => {
+  for (const field of ["provider", "providerQueryVersion"]) {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, field);
+    const invalidMetadata = metadata();
+    const inheritedValue = invalidMetadata[field];
+    delete invalidMetadata[field];
+
+    try {
+      Object.defineProperty(Object.prototype, field, {
+        value: inheritedValue,
+        configurable: true,
+        writable: true,
+      });
+      assert.throws(
+        () => selectUniformly([{ canonicalVenueId: "venue:a" }], invalidMetadata),
+        new RegExp(`metadata\\.${field}`),
+      );
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(Object.prototype, field, originalDescriptor);
+      } else {
+        delete Object.prototype[field];
+      }
+    }
+  }
+});
+
 test("rejection sampling removes uint32 modulo bias", () => {
   const draws = [0xffffffff, 1];
   const result = selectUniformly(
@@ -131,6 +158,44 @@ test("malformed final validation fails closed and is recorded before reselection
     () => 0,
     (candidate) => candidate.canonicalVenueId === "venue:a" ? { pass: "true" } : { pass: true, reasons: [] },
   );
+
+  assert.equal(result.selected.canonicalVenueId, "venue:b");
+  assert.deepEqual(result.receipt.attempts[0].finalValidation, {
+    pass: false,
+    reasons: ["final-validation-malformed"],
+  });
+});
+
+test("final validation requires own pass and reasons data properties", () => {
+  const originalPass = Object.getOwnPropertyDescriptor(Object.prototype, "pass");
+  const originalReasons = Object.getOwnPropertyDescriptor(Object.prototype, "reasons");
+  let result;
+
+  try {
+    Object.defineProperty(Object.prototype, "pass", {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(Object.prototype, "reasons", {
+      value: [],
+      configurable: true,
+      writable: true,
+    });
+    result = selectUniformly(
+      [{ canonicalVenueId: "venue:a" }, { canonicalVenueId: "venue:b" }],
+      metadata(),
+      () => 0,
+      (candidate) => candidate.canonicalVenueId === "venue:a"
+        ? {}
+        : { pass: true, reasons: [] },
+    );
+  } finally {
+    if (originalPass) Object.defineProperty(Object.prototype, "pass", originalPass);
+    else delete Object.prototype.pass;
+    if (originalReasons) Object.defineProperty(Object.prototype, "reasons", originalReasons);
+    else delete Object.prototype.reasons;
+  }
 
   assert.equal(result.selected.canonicalVenueId, "venue:b");
   assert.deepEqual(result.receipt.attempts[0].finalValidation, {
@@ -224,6 +289,33 @@ test("descriptor-reflection validator mutation fails closed without altering can
   assert.equal(result.selected.canonicalVenueId, "venue:b");
   assert.equal(result.receipt.orderedQualifiedSetDigest, expectedDigest);
   assert.equal(result.receipt.attempts[0].selectedCanonicalVenueId, "venue:a");
+  assert.deepEqual(result.receipt.attempts[0].finalValidation, {
+    pass: false,
+    reasons: ["final-validation-threw"],
+  });
+});
+
+test("non-enumerable toJSON cannot hide validator mutation", () => {
+  const pristineCandidate = {
+    canonicalVenueId: "venue:a",
+    evidence: { sourceIds: ["source:1"] },
+  };
+  const result = selectUniformly(
+    [pristineCandidate, { canonicalVenueId: "venue:b" }],
+    metadata(),
+    () => 0,
+    (candidate) => {
+      if (candidate.canonicalVenueId === "venue:a") {
+        candidate.evidence.sourceIds[0] = "source:tampered";
+        Object.defineProperty(candidate, "toJSON", {
+          value: () => pristineCandidate,
+        });
+      }
+      return { pass: true, reasons: [] };
+    },
+  );
+
+  assert.equal(result.selected.canonicalVenueId, "venue:b");
   assert.deepEqual(result.receipt.attempts[0].finalValidation, {
     pass: false,
     reasons: ["final-validation-threw"],
