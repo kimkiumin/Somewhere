@@ -149,7 +149,7 @@ const cases = [
     criticality: "critical",
     expectedDisposition: "reject",
     adjudications: adjudications("reject"),
-    benchmark: { unsupportedClaim: true },
+    benchmark: {},
     evidenceById: {},
     context: {},
     result: meritResult("excellent taste", "missing"),
@@ -161,7 +161,7 @@ const cases = [
     criticality: "critical",
     expectedDisposition: "reject",
     adjudications: adjudications("reject"),
-    benchmark: { unsupportedClaim: true },
+    benchmark: {},
     evidenceById: {
       m1: evidence("venue-signature moon-shaped dumpling", { distinctive: true }),
     },

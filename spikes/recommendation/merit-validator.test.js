@@ -44,7 +44,7 @@ test("manifest freezes every benchmark dependency and disables live recommendati
   assert.equal(manifest.modelFixtureVersion, "deterministic-model-fixture-v1");
   assert.equal(manifest.promptVersion, "merit-qualification-prompt-v1");
   assert.equal(manifest.evidencePolicyVersion, "evidence-policy-v1");
-  assert.equal(manifest.validatorVersion, "merit-validator-v1");
+  assert.equal(manifest.validatorVersion, "merit-validator-v2");
   assert.equal(manifest.fallback, "deterministic_or_manually_verified_pilot");
   assert.equal(manifest.liveRecommendationEnabled, false);
 
@@ -60,6 +60,14 @@ test("manifest freezes every benchmark dependency and disables live recommendati
     assert.ok(["maximum", "minimum"].includes(threshold.operator));
     assert.equal(typeof threshold.value, "number");
   }
+  assert.deepEqual(manifest.thresholds.unsupportedClaimRate, {
+    operator: "maximum",
+    value: 0,
+  });
+  assert.deepEqual(manifest.thresholds.criticalWeaknessMissRate, {
+    operator: "maximum",
+    value: 0,
+  });
 });
 
 test("fixture set is frozen, complete, and independently adjudicated", () => {
@@ -234,9 +242,9 @@ test("scoreBenchmark reports explicit totals and provider/field breakdowns", () 
 
   assert.equal(score.caseCount, 12);
   assert.equal(score.malformedOutputCount, 1);
-  assert.equal(score.unsupportedClaimRate, 0);
-  assert.equal(score.unsupportedClaimRateNumerator, 0);
-  assert.equal(score.unsupportedClaimRateDenominator, 2);
+  assert.equal(score.unsupportedClaimRate, 1 / 9);
+  assert.equal(score.unsupportedClaimRateNumerator, 1);
+  assert.equal(score.unsupportedClaimRateDenominator, 9);
   assert.equal(score.criticalConditionFalsePassRate, 0);
   assert.equal(score.criticalConditionFalsePassRateNumerator, 0);
   assert.equal(score.criticalConditionFalsePassRateDenominator, 9);
@@ -255,9 +263,29 @@ test("scoreBenchmark reports explicit totals and provider/field breakdowns", () 
 
   assert.deepEqual(Object.keys(score.byProvider).sort(), ["kakao", "naver", "tmap"]);
   assert.equal(score.byProvider.kakao.caseCount, 4);
-  assert.equal(score.byProvider.kakao.unsupportedClaimRateDenominator, 1);
+  assert.equal(score.byProvider.kakao.unsupportedClaimRate, 1 / 3);
+  assert.equal(score.byProvider.kakao.unsupportedClaimRateNumerator, 1);
+  assert.equal(score.byProvider.kakao.unsupportedClaimRateDenominator, 3);
+  assert.equal(score.byProvider.naver.unsupportedClaimRate, 0);
+  assert.equal(score.byProvider.naver.unsupportedClaimRateNumerator, 0);
+  assert.equal(score.byProvider.naver.unsupportedClaimRateDenominator, 4);
+  assert.equal(score.byProvider.tmap.unsupportedClaimRate, 0);
+  assert.equal(score.byProvider.tmap.unsupportedClaimRateNumerator, 0);
+  assert.equal(score.byProvider.tmap.unsupportedClaimRateDenominator, 2);
   assert.equal(score.byProvider.naver.criticalWeaknessMissRateDenominator, 2);
   assert.equal(score.byProvider.tmap.insufficientEvidenceHandlingRateDenominator, 2);
+  assert.equal(score.byField.merit.unsupportedClaimRate, 1 / 2);
+  assert.equal(score.byField.merit.unsupportedClaimRateNumerator, 1);
+  assert.equal(score.byField.merit.unsupportedClaimRateDenominator, 2);
+  assert.equal(score.byField.representative_menu.unsupportedClaimRate, 0);
+  assert.equal(
+    score.byField.representative_menu.unsupportedClaimRateNumerator,
+    0,
+  );
+  assert.equal(
+    score.byField.representative_menu.unsupportedClaimRateDenominator,
+    1,
+  );
   assert.equal(score.byField.route.caseCount, 1);
   assert.equal(score.byField.route.criticalConditionFalsePassRateDenominator, 1);
   assert.equal(score.byField.schema.malformedOutputCount, 1);
@@ -274,16 +302,18 @@ test("zero-denominator slices report null rates with explicit zero counts", () =
 
 test("evaluateBenchmarkGate compares every threshold and chooses the frozen fallback", () => {
   const score = scoreBenchmark(cases);
-  const passingGate = evaluateBenchmarkGate(score, manifest);
+  const frozenGate = evaluateBenchmarkGate(score, manifest);
 
-  assert.equal(passingGate.passed, true);
-  assert.deepEqual(passingGate.failedGates, []);
-  assert.equal(passingGate.liveRecommendationEnabled, false);
-  assert.equal(passingGate.selectedPath, manifest.fallback);
+  assert.equal(frozenGate.passed, false);
+  assert.deepEqual(frozenGate.failedGates, [
+    "unsupportedClaimRate",
+    "criticalWeaknessMissRate",
+  ]);
+  assert.equal(frozenGate.liveRecommendationEnabled, false);
+  assert.equal(frozenGate.selectedPath, "deterministic_or_manually_verified_pilot");
 
   const failingScore = {
     ...score,
-    unsupportedClaimRate: manifest.thresholds.unsupportedClaimRate.value + 0.01,
     insufficientEvidenceHandlingRate:
       manifest.thresholds.insufficientEvidenceHandlingRate.value - 0.01,
   };
@@ -295,6 +325,7 @@ test("evaluateBenchmarkGate compares every threshold and chooses the frozen fall
   assert.equal(failingGate.passed, false);
   assert.deepEqual(failingGate.failedGates, [
     "unsupportedClaimRate",
+    "criticalWeaknessMissRate",
     "insufficientEvidenceHandlingRate",
   ]);
   assert.equal(failingGate.selectedPath, manifest.fallback);

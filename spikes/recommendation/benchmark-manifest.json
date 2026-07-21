@@ -4,7 +4,7 @@
   "modelFixtureVersion": "deterministic-model-fixture-v1",
   "promptVersion": "merit-qualification-prompt-v1",
   "evidencePolicyVersion": "evidence-policy-v1",
-  "validatorVersion": "merit-validator-v1",
+  "validatorVersion": "merit-validator-v2",
   "thresholds": {
     "unsupportedClaimRate": {
       "operator": "maximum",
@@ -16,7 +16,7 @@
     },
     "criticalWeaknessMissRate": {
       "operator": "maximum",
-      "value": 0.25
+      "value": 0
     },
     "insufficientEvidenceHandlingRate": {
       "operator": "minimum",

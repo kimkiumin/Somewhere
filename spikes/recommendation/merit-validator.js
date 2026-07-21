@@ -251,6 +251,50 @@ function rawHasCriticalWeakness(result) {
   return Boolean(descriptor && "value" in descriptor && Array.isArray(descriptor.value) && descriptor.value.length > 0);
 }
 
+function rawClaims(result) {
+  let snapshot;
+  try {
+    snapshot = cloneJsonDto(result);
+  } catch {
+    return [];
+  }
+  if (snapshot === null || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    return [];
+  }
+
+  const claims = [];
+  for (const key of ["merits", "critical_weaknesses"]) {
+    if (!Array.isArray(snapshot[key])) continue;
+    for (const item of snapshot[key]) {
+      if (
+        item !== null &&
+        typeof item === "object" &&
+        !Array.isArray(item) &&
+        isNonemptyString(item.claim)
+      ) {
+        claims.push({
+          claim: item.claim,
+          evidenceIds: Array.isArray(item.evidence_ids)
+            ? item.evidence_ids.filter(isNonemptyString)
+            : [],
+        });
+      }
+    }
+  }
+  return claims;
+}
+
+function hasSourceSupport(claim, evidenceIds, evidenceById) {
+  return evidenceIds.some((id) => {
+    const record = evidenceRecord(evidenceById, id);
+    return (
+      record !== null &&
+      Array.isArray(record.supported_claims) &&
+      record.supported_claims.includes(claim)
+    );
+  });
+}
+
 function hasAdjudicatorDisagreement(item) {
   return new Set(item.adjudications.map((entry) => entry.disposition)).size > 1;
 }
@@ -271,14 +315,18 @@ function aggregate(cases, evaluations) {
   let malformedOutputCount = 0;
 
   for (const item of cases) {
+    const claims = rawClaims(item.result);
+    counts.unsupportedClaimRate[1] += claims.length;
+    for (const claim of claims) {
+      if (!hasSourceSupport(claim.claim, claim.evidenceIds, item.evidenceById)) {
+        counts.unsupportedClaimRate[0] += 1;
+      }
+    }
+
     const evaluation = evaluations.get(item);
     const disposition = evaluation.disposition;
     if (evaluation.errors.some((error) => error.startsWith("malformed-"))) {
       malformedOutputCount += 1;
-    }
-    if (item.benchmark.unsupportedClaim === true) {
-      counts.unsupportedClaimRate[1] += 1;
-      if (disposition === "pass") counts.unsupportedClaimRate[0] += 1;
     }
     if (item.criticality === "critical" && item.expectedDisposition !== "pass") {
       counts.criticalConditionFalsePassRate[1] += 1;
