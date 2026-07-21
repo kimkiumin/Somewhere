@@ -418,8 +418,31 @@ test("receipt fixes pool order, draw, selected index, and final validation", () 
   assert.equal(result.selected.canonicalVenueId, "venue:b");
   assert.equal(result.receipt.qualifiedPoolSize, 2);
   assert.equal(result.receipt.attempts[0].selectedIndex, 1);
-  assert.equal(result.receipt.attempts[0].drawValue, 1);
+  assert.deepEqual(result.receipt.attempts[0].rawDraws, [1]);
   assert.match(result.receipt.orderedQualifiedSetDigest, /^[a-f0-9]{64}$/);
+});
+
+test("rejection sampling removes uint32 modulo bias", () => {
+  const draws = [0xffffffff, 1];
+  const result = selectUniformly(
+    [{ canonicalVenueId: "venue:a" }, { canonicalVenueId: "venue:b" }, { canonicalVenueId: "venue:c" }],
+    {
+      requestId: "req-3",
+      providerQueryVersion: "fixture-v1",
+      paginationVersion: "page-v1",
+      coverageVersion: "coverage-v1",
+      canonicalizationVersion: "canonical-v1",
+      ruleVersion: "rules-v1",
+      modelVersion: "fixture-model-v1",
+      promptVersion: "prompt-v1",
+      evidencePolicyVersion: "evidence-v1",
+      snapshotTimestamp: "2026-07-21T09:00:00Z"
+    },
+    () => draws.shift(),
+    () => ({ pass: true, reasons: [] }),
+  );
+  assert.equal(result.selected.canonicalVenueId, "venue:b");
+  assert.deepEqual(result.receipt.attempts[0].rawDraws, [0xffffffff, 1]);
 });
 
 test("failed final validation is recorded before reselection", () => {
@@ -458,23 +481,34 @@ function defaultUint32() {
   return crypto.randomBytes(4).readUInt32BE(0);
 }
 
+function drawUniformIndex(poolSize, nextUint32) {
+  if (!Number.isInteger(poolSize) || poolSize <= 0) throw new Error("poolSize must be positive");
+  const uint32Range = 0x100000000;
+  const acceptanceLimit = Math.floor(uint32Range / poolSize) * poolSize;
+  const rawDraws = [];
+  while (true) {
+    const raw = nextUint32() >>> 0;
+    rawDraws.push(raw);
+    if (raw < acceptanceLimit) return { selectedIndex: raw % poolSize, rawDraws };
+  }
+}
+
 function selectUniformly(candidates, metadata, nextUint32 = defaultUint32, finalValidate = () => ({ pass: true, reasons: [] })) {
   const ordered = [...candidates].sort((a, b) => a.canonicalVenueId.localeCompare(b.canonicalVenueId));
   const pool = [...ordered];
   const receipt = {
     ...metadata,
-    rngAlgorithm: "uint32-modulo-v1",
+    rngAlgorithm: "uint32-rejection-v1",
     qualifiedPoolSize: ordered.length,
     orderedQualifiedSetDigest: digestIds(ordered.map((item) => item.canonicalVenueId)),
     attempts: [],
   };
   while (pool.length > 0) {
-    const drawValue = nextUint32() >>> 0;
-    const selectedIndex = drawValue % pool.length;
+    const { selectedIndex, rawDraws } = drawUniformIndex(pool.length, nextUint32);
     const candidate = pool[selectedIndex];
     const finalValidation = finalValidate(candidate);
     receipt.attempts.push({
-      drawValue,
+      rawDraws,
       remainingPoolSize: pool.length,
       selectedIndex,
       selectedCanonicalVenueId: candidate.canonicalVenueId,
@@ -486,14 +520,14 @@ function selectUniformly(candidates, metadata, nextUint32 = defaultUint32, final
   return { selected: null, receipt: { ...receipt, noFit: true } };
 }
 
-module.exports = { digestIds, selectUniformly };
+module.exports = { digestIds, drawUniformIndex, selectUniformly };
 ```
 
 - [ ] **Step 4: Run the selection tests**
 
 Run: `node --test spikes/recommendation/selection.test.js`
 
-Expected: 2 tests pass.
+Expected: 3 tests pass.
 
 - [ ] **Step 5: Commit the receipt spike**
 
