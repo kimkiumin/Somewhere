@@ -204,7 +204,33 @@ test("validator can read nested JSON evidence through its read-only view", () =>
   });
 });
 
-test("validator mutation cannot alter the frozen snapshot, receipt, digest, or returned candidate", () => {
+test("descriptor-reflection validator mutation fails closed without altering canonical selection", () => {
+  const expectedDigest = idsDigest(["venue:a", "venue:b"]);
+  const result = selectUniformly(
+    [
+      { canonicalVenueId: "venue:a", evidence: { sourceIds: ["source:1"] } },
+      { canonicalVenueId: "venue:b", evidence: { sourceIds: ["source:2"] } },
+    ],
+    metadata(),
+    () => 0,
+    (candidate) => {
+      if (candidate.canonicalVenueId === "venue:a") {
+        Object.getOwnPropertyDescriptor(candidate.evidence, "sourceIds").value[0] = "source:tampered";
+      }
+      return { pass: true, reasons: [] };
+    },
+  );
+
+  assert.equal(result.selected.canonicalVenueId, "venue:b");
+  assert.equal(result.receipt.orderedQualifiedSetDigest, expectedDigest);
+  assert.equal(result.receipt.attempts[0].selectedCanonicalVenueId, "venue:a");
+  assert.deepEqual(result.receipt.attempts[0].finalValidation, {
+    pass: false,
+    reasons: ["final-validation-threw"],
+  });
+});
+
+test("validator mutation cannot alter the canonical snapshot, receipt, digest, or returned candidate", () => {
   const candidate = {
     canonicalVenueId: "venue:a",
     evidence: { sourceIds: ["source:1"] },
@@ -214,13 +240,9 @@ test("validator mutation cannot alter the frozen snapshot, receipt, digest, or r
     [candidate],
     metadata(),
     () => 0,
-    (frozenCandidate) => {
-      assert.throws(() => {
-        frozenCandidate.canonicalVenueId = "venue:tampered";
-      }, TypeError);
-      assert.throws(() => {
-        frozenCandidate.evidence.sourceIds.push("source:tampered");
-      }, TypeError);
+    (validatorCandidate) => {
+      validatorCandidate.canonicalVenueId = "venue:tampered";
+      validatorCandidate.evidence.sourceIds.push("source:tampered");
       return { pass: true, reasons: [] };
     },
   );
@@ -231,10 +253,45 @@ test("validator mutation cannot alter the frozen snapshot, receipt, digest, or r
   });
   assert.equal(result.receipt.orderedQualifiedSetDigest, expectedDigest);
   assert.equal(result.receipt.attempts[0].selectedCanonicalVenueId, "venue:a");
-  assert.deepEqual(result.selected, candidate);
-  assert.equal(Object.isFrozen(result.selected), true);
-  assert.equal(Object.isFrozen(result.selected.evidence), true);
-  assert.equal(Object.isFrozen(result.selected.evidence.sourceIds), true);
+  assert.equal(result.selected, null);
+  assert.equal(result.receipt.noFit, true);
+});
+
+test("final receipts are deeply immutable and do not retain validator results", () => {
+  const validation = { pass: true, reasons: ["fresh-hours"] };
+  const successful = selectUniformly(
+    [{ canonicalVenueId: "venue:a", evidence: { sourceIds: ["source:1"] } }],
+    metadata(),
+    () => 0,
+    () => validation,
+  );
+  const noFit = selectUniformly(
+    [{ canonicalVenueId: "venue:a" }],
+    metadata(),
+    () => 0,
+    () => ({ pass: false, reasons: ["stale-hours"] }),
+  );
+
+  validation.reasons[0] = "tampered";
+  assert.equal(Object.isFrozen(successful.selected), true);
+  assert.equal(Object.isFrozen(successful.selected.evidence), true);
+  assert.equal(Object.isFrozen(successful.selected.evidence.sourceIds), true);
+  assert.deepEqual(successful.receipt.attempts[0].finalValidation, {
+    pass: true,
+    reasons: ["fresh-hours"],
+  });
+
+  for (const receipt of [successful.receipt, noFit.receipt]) {
+    assert.equal(Object.isFrozen(receipt), true);
+    assert.equal(Object.isFrozen(receipt.attempts), true);
+    assert.equal(Object.isFrozen(receipt.attempts[0]), true);
+    assert.equal(Object.isFrozen(receipt.attempts[0].rawDraws), true);
+    assert.equal(Object.isFrozen(receipt.attempts[0].finalValidation), true);
+    assert.equal(Object.isFrozen(receipt.attempts[0].finalValidation.reasons), true);
+  }
+  assert.equal(noFit.receipt.noFit, true);
+  assert.throws(() => successful.receipt.attempts[0].rawDraws.push(1), TypeError);
+  assert.throws(() => noFit.receipt.attempts[0].finalValidation.reasons.push("tampered"), TypeError);
 });
 
 test("false final validation for every candidate returns an auditable no-fit receipt", () => {

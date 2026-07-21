@@ -145,35 +145,7 @@ function deepFreeze(value, seen = new Set()) {
 }
 
 function createCandidateSnapshot(candidate) {
-  return cloneJsonCandidate(candidate);
-}
-
-function createReadOnlyValidatorView(value, proxies = new WeakMap()) {
-  if (value === null || typeof value !== "object") return value;
-  if (proxies.has(value)) return proxies.get(value);
-
-  const proxy = new Proxy(value, {
-    get(target, property, receiver) {
-      return createReadOnlyValidatorView(Reflect.get(target, property, receiver), proxies);
-    },
-    set() {
-      throw new TypeError("candidate snapshot is read-only");
-    },
-    defineProperty() {
-      throw new TypeError("candidate snapshot is read-only");
-    },
-    deleteProperty() {
-      throw new TypeError("candidate snapshot is read-only");
-    },
-    setPrototypeOf() {
-      throw new TypeError("candidate snapshot is read-only");
-    },
-    preventExtensions() {
-      throw new TypeError("candidate snapshot is read-only");
-    },
-  });
-  proxies.set(value, proxy);
-  return proxy;
+  return deepFreeze(cloneJsonCandidate(candidate));
 }
 
 function validateAndOrderCandidates(candidates) {
@@ -221,17 +193,26 @@ function drawUniformIndex(poolSize, nextUint32) {
 
 function normalizeFinalValidation(finalValidate, candidate) {
   try {
-    const result = finalValidate(candidate);
+    const beforeValidation = JSON.stringify(candidate);
+    const validationCandidate = JSON.parse(beforeValidation);
+    const result = finalValidate(validationCandidate);
+    if (JSON.stringify(validationCandidate) !== beforeValidation) {
+      return { pass: false, reasons: ["final-validation-threw"] };
+    }
+
+    const validationSnapshot = cloneJsonCandidate(result);
     if (
-      !isPlainObject(result) ||
-      typeof result.pass !== "boolean" ||
-      !Array.isArray(result.reasons) ||
-      !result.reasons.every((reason) => typeof reason === "string" && reason.trim() !== "")
+      !isPlainObject(validationSnapshot) ||
+      typeof validationSnapshot.pass !== "boolean" ||
+      !Array.isArray(validationSnapshot.reasons) ||
+      !validationSnapshot.reasons.every(
+        (reason) => typeof reason === "string" && reason.trim() !== "",
+      )
     ) {
       return { pass: false, reasons: ["final-validation-malformed"] };
     }
 
-    return { pass: result.pass, reasons: [...result.reasons] };
+    return { pass: validationSnapshot.pass, reasons: [...validationSnapshot.reasons] };
   } catch {
     return { pass: false, reasons: ["final-validation-threw"] };
   }
@@ -262,7 +243,7 @@ function selectUniformly(
     const selectedCanonicalVenueId = candidate.canonicalVenueId;
     const finalValidation = normalizeFinalValidation(
       finalValidate,
-      createReadOnlyValidatorView(candidate),
+      candidate,
     );
 
     receipt.attempts.push({
@@ -273,11 +254,12 @@ function selectUniformly(
       finalValidation,
     });
 
-    if (finalValidation.pass) return { selected: deepFreeze(candidate), receipt };
+    if (finalValidation.pass) return { selected: candidate, receipt: deepFreeze(receipt) };
     pool.splice(selectedIndex, 1);
   }
 
-  return { selected: null, receipt: { ...receipt, noFit: true } };
+  receipt.noFit = true;
+  return { selected: null, receipt: deepFreeze(receipt) };
 }
 
 module.exports = {
