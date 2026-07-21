@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "merit-result-schema-v1",
+  "datasetVersion": "frozen-human-adjudicated-v1",
+  "modelFixtureVersion": "deterministic-model-fixture-v1",
+  "promptVersion": "merit-qualification-prompt-v1",
+  "evidencePolicyVersion": "evidence-policy-v1",
+  "validatorVersion": "merit-validator-v1",
+  "thresholds": {
+    "unsupportedClaimRate": {
+      "operator": "maximum",
+      "value": 0
+    },
+    "criticalConditionFalsePassRate": {
+      "operator": "maximum",
+      "value": 0
+    },
+    "criticalWeaknessMissRate": {
+      "operator": "maximum",
+      "value": 0.25
+    },
+    "insufficientEvidenceHandlingRate": {
+      "operator": "minimum",
+      "value": 1
+    },
+    "deterministicValidatorRejectionRate": {
+      "operator": "minimum",
+      "value": 1
+    },
+    "adjudicatorDisagreementRate": {
+      "operator": "maximum",
+      "value": 0.1
+    }
+  },
+  "fallback": "deterministic_or_manually_verified_pilot",
+  "liveRecommendationEnabled": false
+}
