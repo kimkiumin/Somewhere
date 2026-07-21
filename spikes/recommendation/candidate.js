@@ -15,6 +15,10 @@ function finiteNumber(value) {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
+function isFiniteNonNegative(value) {
+  return Number.isFinite(value) && value >= 0;
+}
+
 function normalizeCandidate(raw) {
   return {
     provider: clean(raw.provider),
@@ -64,16 +68,28 @@ function dedupeKey(candidate, index) {
 }
 
 function mergeEvidence(currentEvidence, incomingEvidence) {
-  const merged = { ...currentEvidence };
+  const merged = {};
+  const keys = new Set([
+    ...Object.keys(currentEvidence),
+    ...Object.keys(incomingEvidence),
+  ]);
 
-  for (const [key, value] of Object.entries(incomingEvidence)) {
-    if (value == null) continue;
-    if (!Object.hasOwn(merged, key)) {
-      merged[key] = value;
-      continue;
-    }
-    if (merged[key] === null || !Object.is(merged[key], value)) {
+  for (const key of keys) {
+    const currentValue = currentEvidence[key];
+    const incomingValue = incomingEvidence[key];
+    const hasCurrentValue = Object.hasOwn(currentEvidence, key);
+    const hasIncomingValue = Object.hasOwn(incomingEvidence, key);
+
+    if (
+      !hasCurrentValue ||
+      !hasIncomingValue ||
+      currentValue == null ||
+      incomingValue == null ||
+      !Object.is(currentValue, incomingValue)
+    ) {
       merged[key] = null;
+    } else {
+      merged[key] = currentValue;
     }
   }
 
@@ -112,17 +128,33 @@ function evaluateHardFilters(candidate, request, routeFacts) {
   const reasons = [];
   const unknowns = [];
 
+  const validPriceCeiling = isFiniteNonNegative(request.maxPriceBand);
+  const validWalkingDistanceCeiling = isFiniteNonNegative(
+    request.maxWalkingDistanceM,
+  );
+  const validWalkingDurationCeiling = isFiniteNonNegative(
+    request.maxWalkingDurationS,
+  );
+
+  if (!validPriceCeiling) reasons.push("invalid-price-ceiling");
+  if (!validWalkingDistanceCeiling) {
+    reasons.push("invalid-walking-distance-ceiling");
+  }
+  if (!validWalkingDurationCeiling) {
+    reasons.push("invalid-walking-duration-ceiling");
+  }
+
   if (candidate.category !== request.category) reasons.push("category-mismatch");
   if (
-    !Number.isFinite(candidate.priceBand) ||
+    !isFiniteNonNegative(candidate.priceBand) ||
     candidate.priceBand > request.maxPriceBand
   ) {
     reasons.push("price-mismatch");
   }
 
   if (
-    !Number.isFinite(routeFacts.walkingDistanceM) ||
-    !Number.isFinite(routeFacts.walkingDurationS)
+    !isFiniteNonNegative(routeFacts.walkingDistanceM) ||
+    !isFiniteNonNegative(routeFacts.walkingDurationS)
   ) {
     reasons.push("walking-route-unknown");
   } else {
