@@ -144,8 +144,8 @@ function deepFreeze(value, seen = new Set()) {
   return Object.freeze(value);
 }
 
-function createFrozenSnapshot(candidate) {
-  return deepFreeze(cloneJsonCandidate(candidate));
+function createCandidateSnapshot(candidate) {
+  return cloneJsonCandidate(candidate);
 }
 
 function createReadOnlyValidatorView(value, proxies = new WeakMap()) {
@@ -181,7 +181,7 @@ function validateAndOrderCandidates(candidates) {
 
   const ids = new Set();
   const ordered = candidates.map((candidate) => {
-    const snapshot = createFrozenSnapshot(candidate);
+    const snapshot = createCandidateSnapshot(candidate);
     const id = Object.getOwnPropertyDescriptor(snapshot, "canonicalVenueId")?.value;
     if (typeof id !== "string" || id === "" || id.trim() !== id) {
       throw new TypeError("candidate.canonicalVenueId must be a non-empty canonical string");
@@ -273,7 +273,7 @@ function selectUniformly(
       finalValidation,
     });
 
-    if (finalValidation.pass) return { selected: candidate, receipt };
+    if (finalValidation.pass) return { selected: deepFreeze(candidate), receipt };
     pool.splice(selectedIndex, 1);
   }
 

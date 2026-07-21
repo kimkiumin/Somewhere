@@ -186,6 +186,24 @@ test("non-strict validator mutation throws fail closed and leaves the receipt in
   });
 });
 
+test("validator can read nested JSON evidence through its read-only view", () => {
+  const result = selectUniformly(
+    [{ canonicalVenueId: "venue:a", evidence: { sourceIds: ["source:1"] } }],
+    metadata(),
+    () => 0,
+    (candidate) => ({
+      pass: candidate.evidence.sourceIds[0] === "source:1",
+      reasons: [],
+    }),
+  );
+
+  assert.equal(result.selected.canonicalVenueId, "venue:a");
+  assert.deepEqual(result.receipt.attempts[0].finalValidation, {
+    pass: true,
+    reasons: [],
+  });
+});
+
 test("validator mutation cannot alter the frozen snapshot, receipt, digest, or returned candidate", () => {
   const candidate = {
     canonicalVenueId: "venue:a",
