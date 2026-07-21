@@ -1,0 +1,57 @@
+[
+  {
+    "id": "d001",
+    "name": "Small Independent Bookstore",
+    "category": "shop",
+    "mood": "quiet discovery",
+    "initialDistanceM": 720,
+    "estimatedMinutes": 12,
+    "safetyLevel": "safe",
+    "hint": "A quiet place with paper and light",
+    "description": "A small local bookstore tucked away from the main street. Good for a short, quiet discovery."
+  },
+  {
+    "id": "d002",
+    "name": "Alley Cafe",
+    "category": "cafe",
+    "mood": "casual pause",
+    "initialDistanceM": 480,
+    "estimatedMinutes": 8,
+    "safetyLevel": "safe",
+    "hint": "A small warm pause nearby",
+    "description": "A calm neighborhood cafe hidden in a narrow alley. Good for a light stop during a walk."
+  },
+  {
+    "id": "d003",
+    "name": "Tiny Local Gallery",
+    "category": "culture",
+    "mood": "curious",
+    "initialDistanceM": 950,
+    "estimatedMinutes": 16,
+    "safetyLevel": "safe",
+    "hint": "Something quiet to look at",
+    "description": "A compact cultural space with a small exhibition. Good for a short local discovery."
+  },
+  {
+    "id": "d004",
+    "name": "Pocket Park Viewpoint",
+    "category": "walk",
+    "mood": "open air",
+    "initialDistanceM": 630,
+    "estimatedMinutes": 10,
+    "safetyLevel": "safe",
+    "hint": "A small opening in the city",
+    "description": "A small public spot where the street opens up. Good for a quick pause and a change of pace."
+  },
+  {
+    "id": "d005",
+    "name": "Local Craft Shop",
+    "category": "shop",
+    "mood": "handmade",
+    "initialDistanceM": 860,
+    "estimatedMinutes": 14,
+    "safetyLevel": "safe",
+    "hint": "Something made by hand",
+    "description": "A small shop featuring local objects and handmade goods. Good for a slow browse."
+  }
+]

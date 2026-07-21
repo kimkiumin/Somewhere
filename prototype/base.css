@@ -1,0 +1,64 @@
+:root {
+  color-scheme: light;
+  --color-canvas: #f5f1e8;
+  --color-panel: #fffdf8;
+  --color-muted: #e6ede3;
+  --color-deep: #17231c;
+  --color-text: #17231c;
+  --color-text-muted: #697266;
+  --color-text-inverse: #fffdf8;
+  --color-border: #d8ddd2;
+  --color-accent: #2d5b73;
+  --color-warm: #b66a42;
+  --color-safe: #3f6b4a;
+  --color-caution: #8b6230;
+  --shadow-shell: 0 16px 48px rgba(23, 35, 28, 0.08);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --radius-control: 8px;
+  --radius-panel: 8px;
+  --font-primary:
+    "SF Pro Display", "SF Pro Text", Aptos, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+  font-family: var(--font-primary);
+  background: var(--color-canvas);
+  color: var(--color-text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--color-canvas);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100svh;
+  margin: 0;
+  background:
+    linear-gradient(180deg, rgba(245, 241, 232, 0.92), rgba(230, 237, 227, 0.72)),
+    var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-primary);
+  letter-spacing: 0;
+}
+
+button {
+  font: inherit;
+}
+
+#app {
+  min-height: 100svh;
+  padding: var(--space-4);
+}

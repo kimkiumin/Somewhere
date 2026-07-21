@@ -1,7 +1,7 @@
 # Prototype Notes
 
 Status: implemented / v0.1  
-Last updated: 2026-07-09
+Last updated: 2026-07-21
 
 This document records what the prototype currently implements, what it does not implement, and what UX hypotheses it is meant to test.
 
