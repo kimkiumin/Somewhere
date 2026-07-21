@@ -4,6 +4,7 @@ const crypto = require("node:crypto");
 
 const REQUIRED_METADATA_FIELDS = [
   "requestId",
+  "provider",
   "providerQueryVersion",
   "paginationVersion",
   "coverageVersion",
@@ -16,7 +17,6 @@ const REQUIRED_METADATA_FIELDS = [
 ];
 
 const UINT32_RANGE = 0x100000000;
-const OPTIONAL_METADATA_FIELDS = ["provider"];
 
 function digestIds(ids) {
   return crypto.createHash("sha256").update(JSON.stringify(ids)).digest("hex");
@@ -59,14 +59,6 @@ function validateMetadata(metadata) {
     receiptMetadata[field] = value;
   }
 
-  for (const field of OPTIONAL_METADATA_FIELDS) {
-    if (!Object.hasOwn(metadata, field)) continue;
-    if (typeof metadata[field] !== "string" || metadata[field].trim() === "") {
-      throw new TypeError(`metadata.${field} must be a non-empty string when provided`);
-    }
-    receiptMetadata[field] = metadata[field];
-  }
-
   if (!isSnapshotTimestamp(receiptMetadata.snapshotTimestamp)) {
     throw new TypeError("metadata.snapshotTimestamp must be an ISO UTC timestamp");
   }
@@ -78,6 +70,24 @@ function compareCanonicalIds(left, right) {
   if (left < right) return -1;
   if (left > right) return 1;
   return 0;
+}
+
+function deepFreeze(value, seen = new Set()) {
+  if (value === null || typeof value !== "object" || seen.has(value)) return value;
+
+  seen.add(value);
+  for (const key of Reflect.ownKeys(value)) {
+    deepFreeze(value[key], seen);
+  }
+  return Object.freeze(value);
+}
+
+function createFrozenSnapshot(candidate) {
+  try {
+    return deepFreeze(structuredClone(candidate));
+  } catch {
+    throw new TypeError("candidate must be deep-cloneable and immutable");
+  }
 }
 
 function validateAndOrderCandidates(candidates) {
@@ -96,7 +106,7 @@ function validateAndOrderCandidates(candidates) {
     if (ids.has(id)) throw new TypeError("candidate.canonicalVenueId must be unique");
 
     ids.add(id);
-    return candidate;
+    return createFrozenSnapshot(candidate);
   });
 
   return ordered.sort((left, right) => compareCanonicalIds(
@@ -166,13 +176,14 @@ function selectUniformly(
   while (pool.length > 0) {
     const { selectedIndex, rawDraws } = drawUniformIndex(pool.length, nextUint32);
     const candidate = pool[selectedIndex];
+    const selectedCanonicalVenueId = candidate.canonicalVenueId;
     const finalValidation = normalizeFinalValidation(finalValidate, candidate);
 
     receipt.attempts.push({
       rawDraws,
       remainingPoolSize: pool.length,
       selectedIndex,
-      selectedCanonicalVenueId: candidate.canonicalVenueId,
+      selectedCanonicalVenueId,
       finalValidation,
     });
 

@@ -66,17 +66,18 @@ test("receipt retains every required frozen-snapshot metadata field", () => {
   }
 });
 
-test("documented provider-query metadata is valid without a separate provider field", () => {
-  const { provider, ...documentedMetadata } = metadata();
-  const result = selectUniformly(
-    [{ canonicalVenueId: "venue:a" }],
-    documentedMetadata,
-    () => 0,
-    () => ({ pass: true, reasons: [] }),
-  );
-
-  assert.equal(result.receipt.providerQueryVersion, documentedMetadata.providerQueryVersion);
-  assert.equal(Object.hasOwn(result.receipt, "provider"), false);
+test("missing or blank provider identity is rejected", () => {
+  const { provider, ...missingProvider } = metadata();
+  for (const invalidMetadata of [
+    missingProvider,
+    metadata({ provider: "" }),
+    metadata({ provider: "  " }),
+  ]) {
+    assert.throws(
+      () => selectUniformly([{ canonicalVenueId: "venue:a" }], invalidMetadata),
+      /metadata\.provider/,
+    );
+  }
 });
 
 test("rejection sampling removes uint32 modulo bias", () => {
@@ -138,13 +139,15 @@ test("malformed final validation fails closed and is recorded before reselection
   });
 });
 
-test("throwing final validation fails closed and is recorded before reselection", () => {
+test("validator mutation throws fail closed and is recorded before reselection", () => {
   const result = selectUniformly(
     [{ canonicalVenueId: "venue:a" }, { canonicalVenueId: "venue:b" }],
     metadata(),
     () => 0,
     (candidate) => {
-      if (candidate.canonicalVenueId === "venue:a") throw new Error("source unavailable");
+      if (candidate.canonicalVenueId === "venue:a") {
+        candidate.canonicalVenueId = "venue:tampered";
+      }
       return { pass: true, reasons: [] };
     },
   );
@@ -154,6 +157,39 @@ test("throwing final validation fails closed and is recorded before reselection"
     pass: false,
     reasons: ["final-validation-threw"],
   });
+});
+
+test("validator mutation cannot alter the frozen snapshot, receipt, digest, or returned candidate", () => {
+  const candidate = {
+    canonicalVenueId: "venue:a",
+    evidence: { sourceIds: ["source:1"] },
+  };
+  const expectedDigest = idsDigest(["venue:a"]);
+  const result = selectUniformly(
+    [candidate],
+    metadata(),
+    () => 0,
+    (frozenCandidate) => {
+      assert.throws(() => {
+        frozenCandidate.canonicalVenueId = "venue:tampered";
+      }, TypeError);
+      assert.throws(() => {
+        frozenCandidate.evidence.sourceIds.push("source:tampered");
+      }, TypeError);
+      return { pass: true, reasons: [] };
+    },
+  );
+
+  assert.deepEqual(candidate, {
+    canonicalVenueId: "venue:a",
+    evidence: { sourceIds: ["source:1"] },
+  });
+  assert.equal(result.receipt.orderedQualifiedSetDigest, expectedDigest);
+  assert.equal(result.receipt.attempts[0].selectedCanonicalVenueId, "venue:a");
+  assert.deepEqual(result.selected, candidate);
+  assert.equal(Object.isFrozen(result.selected), true);
+  assert.equal(Object.isFrozen(result.selected.evidence), true);
+  assert.equal(Object.isFrozen(result.selected.evidence.sourceIds), true);
 });
 
 test("false final validation for every candidate returns an auditable no-fit receipt", () => {
