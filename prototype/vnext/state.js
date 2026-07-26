@@ -18,6 +18,13 @@
     "change_of_mind", "schedule_change", "skipped",
   ]);
   const REACTIONS = Object.freeze(["dislike", "like", "love", "did_not_visit"]);
+  const NO_FIT_FIELDS = Object.freeze([
+    "category", "maxWalkMinutes", "budget", "dietary", "allergies",
+    "accessibility", "disclosure",
+  ]);
+  const ARRIVAL_DETAIL_FIELDS = Object.freeze([
+    "name", "address", "building", "floorUnit", "entrance",
+  ]);
 
   function defaultConstraints() {
     return {
@@ -25,6 +32,7 @@
       maxWalkMinutes: 20,
       budget: null,
       dietary: [],
+      allergies: [],
       accessibility: [],
       disclosure: "standard",
     };
@@ -35,6 +43,7 @@
       phase: firstUse ? "onboarding" : "constraints",
       constraints: defaultConstraints(),
       errors: {},
+      affectedConditions: [],
       permission,
       committed: false,
       destination: null,
@@ -59,16 +68,12 @@
   function validateConstraints(value) {
     const errors = {};
     if (!value || !["restaurant", "cafe"].includes(value.category)) {
-      errors.category = "?앸떦 ?먮뒗 移댄럹瑜??좏깮?댁＜?몄슂.";
+      errors.category = "식당 또는 카페를 선택해 주세요.";
     }
     if (!Number.isFinite(value?.maxWalkMinutes) || value.maxWalkMinutes < 1) {
-      errors.maxWalkMinutes = "?꾨낫 ?쒓컙? 1遺??댁긽?댁뼱???⑸땲??";
+      errors.maxWalkMinutes = "도보 시간은 1분 이상이어야 합니다.";
     }
     return { valid: Object.keys(errors).length === 0, errors };
-  }
-
-  function actionNow(action) {
-    return Number.isFinite(action.nowMs) ? action.nowMs : Date.now();
   }
 
   function arrivalState(state, nowMs) {
@@ -76,9 +81,25 @@
       ...state,
       phase: "arrived",
       revealed: true,
-      confidence: "ready",
+      bearingDeg: null,
+      confidence: "unavailable",
       feedbackEligibleAtMs: nowMs + 3_600_000,
     };
+  }
+
+  function normalizeAffectedConditions(value) {
+    if (!Array.isArray(value) || value.length === 0) return null;
+    const normalized = [];
+    for (const condition of value) {
+      if (
+        !condition
+        || !NO_FIT_FIELDS.includes(condition.field)
+        || typeof condition.label !== "string"
+        || condition.label.trim() === ""
+      ) return null;
+      normalized.push({ field: condition.field, label: condition.label.trim() });
+    }
+    return normalized;
   }
 
   function publicArrivalDetails(destination) {
@@ -116,7 +137,7 @@
           errors: {
             ...result.errors,
             ...(requiresRecoveryReview ? {
-              recoveryReview: `Review the recent Stop reason (${state.recoveryReason ?? "unknown"}) before continuing.`,
+              recoveryReview: "최근 안내 종료 이유와 새 출발 조건을 확인해 주세요.",
             } : {}),
           },
         };
@@ -126,6 +147,7 @@
         phase: "finding",
         constraints: structuredClone(action.constraints),
         errors: {},
+        affectedConditions: [],
         committed: true,
         recoveryReviewed: state.guardedRecovery ? true : false,
       };
@@ -135,7 +157,8 @@
         return {
           ...state,
           phase: "constraints",
-          errors: { finding: "?μ냼瑜?以鍮꾪븯吏 紐삵뻽?듬땲??" },
+          committed: false,
+          errors: { finding: "장소와 경로를 준비하지 못했습니다. 조건을 다시 확인해 주세요." },
         };
       }
       return {
@@ -149,11 +172,14 @@
       };
     }
     if (action.type === "FIND_NO_FIT" && state.phase === "finding") {
+      const affectedConditions = normalizeAffectedConditions(action.affectedConditions);
+      if (!affectedConditions) return state;
       return {
         ...state,
         phase: "constraints",
         committed: false,
-        errors: { finding: "議곌굔??異⑹”?섎뒗 ?μ냼媛 ?놁뒿?덈떎." },
+        affectedConditions,
+        errors: { finding: "필수 조건을 모두 충족하는 장소를 찾지 못했습니다." },
       };
     }
     if (
@@ -164,14 +190,20 @@
         ...state,
         phase: "constraints",
         committed: false,
-        errors: { ...state.errors, locationPermission: "Location permission is required to continue." },
+        errors: {
+          ...state.errors,
+          locationPermission: "계속하려면 위치 권한이 필요합니다. 권한 설정을 확인해 주세요.",
+        },
       };
     }
     if (action.type === "WALK" && ["following", "near", "following_revealed"].includes(state.phase)) {
       const distanceM = Number.isFinite(action.distanceM) ? Math.max(0, action.distanceM) : state.distanceM;
       if (!Number.isFinite(distanceM)) return state;
       const walking = { ...state, distanceM };
-      if (distanceM < 30) return arrivalState(walking, actionNow(action));
+      if (distanceM < 30) {
+        if (!Number.isFinite(action.nowMs)) return state;
+        return arrivalState(walking, action.nowMs);
+      }
       if (distanceM < 120) return { ...walking, phase: "near" };
       return { ...walking, phase: state.revealed ? "following_revealed" : "following" };
     }
@@ -210,11 +242,12 @@
       return { ...state, phase: "stop_confirm" };
     }
     if (action.type === "CONFIRM_END" && state.phase === "stop_confirm") {
+      if (!Number.isFinite(action.nowMs)) return state;
       return {
         ...state,
         phase: "stop_reason",
         guidanceEnded: true,
-        stoppedAtMs: actionNow(action),
+        stoppedAtMs: action.nowMs,
       };
     }
     if (
@@ -225,7 +258,10 @@
       return { ...state, phase: "stopped", stopReason: action.reason };
     }
     if (action.type === "NEW_RECOMMENDATION" && state.phase === "stopped") {
-      const guardedRecovery = actionNow(action) - state.stoppedAtMs < 300_000;
+      if (!Number.isFinite(action.nowMs) || !Number.isFinite(state.stoppedAtMs)) return state;
+      const elapsedMs = action.nowMs - state.stoppedAtMs;
+      if (elapsedMs < 0) return state;
+      const guardedRecovery = elapsedMs <= 300_000;
       return {
         ...createInitialState({ firstUse: false, permission: state.permission }),
         constraints: structuredClone(state.constraints),
@@ -272,8 +308,24 @@
     if (action.type === "CONFIRM_EXTERNAL_MAP" && state.phase === "external_map_warning") {
       return { ...state, phase: "external_map_handoff", revealed: true };
     }
-    if (action.type === "ARRIVE" && ["following", "near", "following_revealed"].includes(state.phase)) {
-      return arrivalState(state, actionNow(action));
+    if (
+      action.type === "ARRIVE"
+      && ["following", "near", "following_revealed"].includes(state.phase)
+      && Number.isFinite(action.nowMs)
+    ) {
+      return arrivalState(state, action.nowMs);
+    }
+    if (
+      action.type === "ARRIVE_WITH_MISSING_FIELD"
+      && ["following", "near", "following_revealed"].includes(state.phase)
+      && ARRIVAL_DETAIL_FIELDS.includes(action.field)
+      && Number.isFinite(action.nowMs)
+      && state.destination
+    ) {
+      return arrivalState({
+        ...state,
+        destination: { ...state.destination, [action.field]: null },
+      }, action.nowMs);
     }
     if (action.type === "FINISH_ARRIVAL" && state.phase === "arrived") {
       return { ...state, phase: "feedback_pending" };
@@ -282,7 +334,8 @@
       action.type === "CHECK_FEEDBACK"
       && state.phase === "feedback_pending"
       && Number.isFinite(state.feedbackEligibleAtMs)
-      && actionNow(action) >= state.feedbackEligibleAtMs
+      && Number.isFinite(action.nowMs)
+      && action.nowMs >= state.feedbackEligibleAtMs
     ) {
       return { ...state, phase: "place_reaction" };
     }
@@ -309,6 +362,7 @@
       phase: state.phase,
       constraints: structuredClone(state.constraints),
       errors: structuredClone(state.errors),
+      affectedConditions: structuredClone(state.affectedConditions),
       permission: state.permission,
       committed: state.committed,
       distanceM: state.distanceM,

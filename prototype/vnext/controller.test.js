@@ -21,6 +21,7 @@ function validConstraints(overrides = {}) {
     maxWalkMinutes: 20,
     budget: null,
     dietary: [],
+    allergies: [],
     accessibility: [],
     disclosure: "standard",
     ...overrides,
@@ -65,7 +66,13 @@ test("start schedules one automatic finding completion and no second commit", ()
 
 test("finding exits cancel the pending completion and stale callbacks stay inert", () => {
   const exits = [
-    { action: { type: "FIND_NO_FIT" }, expectedError: "finding" },
+    {
+      action: {
+        type: "FIND_NO_FIT",
+        affectedConditions: [{ field: "maxWalkMinutes", label: "최대 도보 시간" }],
+      },
+      expectedError: "finding",
+    },
     { action: { type: "PERMISSION_DENIED", context: "finding" }, expectedError: "locationPermission" },
     { action: { type: "RESET" }, expectedError: null },
   ];
@@ -134,24 +141,75 @@ test("render receives only public views and getState returns a deep copy", () =>
   assert.equal(controller.getState().destination.name, MOCK_DESTINATION.name);
 });
 
+test("no-fit simulation reports the active advanced conditions without changing them", () => {
+  const timer = createScheduler();
+  const rendered = [];
+  const controller = createInspectableController({
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    render: (publicView) => rendered.push(publicView),
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+    now: () => 1_000,
+  });
+  const constraints = validConstraints({
+    budget: "20,000원 이하",
+    dietary: ["채식"],
+    allergies: ["견과류"],
+    accessibility: ["계단 없는 입구"],
+    disclosure: "minimal",
+  });
+
+  controller.start(constraints);
+  controller.simulate("no-fit");
+
+  assert.equal(controller.getState().phase, "constraints");
+  assert.deepEqual(controller.getState().constraints, constraints);
+  assert.deepEqual(controller.getState().affectedConditions, [
+    { field: "budget", label: "예산" },
+    { field: "dietary", label: "식이 조건" },
+    { field: "allergies", label: "알레르기" },
+    { field: "accessibility", label: "접근성 조건" },
+    { field: "disclosure", label: "목적지 공개 수준" },
+  ]);
+  assert.deepEqual(rendered.at(-1).affectedConditions, controller.getState().affectedConditions);
+});
+
 function createEventRoot() {
-  const listeners = new Set();
+  const listeners = new Map();
+  const focusCalls = [];
+  const focusTarget = {
+    focus(options) {
+      focusCalls.push(options);
+    },
+  };
   return {
     innerHTML: "",
     addEventListener(type, listener) {
-      if (type === "click") listeners.add(listener);
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(listener);
     },
     removeEventListener(type, listener) {
-      if (type === "click") listeners.delete(listener);
+      listeners.get(type)?.delete(listener);
     },
     contains() {
       return true;
     },
-    click(target) {
-      for (const listener of listeners) listener({ target, preventDefault() {} });
+    querySelector(selector) {
+      return selector === "[data-screen-heading]" ? focusTarget : null;
     },
-    listenerCount() {
-      return listeners.size;
+    click(target) {
+      for (const listener of listeners.get("click") || []) {
+        listener({ target, preventDefault() {} });
+      }
+    },
+    input(target) {
+      for (const listener of listeners.get("input") || []) listener({ target });
+    },
+    listenerCount(type = "click") {
+      return listeners.get(type)?.size ?? 0;
+    },
+    focusCount() {
+      return focusCalls.length;
     },
   };
 }
@@ -190,6 +248,7 @@ test("mount delegates product and prototype controls through the reducer", () =>
   const root = createEventRoot();
   const controlsRoot = createEventRoot();
   const timer = createScheduler();
+  const dispatchedActions = [];
   let currentNow = 10_000;
   const mounted = mountInspectable(root, controlsRoot, {
     initialState: stateApi.createInitialState({ firstUse: false }),
@@ -197,6 +256,13 @@ test("mount delegates product and prototype controls through the reducer", () =>
     cancel: timer.cancel,
     now: () => currentNow,
     FormData: FixtureFormData,
+    stateApi: {
+      ...stateApi,
+      reduce(state, action) {
+        dispatchedActions.push(action.type);
+        return stateApi.reduce(state, action);
+      },
+    },
   });
   const form = {
     values: {
@@ -204,13 +270,17 @@ test("mount delegates product and prototype controls through the reducer", () =>
       maxWalkMinutes: "15",
       budget: "10000",
       dietary: "vegan, shellfish-free",
+      allergies: "peanut, sesame",
       accessibility: "step-free",
+      disclosure: "minimal",
     },
   };
 
   root.click(productButton("start", { form }));
   assert.equal(mounted.controller.getState().phase, "finding");
   assert.deepEqual(mounted.controller.getState().constraints.dietary, ["vegan", "shellfish-free"]);
+  assert.deepEqual(mounted.controller.getState().constraints.allergies, ["peanut", "sesame"]);
+  assert.equal(mounted.controller.getState().constraints.disclosure, "minimal");
   timer.scheduled[0].callback();
   assert.equal(mounted.controller.getState().phase, "following");
 
@@ -224,7 +294,8 @@ test("mount delegates product and prototype controls through the reducer", () =>
   assert.equal(mounted.controller.getState().phase, "following");
   controlsRoot.click(simulationButton("missing-arrival-field"));
   assert.equal(mounted.controller.getState().phase, "arrived");
-  assert.equal(mounted.controller.getState().destination.floorUnit, undefined);
+  assert.equal(mounted.controller.getState().destination.floorUnit, null);
+  assert.equal(dispatchedActions.at(-1), "ARRIVE_WITH_MISSING_FIELD");
 
   root.click(productButton("finish-arrival"));
   assert.equal(mounted.controller.getState().phase, "feedback_pending");
@@ -289,6 +360,142 @@ test("mount renders guarded review and restarts with one acknowledged Start", ()
   form.values.recoveryReviewed = "yes";
   root.click(productButton("start", { form }));
   assert.equal(mounted.controller.getState().phase, "finding");
+});
+
+function stoppedState(reason) {
+  const finding = stateApi.reduce(
+    stateApi.createInitialState({ firstUse: false }),
+    { type: "START", constraints: validConstraints() },
+  );
+  const following = stateApi.reduce(finding, {
+    type: "FIND_SUCCESS",
+    destination: MOCK_DESTINATION,
+    route: MOCK_ROUTE,
+  });
+  const paused = stateApi.reduce(following, { type: "STOP" });
+  const confirm = stateApi.reduce(paused, { type: "REQUEST_END" });
+  const reasonScreen = stateApi.reduce(confirm, { type: "CONFIRM_END", nowMs: 1_000 });
+  return stateApi.reduce(reasonScreen, { type: "SUBMIT_STOP_REASON", reason });
+}
+
+test("mount dispatches every Stop reason into its guarded new-start review", () => {
+  const cases = [
+    ["safety", /안전 관련 조건/],
+    ["route_sensor", /재보정/],
+    ["condition_mismatch", /맞지 않았던 필수 조건/],
+    ["venue_problem", /현장에서 문제가 된 사항/],
+    ["change_of_mind", /모든 조건/],
+    ["schedule_change", /이전 여정은 종료되었어요/],
+    ["skipped", /종료 이유를 건너뛰었어요/],
+  ];
+
+  for (const [reason, expectedPrompt] of cases) {
+    const root = createEventRoot();
+    const controlsRoot = createEventRoot();
+    const timer = createScheduler();
+    const mounted = mountInspectable(root, controlsRoot, {
+      initialState: stoppedState(reason),
+      schedule: timer.schedule,
+      cancel: timer.cancel,
+      now: () => 301_000,
+      FormData: FixtureFormData,
+    });
+
+    root.click(productButton("new-recommendation"));
+    assert.equal(mounted.controller.getState().guardedRecovery, true, reason);
+    assert.equal(mounted.controller.getState().recoveryReason, reason, reason);
+    assert.match(root.innerHTML, expectedPrompt, reason);
+    assert.equal((root.innerHTML.match(/name="recoveryReviewed"/g) || []).length, 1, reason);
+    assert.equal((root.innerHTML.match(/data-action="start"/g) || []).length, 1, reason);
+
+    const form = {
+      values: {
+        category: "restaurant",
+        maxWalkMinutes: "20",
+        disclosure: "standard",
+        recoveryReviewed: "yes",
+      },
+      querySelector(selector) {
+        if (selector !== '[name="recoveryReviewed"]') return null;
+        return { checked: true, reportValidity() {}, focus() {} };
+      },
+    };
+    root.click(productButton("start", { form }));
+    assert.equal(mounted.controller.getState().phase, "finding", reason);
+    assert.equal(timer.scheduled.length, 1, reason);
+    mounted.destroy();
+  }
+});
+
+test("mount focuses accepted screen renders but not rejected duplicate actions", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const timer = createScheduler();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+    FormData: FixtureFormData,
+  });
+  const form = {
+    values: {
+      category: "restaurant",
+      maxWalkMinutes: "20",
+      disclosure: "standard",
+    },
+  };
+  const startButton = productButton("start", { form });
+
+  assert.equal(root.focusCount(), 1);
+  root.click(startButton);
+  assert.equal(root.focusCount(), 2);
+  root.click(startButton);
+  assert.equal(root.focusCount(), 2);
+
+  mounted.destroy();
+});
+
+test("advanced input updates its collapsed summary without rerendering or moving focus", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const summary = { textContent: "추가 조건 1개 적용 중 — 목적지 공개 수준" };
+  const details = {
+    querySelector(selector) {
+      return selector === "summary" ? summary : null;
+    },
+  };
+  const form = {
+    values: {
+      category: "restaurant",
+      maxWalkMinutes: "20",
+      budget: "20000",
+      dietary: "채식",
+      allergies: "견과류",
+      accessibility: "계단 없는 입구",
+      disclosure: "minimal",
+    },
+  };
+  const input = {
+    closest(selector) {
+      if (selector === '[data-form="constraints"]') return form;
+      if (selector === "[data-advanced-conditions]") return details;
+      return null;
+    },
+  };
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    FormData: FixtureFormData,
+  });
+  const focusBeforeInput = root.focusCount();
+
+  root.input(input);
+
+  assert.equal(
+    summary.textContent,
+    "추가 조건 5개 적용 중 — 예산 · 식이 조건 · 알레르기 · 접근성 조건 · 목적지 공개 수준",
+  );
+  assert.equal(root.focusCount(), focusBeforeInput);
+  mounted.destroy();
 });
 
 test("CommonJS test inspection is separate from browser and mounted production APIs", () => {

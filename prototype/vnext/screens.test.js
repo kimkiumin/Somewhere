@@ -12,10 +12,12 @@ function view(overrides = {}) {
       maxWalkMinutes: 20,
       budget: null,
       dietary: [],
+      allergies: [],
       accessibility: [],
       disclosure: "standard",
     },
     errors: {},
+    affectedConditions: [],
     distanceM: null,
     bearingDeg: null,
     needleMode: "searching",
@@ -30,23 +32,64 @@ function view(overrides = {}) {
 
 test("constraints show one start action and collapsed advanced settings", () => {
   const html = screens.renderProductScreen(view());
-  assert.match(html, /조건으로 바로 출발/);
+  assert.match(html, />이 조건으로 바로 출발<\/button>/);
   assert.match(html, /<details[^>]*data-advanced-conditions/);
+  assert.doesNotMatch(html, /<details[^>]*data-advanced-conditions[^>]*\sopen(?:\s|>)/);
   assert.equal((html.match(/data-action="start"/g) || []).length, 1);
   assert.doesNotMatch(html, /Reroll|다시 추천/);
 });
 
-test("guarded recovery shows the preserved reason and one acknowledgment before the single Start", () => {
+test("onboarding explicitly says the destination stays hidden", () => {
+  const html = screens.renderProductScreen(view({ phase: "onboarding" }));
+  assert.match(html, /목적지는 도착하거나 직접 확인할 때까지 숨겨져 있어요/);
+});
+
+test("collapsed advanced conditions summarize every active type and preserve disclosure", () => {
   const html = screens.renderProductScreen(view({
-    guardedRecovery: true,
-    recoveryReason: "safety",
-    recoveryReviewed: false,
+    constraints: {
+      category: "restaurant",
+      maxWalkMinutes: 20,
+      budget: "20,000원 이하",
+      dietary: ["채식"],
+      allergies: ["견과류"],
+      accessibility: ["계단 없는 입구"],
+      disclosure: "minimal",
+    },
   }));
 
-  assert.match(html, /최근 안내 종료 이유/);
-  assert.match(html, /안전 문제/);
-  assert.match(html, /name="recoveryReviewed"/);
-  assert.equal((html.match(/data-action="start"/g) || []).length, 1);
+  assert.match(html, /추가 조건 5개 적용 중/);
+  for (const label of ["예산", "식이 조건", "알레르기", "접근성 조건", "목적지 공개 수준"]) {
+    assert.match(html, new RegExp(label));
+  }
+  assert.match(html, /name="allergies"[^>]*value="견과류"/);
+  assert.match(html, /name="disclosure"/);
+  assert.match(html, /option value="minimal" selected/);
+});
+
+test("guarded recovery renders a distinct review for every preserved Stop reason", () => {
+  const cases = [
+    ["safety", "안전 문제", /안전 관련 조건/, /새 추천을 원하는지/],
+    ["route_sensor", "경로 또는 센서 문제", /재보정/, /저장 경로/],
+    ["condition_mismatch", "필수 조건 불일치", /맞지 않았던 필수 조건/, /수정하거나 다시 확인/],
+    ["venue_problem", "장소 현장 문제", /현장에서 문제가 된 사항/, /관련 조건/],
+    ["change_of_mind", "단순 변심", /모든 조건/, /다시 확인/],
+    ["schedule_change", "일정 변경", /이전 여정은 종료되었어요/, /자동으로 새 추천을 시작하지 않아요/],
+    ["skipped", "이유 건너뜀", /종료 이유를 건너뛰었어요/, /새 출발 조건/],
+  ];
+
+  for (const [reason, label, prompt, instruction] of cases) {
+    const html = screens.renderProductScreen(view({
+      guardedRecovery: true,
+      recoveryReason: reason,
+      recoveryReviewed: false,
+    }));
+    assert.match(html, new RegExp(label), reason);
+    assert.match(html, prompt, reason);
+    assert.match(html, instruction, reason);
+    assert.equal((html.match(/name="recoveryReviewed"/g) || []).length, 1, reason);
+    assert.equal((html.match(/data-action="start"/g) || []).length, 1, reason);
+    assert.match(html, />이 조건으로 바로 출발<\/button>/, reason);
+  }
 });
 
 test("constraints and finding do not render a compass", () => {
@@ -126,6 +169,40 @@ test("route recovery keeps searching copy accurate and preserves the Stop exit",
   assert.match(html, /data-action="stop"/);
 });
 
+test("revealed identity remains escaped during route recovery and recomputing", () => {
+  for (const phase of ["route_recovery", "recomputing"]) {
+    const html = screens.renderProductScreen(view({
+      phase,
+      revealed: true,
+      needleMode: "searching",
+      confidence: phase === "route_recovery" ? "low" : "recomputing",
+      destination: {
+        name: "바람식당 <script>",
+        address: "서울시 테스트로 1",
+        building: "테스트 빌딩",
+        floorUnit: "2층",
+        entrance: "동쪽 출입구",
+      },
+    }));
+
+    assert.match(html, /목적지 공개됨/, phase);
+    assert.match(html, /바람식당 &lt;script&gt;/, phase);
+    assert.doesNotMatch(html, /<script>/, phase);
+  }
+});
+
+test("pre-Reveal recovery and recomputing expose no identity", () => {
+  for (const phase of ["route_recovery", "recomputing"]) {
+    const html = screens.renderProductScreen(view({
+      phase,
+      revealed: false,
+      destination: null,
+      needleMode: "searching",
+    }));
+    assert.doesNotMatch(html, /목적지 공개됨|destination-name/, phase);
+  }
+});
+
 test("external map warning requires explicit confirmation", () => {
   const html = screens.renderProductScreen(view({ phase: "external_map_warning" }));
   assert.match(html, /목적지가 공개될 수 있습니다/);
@@ -133,7 +210,7 @@ test("external map warning requires explicit confirmation", () => {
   assert.match(html, /data-action="confirm-external-map"/);
 });
 
-test("arrival renders escaped exact assistance fields and explicit unknowns", () => {
+test("arrival renders escaped exact assistance fields", () => {
   const html = screens.renderProductScreen(view({
     phase: "arrived",
     revealed: true,
@@ -146,6 +223,48 @@ test("arrival renders escaped exact assistance fields and explicit unknowns", ()
   assert.match(html, /식당 &lt;script&gt;/);
   assert.match(html, /층 정보 없음/);
   assert.match(html, /동쪽 출입구/);
+});
+
+test("every missing arrival assistance field has an independent unknown label", () => {
+  const complete = {
+    name: "바람식당",
+    address: "서울시 테스트로 1",
+    building: "테스트 빌딩",
+    floorUnit: "2층",
+    entrance: "동쪽 출입구",
+  };
+  const cases = [
+    ["name", "상호명 정보 없음"],
+    ["address", "주소 정보 없음"],
+    ["building", "건물 정보 없음"],
+    ["floorUnit", "층 정보 없음"],
+    ["entrance", "입구 정보 없음"],
+  ];
+
+  for (const [field, expected] of cases) {
+    const html = screens.renderProductScreen(view({
+      phase: "arrived",
+      revealed: true,
+      destination: { ...complete, [field]: null },
+    }));
+    assert.match(html, new RegExp(expected), field);
+  }
+});
+
+test("no-fit identifies affected fields and escapes their labels", () => {
+  const html = screens.renderProductScreen(view({
+    errors: { finding: "필수 조건을 모두 충족하는 장소를 찾지 못했습니다." },
+    affectedConditions: [
+      { field: "allergies", label: "견과류 <script>" },
+      { field: "accessibility", label: "계단 없는 입구" },
+    ],
+  }));
+
+  assert.match(html, /다시 확인할 조건/);
+  assert.match(html, /data-condition="allergies"/);
+  assert.match(html, /견과류 &lt;script&gt;/);
+  assert.match(html, /계단 없는 입구/);
+  assert.doesNotMatch(html, /<script>/);
 });
 
 test("pre-Reveal screens cannot emit destination fields even when supplied malformed data", () => {
@@ -192,4 +311,30 @@ test("prototype controls and renderApp remain outside the product renderer", () 
   screens.renderApp(root, controlsRoot, view());
   assert.match(root.innerHTML, /product-screen/);
   assert.match(controlsRoot.innerHTML, /prototype-controls/);
+});
+
+test("screen headings are programmatically focusable and renderApp moves focus", () => {
+  for (const phase of ["onboarding", "constraints", "following", "arrived", "complete"]) {
+    const html = screens.renderProductScreen(view({
+      phase,
+      destination: phase === "arrived" ? {
+        name: "바람식당", address: "서울시 테스트로 1", building: null,
+        floorUnit: null, entrance: null,
+      } : null,
+    }));
+    assert.match(html, /<h1[^>]*data-screen-heading[^>]*tabindex="-1"/, phase);
+  }
+
+  const focused = [];
+  const focusTarget = { focus: (options) => focused.push(options) };
+  const root = {
+    innerHTML: "",
+    querySelector(selector) {
+      return selector === "[data-screen-heading]" ? focusTarget : null;
+    },
+  };
+  const controlsRoot = { innerHTML: "" };
+  screens.renderApp(root, controlsRoot, view());
+
+  assert.deepEqual(focused, [{ preventScroll: true }]);
 });

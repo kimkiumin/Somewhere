@@ -20,6 +20,7 @@
   const TIMED_ACTIONS = new Set([
     "WALK",
     "ARRIVE",
+    "ARRIVE_WITH_MISSING_FIELD",
     "CONFIRM_END",
     "NEW_RECOMMENDATION",
     "CHECK_FEEDBACK",
@@ -34,6 +35,28 @@
   function clone(value) {
     if (typeof structuredClone === "function") return structuredClone(value);
     return JSON.parse(JSON.stringify(value));
+  }
+
+  function affectedConditionsForNoFit(constraints) {
+    const affected = [];
+    if (constraints?.budget != null && String(constraints.budget).trim() !== "") {
+      affected.push({ field: "budget", label: "예산" });
+    }
+    if (Array.isArray(constraints?.dietary) && constraints.dietary.length > 0) {
+      affected.push({ field: "dietary", label: "식이 조건" });
+    }
+    if (Array.isArray(constraints?.allergies) && constraints.allergies.length > 0) {
+      affected.push({ field: "allergies", label: "알레르기" });
+    }
+    if (Array.isArray(constraints?.accessibility) && constraints.accessibility.length > 0) {
+      affected.push({ field: "accessibility", label: "접근성 조건" });
+    }
+    if (constraints?.disclosure === "minimal") {
+      affected.push({ field: "disclosure", label: "목적지 공개 수준" });
+    }
+    return affected.length > 0
+      ? affected
+      : [{ field: "maxWalkMinutes", label: "최대 도보 시간" }];
   }
 
   function createControllerCore(options = {}, inspectable = false) {
@@ -111,7 +134,12 @@
       }
       if (name === "near") return dispatch({ type: "WALK", distanceM: 70 });
       if (name === "arrive") return dispatch({ type: "ARRIVE" });
-      if (name === "no-fit") return dispatch({ type: "FIND_NO_FIT" });
+      if (name === "no-fit") {
+        return dispatch({
+          type: "FIND_NO_FIT",
+          affectedConditions: affectedConditionsForNoFit(state.constraints),
+        });
+      }
       if (name === "low-confidence") return dispatch({ type: "LOW_CONFIDENCE", reason: "heading" });
       if (name === "restore-confidence") {
         const retried = dispatch({ type: "RETRY_GUIDANCE" });
@@ -122,12 +150,7 @@
         return dispatch({ type: "PERMISSION_DENIED", context: "finding" });
       }
       if (name === "missing-arrival-field") {
-        if (state.destination && ["following", "near", "following_revealed"].includes(state.phase)) {
-          const destination = { ...state.destination };
-          delete destination.floorUnit;
-          state = { ...state, destination };
-        }
-        return dispatch({ type: "ARRIVE" });
+        return dispatch({ type: "ARRIVE_WITH_MISSING_FIELD", field: "floorUnit" });
       }
       if (name === "feedback-ready") {
         if (state.phase === "arrived") dispatch({ type: "FINISH_ARRIVAL" });
@@ -197,18 +220,24 @@
         recoveryReview.focus?.();
         return null;
       }
+      return {
+        constraints: readConstraints(form),
+        recoveryReviewed: new FormDataType(form).get("recoveryReviewed") === "yes",
+      };
+    }
+
+    function readConstraints(form) {
       const data = new FormDataType(form);
       const budget = String(data.get("budget") ?? "").trim();
+      const disclosure = data.get("disclosure") === "minimal" ? "minimal" : "standard";
       return {
-        constraints: {
-          category: String(data.get("category") ?? ""),
-          maxWalkMinutes: Number(data.get("maxWalkMinutes")),
-          budget: budget || null,
-          dietary: splitList(data.get("dietary")),
-          accessibility: splitList(data.get("accessibility")),
-          disclosure: "standard",
-        },
-        recoveryReviewed: data.get("recoveryReviewed") === "yes",
+        category: String(data.get("category") ?? ""),
+        maxWalkMinutes: Number(data.get("maxWalkMinutes")),
+        budget: budget || null,
+        dietary: splitList(data.get("dietary")),
+        allergies: splitList(data.get("allergies")),
+        accessibility: splitList(data.get("accessibility")),
+        disclosure,
       };
     }
 
@@ -265,7 +294,18 @@
       controller.simulate(button.dataset.simulate);
     }
 
+    function onConstraintsInput(event) {
+      const form = event.target?.closest?.('[data-form="constraints"]');
+      const details = event.target?.closest?.("[data-advanced-conditions]");
+      if (!form || !details || typeof screens.summarizeAdvancedConditions !== "function") return;
+      const summary = details.querySelector?.("summary");
+      if (!summary) return;
+      summary.textContent = screens.summarizeAdvancedConditions(readConstraints(form));
+    }
+
     root.addEventListener("click", onProductClick);
+    root.addEventListener("input", onConstraintsInput);
+    root.addEventListener("change", onConstraintsInput);
     controlsRoot.addEventListener("click", onPrototypeClick);
 
     let mounted = true;
@@ -273,6 +313,8 @@
       if (!mounted) return;
       mounted = false;
       root.removeEventListener("click", onProductClick);
+      root.removeEventListener("input", onConstraintsInput);
+      root.removeEventListener("change", onConstraintsInput);
       controlsRoot.removeEventListener("click", onPrototypeClick);
       controller.destroy();
     }

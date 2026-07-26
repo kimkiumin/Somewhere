@@ -10,6 +10,7 @@ function validConstraints() {
     maxWalkMinutes: 20,
     budget: null,
     dietary: [],
+    allergies: [],
     accessibility: [],
     disclosure: "standard",
   };
@@ -36,9 +37,54 @@ test("invalid constraints remain editable and identify exact fields", () => {
 
   assert.equal(unchanged.phase, "constraints");
   assert.deepEqual(unchanged.errors, {
-    maxWalkMinutes: "?꾨낫 ?쒓컙? 1遺??댁긽?댁뼱???⑸땲??",
+    maxWalkMinutes: "도보 시간은 1분 이상이어야 합니다.",
   });
   assert.equal(unchanged.constraints.maxWalkMinutes, 0);
+});
+
+test("sequence errors use intentional Korean without known mojibake", () => {
+  const invalid = stateApi.validateConstraints({
+    ...validConstraints(), category: "unknown", maxWalkMinutes: 0,
+  });
+  const finding = stateApi.reduce(
+    stateApi.createInitialState({ firstUse: false }),
+    { type: "START", constraints: validConstraints() },
+  );
+  const findingFailure = stateApi.reduce(finding, {
+    type: "FIND_SUCCESS", destination: null, route: null,
+  });
+  const noFit = stateApi.reduce(finding, {
+    type: "FIND_NO_FIT",
+    affectedConditions: [{ field: "allergies", label: "견과류 알레르기" }],
+  });
+  const denied = stateApi.reduce(finding, { type: "PERMISSION_DENIED" });
+  const stopped = stateApi.reduce(
+    stateApi.reduce(
+      stateApi.reduce(
+        stateApi.reduce(followingState(), { type: "STOP" }),
+        { type: "REQUEST_END" },
+      ),
+      { type: "CONFIRM_END", nowMs: 1_000 },
+    ),
+    { type: "SUBMIT_STOP_REASON", reason: "safety" },
+  );
+  const guarded = stateApi.reduce(stopped, {
+    type: "NEW_RECOMMENDATION", nowMs: 301_000,
+  });
+  const blocked = stateApi.reduce(guarded, {
+    type: "START", constraints: validConstraints(),
+  });
+  const messages = [
+    ...Object.values(invalid.errors),
+    ...Object.values(findingFailure.errors),
+    ...Object.values(noFit.errors),
+    ...Object.values(denied.errors),
+    ...Object.values(blocked.errors),
+  ];
+
+  assert.equal(messages.length, 6);
+  for (const message of messages) assert.match(message, /[가-힣]/);
+  assert.doesNotMatch(messages.join(" "), /\?앸|\?꾨|\?쒓|\?μ|議곌굔|異⑹|⑸땲|Review the|Location permission/);
 });
 
 test("finding success begins guidance without a ready or second commit state", () => {
@@ -201,8 +247,31 @@ test("arrival automatically reveals verified arrival details and schedules feedb
   const view = stateApi.toPublicView(arrived);
   assert.equal(arrived.phase, "arrived");
   assert.equal(arrived.revealed, true);
+  assert.equal(arrived.confidence, "unavailable");
+  assert.equal(arrived.bearingDeg, null);
   assert.equal(arrived.feedbackEligibleAtMs, 3_610_000);
+  assert.equal(view.bearingDeg, null);
   assert.equal(view.destination.floorUnit, "2F");
+});
+
+test("missing arrival assistance is an explicit reducer transition", () => {
+  const following = followingState();
+  const arrived = stateApi.reduce(following, {
+    type: "ARRIVE_WITH_MISSING_FIELD",
+    field: "floorUnit",
+    nowMs: 10_000,
+  });
+  const invalidField = stateApi.reduce(following, {
+    type: "ARRIVE_WITH_MISSING_FIELD",
+    field: "menu",
+    nowMs: 10_000,
+  });
+
+  assert.equal(arrived.phase, "arrived");
+  assert.equal(arrived.destination.floorUnit, null);
+  assert.equal(stateApi.toPublicView(arrived).destination.floorUnit, null);
+  assert.equal(following.destination.floorUnit, "2F");
+  assert.equal(invalidField, following);
 });
 
 test("arrival completion waits for feedback eligibility", () => {
@@ -250,6 +319,62 @@ test("walks, guarded recovery, permissions, and feedback actions obey phase guar
   assert.equal(reaction.reaction, "love");
 });
 
+test("no-fit returns exact affected conditions without relaxing constraints", () => {
+  const constraints = validConstraints();
+  constraints.allergies = ["견과류"];
+  constraints.accessibility = ["계단 없는 입구"];
+  const finding = stateApi.reduce(
+    stateApi.createInitialState({ firstUse: false }),
+    { type: "START", constraints },
+  );
+  const affectedConditions = [
+    { field: "allergies", label: "견과류 알레르기" },
+    { field: "accessibility", label: "계단 없는 입구" },
+  ];
+  const noFit = stateApi.reduce(finding, {
+    type: "FIND_NO_FIT", affectedConditions,
+  });
+  const missingMetadata = stateApi.reduce(finding, { type: "FIND_NO_FIT" });
+  affectedConditions[0].label = "changed outside";
+
+  assert.equal(noFit.phase, "constraints");
+  assert.equal(noFit.committed, false);
+  assert.deepEqual(noFit.constraints, constraints);
+  assert.deepEqual(noFit.affectedConditions, [
+    { field: "allergies", label: "견과류 알레르기" },
+    { field: "accessibility", label: "계단 없는 입구" },
+  ]);
+  assert.deepEqual(stateApi.toPublicView(noFit).affectedConditions, noFit.affectedConditions);
+  assert.match(noFit.errors.finding, /충족하는 장소를 찾지 못했습니다/);
+  assert.equal(missingMetadata, finding);
+});
+
+test("timed reducer actions require finite nowMs and never read the wall clock", () => {
+  const following = followingState();
+  const paused = stateApi.reduce(following, { type: "STOP" });
+  const confirm = stateApi.reduce(paused, { type: "REQUEST_END" });
+  const originalDateNow = Date.now;
+  Date.now = () => { throw new Error("reducer read wall clock"); };
+  try {
+    assert.equal(stateApi.reduce(following, { type: "ARRIVE" }), following);
+    assert.equal(stateApi.reduce(following, { type: "ARRIVE", nowMs: Infinity }), following);
+    assert.equal(stateApi.reduce(following, { type: "WALK", distanceM: 29 }), following);
+    assert.equal(stateApi.reduce(confirm, { type: "CONFIRM_END" }), confirm);
+
+    const stopReason = stateApi.reduce(confirm, { type: "CONFIRM_END", nowMs: 1_000 });
+    const stopped = stateApi.reduce(stopReason, {
+      type: "SUBMIT_STOP_REASON", reason: "skipped",
+    });
+    assert.equal(stateApi.reduce(stopped, { type: "NEW_RECOMMENDATION" }), stopped);
+
+    const arrived = stateApi.reduce(following, { type: "ARRIVE", nowMs: 10_000 });
+    const pending = stateApi.reduce(arrived, { type: "FINISH_ARRIVAL" });
+    assert.equal(stateApi.reduce(pending, { type: "CHECK_FEEDBACK" }), pending);
+  } finally {
+    Date.now = originalDateNow;
+  }
+});
+
 test("formatDistance formats meters and kilometers without inventing a distance", () => {
   assert.equal(stateApi.formatDistance(850), "850 m");
   assert.equal(stateApi.formatDistance(1250), "1.3 km");
@@ -286,12 +411,12 @@ test("guarded recovery preserves Stop reason and requires explicit review before
   assert.equal(guarded.recoveryReason, "safety");
   assert.equal(guarded.recoveryReviewed, false);
   assert.equal(blocked.phase, "constraints");
-  assert.match(blocked.errors.recoveryReview, /safety/);
+  assert.match(blocked.errors.recoveryReview, /종료 이유와 새 출발 조건/);
   assert.equal(reviewed.phase, "finding");
   assert.equal(reviewed.recoveryReviewed, true);
 });
 
-test("recommendation after the five-minute guard starts normally", () => {
+test("the five-minute guarded recovery boundary is inclusive", () => {
   const stopped = stateApi.reduce(
     stateApi.reduce(
       stateApi.reduce(
@@ -302,9 +427,12 @@ test("recommendation after the five-minute guard starts normally", () => {
     ),
     { type: "SUBMIT_STOP_REASON", reason: "schedule_change" },
   );
-  const normal = stateApi.reduce(stopped, { type: "NEW_RECOMMENDATION", nowMs: 301_000 });
+  const guarded = stateApi.reduce(stopped, { type: "NEW_RECOMMENDATION", nowMs: 301_000 });
+  const normal = stateApi.reduce(stopped, { type: "NEW_RECOMMENDATION", nowMs: 301_001 });
   const finding = stateApi.reduce(normal, { type: "START", constraints: validConstraints() });
 
+  assert.equal(guarded.guardedRecovery, true);
+  assert.equal(guarded.recoveryReason, "schedule_change");
   assert.equal(normal.guardedRecovery, false);
   assert.equal(normal.recoveryReason, null);
   assert.equal(finding.phase, "finding");
