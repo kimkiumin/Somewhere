@@ -62,3 +62,24 @@ test("verification entry point tracks its historical prototype baseline", () => 
     [],
   );
 });
+
+test("vNext sequence prototype is isolated from historical v0.1", () => {
+  const required = [
+    "prototype/vnext/README.md",
+    "prototype/vnext/index.html",
+    "prototype/vnext/style.css",
+    "prototype/vnext/state.js",
+    "prototype/vnext/screens.js",
+    "prototype/vnext/controller.js",
+    "prototype/vnext/app.js",
+  ];
+  for (const file of required) {
+    assert.equal(fs.existsSync(path.join(root, file)), true, `${file} is missing`);
+  }
+
+  const vnextHtml = read("prototype/vnext/index.html");
+  const historicalHtml = read("prototype/index.html");
+  assert.match(vnextHtml, /Somewhere vNext/i);
+  assert.match(historicalHtml, /Blind Compass Prototype/i);
+  assert.doesNotMatch(vnextHtml, /prototype\/app\.js/);
+});
