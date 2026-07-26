@@ -35,6 +35,9 @@ build/
 # Superpowers visual brainstorming sessions
 .superpowers/
 
+# Isolated feature worktrees
+.worktrees/
+
 # Research crawler run output
 .research/runs/
 .research/test-runs/
