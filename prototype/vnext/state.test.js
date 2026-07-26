@@ -229,3 +229,92 @@ test("formatDistance formats meters and kilometers without inventing a distance"
   assert.equal(stateApi.formatDistance(1250), "1.3 km");
   assert.equal(stateApi.formatDistance(null), null);
 });
+
+test("revealed identity remains public while guidance recomputes or recovers", () => {
+  const revealedGuidance = followingState({ revealed: true });
+  const recomputing = stateApi.reduce(revealedGuidance, { type: "LOW_CONFIDENCE", reason: "heading" });
+  const recovery = stateApi.reduce(recomputing, { type: "RETRY_GUIDANCE" });
+
+  assert.equal(recomputing.phase, "route_recovery");
+  assert.equal(recovery.phase, "recomputing");
+  assert.equal(stateApi.toPublicView(recomputing).destination.name, "Hidden restaurant");
+  assert.equal(stateApi.toPublicView(recovery).destination.name, "Hidden restaurant");
+});
+
+test("guarded recovery preserves Stop reason and requires explicit review before START", () => {
+  const stopReason = stateApi.reduce(
+    stateApi.reduce(
+      stateApi.reduce(followingState(), { type: "STOP" }),
+      { type: "REQUEST_END" },
+    ),
+    { type: "CONFIRM_END", nowMs: 1_000 },
+  );
+  const stopped = stateApi.reduce(stopReason, { type: "SUBMIT_STOP_REASON", reason: "safety" });
+  const guarded = stateApi.reduce(stopped, { type: "NEW_RECOMMENDATION", nowMs: 300_999 });
+  const blocked = stateApi.reduce(guarded, { type: "START", constraints: validConstraints() });
+  const reviewed = stateApi.reduce(guarded, {
+    type: "START", constraints: validConstraints(), recoveryReviewed: true,
+  });
+
+  assert.equal(guarded.guardedRecovery, true);
+  assert.equal(guarded.recoveryReason, "safety");
+  assert.equal(guarded.recoveryReviewed, false);
+  assert.equal(blocked.phase, "constraints");
+  assert.match(blocked.errors.recoveryReview, /safety/);
+  assert.equal(reviewed.phase, "finding");
+  assert.equal(reviewed.recoveryReviewed, true);
+});
+
+test("recommendation after the five-minute guard starts normally", () => {
+  const stopped = stateApi.reduce(
+    stateApi.reduce(
+      stateApi.reduce(
+        stateApi.reduce(followingState(), { type: "STOP" }),
+        { type: "REQUEST_END" },
+      ),
+      { type: "CONFIRM_END", nowMs: 1_000 },
+    ),
+    { type: "SUBMIT_STOP_REASON", reason: "schedule_change" },
+  );
+  const normal = stateApi.reduce(stopped, { type: "NEW_RECOMMENDATION", nowMs: 301_000 });
+  const finding = stateApi.reduce(normal, { type: "START", constraints: validConstraints() });
+
+  assert.equal(normal.guardedRecovery, false);
+  assert.equal(normal.recoveryReason, null);
+  assert.equal(finding.phase, "finding");
+});
+
+test("public view publishes an explicit needle mode for trusted, searching, and paused guidance", () => {
+  const following = followingState();
+  const recovery = stateApi.reduce(following, { type: "LOW_CONFIDENCE", reason: "heading" });
+  const recomputing = stateApi.reduce(recovery, { type: "RETRY_GUIDANCE" });
+  const paused = stateApi.reduce(following, { type: "STOP" });
+  const confirmedStop = stateApi.reduce(
+    stateApi.reduce(paused, { type: "REQUEST_END" }),
+    { type: "CONFIRM_END", nowMs: 1_000 },
+  );
+
+  assert.equal(stateApi.toPublicView(following).needleMode, "pointing");
+  assert.equal(stateApi.toPublicView(recovery).bearingDeg, null);
+  assert.equal(stateApi.toPublicView(recovery).needleMode, "searching");
+  assert.equal(stateApi.toPublicView(recomputing).bearingDeg, null);
+  assert.equal(stateApi.toPublicView(recomputing).needleMode, "searching");
+  assert.equal(stateApi.toPublicView(paused).needleMode, "paused");
+  assert.equal(stateApi.toPublicView(confirmedStop).needleMode, "paused");
+});
+
+test("a missing bearing cannot claim a pointing needle", () => {
+  const finding = stateApi.reduce(
+    stateApi.createInitialState({ firstUse: false }),
+    { type: "START", constraints: validConstraints() },
+  );
+  const following = stateApi.reduce(finding, {
+    type: "FIND_SUCCESS",
+    destination: { id: "fixture-2", name: "Hidden cafe" },
+    route: { id: "route-2", distanceM: 850 },
+  });
+  const view = stateApi.toPublicView(following);
+
+  assert.equal(view.bearingDeg, null);
+  assert.equal(view.needleMode, "searching");
+});

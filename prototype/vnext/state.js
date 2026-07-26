@@ -50,6 +50,7 @@
       guidanceEnded: false,
       stoppedAtMs: null,
       guardedRecovery: false,
+      recoveryReviewed: false,
       feedbackEligibleAtMs: null,
       reaction: null,
     };
@@ -107,11 +108,17 @@
     }
     if (action.type === "START" && state.phase === "constraints") {
       const result = validateConstraints(action.constraints);
-      if (!result.valid) {
+      const requiresRecoveryReview = state.guardedRecovery && action.recoveryReviewed !== true;
+      if (!result.valid || requiresRecoveryReview) {
         return {
           ...state,
           constraints: structuredClone(action.constraints),
-          errors: result.errors,
+          errors: {
+            ...result.errors,
+            ...(requiresRecoveryReview ? {
+              recoveryReview: `Review the recent Stop reason (${state.recoveryReason ?? "unknown"}) before continuing.`,
+            } : {}),
+          },
         };
       }
       return {
@@ -120,6 +127,7 @@
         constraints: structuredClone(action.constraints),
         errors: {},
         committed: true,
+        recoveryReviewed: state.guardedRecovery ? true : false,
       };
     }
     if (action.type === "FIND_SUCCESS" && state.phase === "finding") {
@@ -222,6 +230,8 @@
         ...createInitialState({ firstUse: false, permission: state.permission }),
         constraints: structuredClone(state.constraints),
         guardedRecovery,
+        recoveryReason: guardedRecovery ? state.stopReason : null,
+        recoveryReviewed: false,
       };
     }
     if (
@@ -288,7 +298,13 @@
   }
 
   function toPublicView(state) {
-    const identityVisible = ["revealed", "following_revealed", "arrived"].includes(state.phase);
+    const identityVisible = state.revealed && !state.guidanceEnded;
+    const hasTrustedBearing = state.confidence === "ready" && Number.isFinite(state.bearingDeg);
+    const needleMode = ["paused", "stop_confirm", "stop_reason", "stopped"].includes(state.phase)
+      ? "paused"
+      : hasTrustedBearing
+        ? "pointing"
+        : "searching";
     return {
       phase: state.phase,
       constraints: structuredClone(state.constraints),
@@ -296,7 +312,8 @@
       permission: state.permission,
       committed: state.committed,
       distanceM: state.distanceM,
-      bearingDeg: state.confidence === "ready" ? state.bearingDeg : null,
+      bearingDeg: hasTrustedBearing ? state.bearingDeg : null,
+      needleMode,
       confidence: state.confidence,
       recoveryReason: state.recoveryReason,
       menu: state.destination?.menu ?? null,
@@ -304,6 +321,7 @@
       destination: identityVisible ? publicArrivalDetails(state.destination) : null,
       revealed: state.revealed,
       guardedRecovery: state.guardedRecovery,
+      recoveryReviewed: state.recoveryReviewed,
       feedbackEligibleAtMs: state.feedbackEligibleAtMs,
       reaction: state.reaction,
     };
