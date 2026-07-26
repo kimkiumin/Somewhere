@@ -318,3 +318,18 @@ test("a missing bearing cannot claim a pointing needle", () => {
   assert.equal(view.bearingDeg, null);
   assert.equal(view.needleMode, "searching");
 });
+
+test("Stop disclosure flow keeps the needle paused until guidance is continued", () => {
+  const paused = stateApi.reduce(followingState(), { type: "STOP" });
+  const reason = stateApi.reduce(paused, { type: "OPEN_DESTINATION_INFO" });
+  const revealed = stateApi.reduce(reason, {
+    type: "REVEAL_DESTINATION",
+    reason: "curiosity",
+  });
+  const recomputing = stateApi.reduce(revealed, { type: "CONTINUE_AFTER_REVEAL" });
+
+  assert.equal(stateApi.toPublicView(paused).needleMode, "paused");
+  assert.equal(stateApi.toPublicView(reason).needleMode, "paused");
+  assert.equal(stateApi.toPublicView(revealed).needleMode, "paused");
+  assert.equal(stateApi.toPublicView(recomputing).needleMode, "searching");
+});

@@ -300,7 +300,7 @@
   function toPublicView(state) {
     const identityVisible = state.revealed && !state.guidanceEnded;
     const hasTrustedBearing = state.confidence === "ready" && Number.isFinite(state.bearingDeg);
-    const needleMode = ["paused", "stop_confirm", "stop_reason", "stopped"].includes(state.phase)
+    const needleMode = state.confidence === "paused" || ["paused", "stop_confirm", "stop_reason", "stopped"].includes(state.phase)
       ? "paused"
       : hasTrustedBearing
         ? "pointing"
