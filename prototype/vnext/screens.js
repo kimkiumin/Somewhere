@@ -32,6 +32,8 @@
       ? `경로 방향 ${Math.round(view.bearingDeg)}도 안내 중이에요`
       : view.needleMode === "paused"
         ? "안내 일시정지"
+        : ["route_recovery", "recomputing"].includes(view.phase)
+          ? "정확한 방향을 확인하고 있어요"
         : "방향을 확인하고 있어요";
 
     return `<p class="guidance-status">${escapeHtml(status)}</p>
@@ -155,6 +157,7 @@
   function renderStopConfirm() {
     return `<h1>안내를 종료할까요?</h1>
       <p>종료한 뒤에 이유를 건너뛸 수 있어요.</p>
+      ${action("안내 계속", "continue-guidance")}
       ${action("안내 종료 확인", "confirm-end")}`;
   }
 
@@ -178,10 +181,11 @@
 
   function renderRouteRecovery(view) {
     return `<h1>안내를 다시 확인해야 해요</h1>
-      <p>현재 방향을 신뢰하기 어려워서 바늘을 멈췄어요.</p>
+      <p>현재 방향을 신뢰하기 어려워서 정확한 방향을 확인하고 있어요.</p>
       ${renderCompassShell({ ...view, needleMode: "searching" })}
       ${action("안내 다시 시도", "retry-guidance")}
       ${action("저장된 경로 사용", "use-cached-route")}
+      ${action("안내 멈추기", "stop")}
       ${action("외부 지도에서 보기", "request-external-map")}`;
   }
 

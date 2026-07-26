@@ -97,6 +97,22 @@ test("paused and reveal reason screens expose the approved branch controls", () 
   assert.equal((reason.match(/data-action="reveal-destination"/g) || []).length, 7);
 });
 
+test("stop confirmation provides a semantic route back to guidance", () => {
+  const html = screens.renderProductScreen(view({ phase: "stop_confirm", needleMode: "paused" }));
+  assert.match(html, /data-action="continue-guidance"/);
+  assert.match(html, /data-action="confirm-end"/);
+});
+
+test("route recovery keeps searching copy accurate and preserves the Stop exit", () => {
+  const html = screens.renderProductScreen(view({
+    phase: "route_recovery", needleMode: "searching", confidence: "low",
+  }));
+  assert.match(html, /compass-needle is-searching/);
+  assert.match(html, /정확한 방향을 확인하고 있어요/);
+  assert.doesNotMatch(html, /바늘을 멈췄어요/);
+  assert.match(html, /data-action="stop"/);
+});
+
 test("external map warning requires explicit confirmation", () => {
   const html = screens.renderProductScreen(view({ phase: "external_map_warning" }));
   assert.match(html, /목적지가 공개될 수 있습니다/);

@@ -175,7 +175,7 @@
       if (distanceM < 120) return { ...walking, phase: "near" };
       return { ...walking, phase: state.revealed ? "following_revealed" : "following" };
     }
-    if (action.type === "STOP" && ["following", "near", "following_revealed"].includes(state.phase)) {
+    if (action.type === "STOP" && ["following", "near", "following_revealed", "route_recovery"].includes(state.phase)) {
       return {
         ...state,
         phase: "paused",
@@ -185,7 +185,7 @@
         stopReason: null,
       };
     }
-    if (action.type === "CONTINUE_GUIDANCE" && state.phase === "paused") {
+    if (action.type === "CONTINUE_GUIDANCE" && ["paused", "stop_confirm"].includes(state.phase)) {
       return { ...state, phase: "recomputing", confidence: "recomputing" };
     }
     if (action.type === "OPEN_DESTINATION_INFO" && state.phase === "paused") {

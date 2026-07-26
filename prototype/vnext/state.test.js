@@ -153,6 +153,32 @@ test("confirmed end asks a distinct skippable Stop reason after ending", () => {
   assert.equal(stopped.revealReason, null);
 });
 
+test("stop confirmation can resume disclosed guidance through recomputing", () => {
+  const paused = stateApi.reduce(followingState({ revealed: true }), { type: "STOP" });
+  const confirm = stateApi.reduce(paused, { type: "REQUEST_END" });
+  const recomputing = stateApi.reduce(confirm, { type: "CONTINUE_GUIDANCE" });
+  const resumed = stateApi.reduce(recomputing, { type: "RECOVERY_READY" });
+
+  assert.equal(recomputing.phase, "recomputing");
+  assert.equal(recomputing.revealed, true);
+  assert.equal(resumed.phase, "following_revealed");
+});
+
+test("Stop remains an escape route from route recovery and resumes safely", () => {
+  const recovery = stateApi.reduce(
+    followingState({ revealed: true }),
+    { type: "LOW_CONFIDENCE", reason: "heading" },
+  );
+  const paused = stateApi.reduce(recovery, { type: "STOP" });
+  const recomputing = stateApi.reduce(paused, { type: "CONTINUE_GUIDANCE" });
+  const resumed = stateApi.reduce(recomputing, { type: "RECOVERY_READY" });
+
+  assert.equal(paused.phase, "paused");
+  assert.equal(paused.confidence, "paused");
+  assert.equal(recomputing.phase, "recomputing");
+  assert.equal(resumed.phase, "following_revealed");
+});
+
 test("low-confidence and recomputing states never expose a bearing", () => {
   const recovery = stateApi.reduce(followingState(), { type: "LOW_CONFIDENCE", reason: "heading" });
   const recomputing = stateApi.reduce(recovery, { type: "RETRY_GUIDANCE" });
