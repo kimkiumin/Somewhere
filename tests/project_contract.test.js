@@ -8,6 +8,7 @@ const assert = require("node:assert/strict");
 
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const extractTitle = (html) => html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1].trim() ?? null;
 
 test("repository declares the approved vNext source hierarchy", () => {
   const agents = read("AGENTS.md");
@@ -79,7 +80,11 @@ test("vNext sequence prototype is isolated from historical v0.1", () => {
 
   const vnextHtml = read("prototype/vnext/index.html");
   const historicalHtml = read("prototype/index.html");
-  assert.match(vnextHtml, /Somewhere vNext/i);
-  assert.match(historicalHtml, /Blind Compass Prototype/i);
+  assert.equal(extractTitle(vnextHtml), "Somewhere vNext 시퀀스 프로토타입");
+  assert.equal(extractTitle(historicalHtml), "Blind Compass Prototype");
   assert.doesNotMatch(vnextHtml, /prototype\/app\.js/);
+});
+
+test("vNext title extraction rejects a body-only occurrence", () => {
+  assert.equal(extractTitle("<body>Somewhere vNext</body>"), null);
 });
