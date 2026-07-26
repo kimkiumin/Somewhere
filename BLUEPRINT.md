@@ -91,6 +91,7 @@ recommendation ready
 ## 7. Document Map
 
 - [Product Contract](docs/blueprint/product_contract.md)
+- [vNext App Sequence](docs/blueprint/app_sequence.md)
 - [UX State Model](docs/blueprint/ux_state_model.md)
 - [Recommendation and Data](docs/blueprint/recommendation_and_data.md)
 - [Navigation and iOS](docs/blueprint/navigation_and_ios.md)
