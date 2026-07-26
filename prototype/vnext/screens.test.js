@@ -36,6 +36,19 @@ test("constraints show one start action and collapsed advanced settings", () => 
   assert.doesNotMatch(html, /Reroll|다시 추천/);
 });
 
+test("guarded recovery shows the preserved reason and one acknowledgment before the single Start", () => {
+  const html = screens.renderProductScreen(view({
+    guardedRecovery: true,
+    recoveryReason: "safety",
+    recoveryReviewed: false,
+  }));
+
+  assert.match(html, /최근 안내 종료 이유/);
+  assert.match(html, /안전 문제/);
+  assert.match(html, /name="recoveryReviewed"/);
+  assert.equal((html.match(/data-action="start"/g) || []).length, 1);
+});
+
 test("constraints and finding do not render a compass", () => {
   assert.doesNotMatch(screens.renderProductScreen(view()), /compass-shell/);
   assert.doesNotMatch(

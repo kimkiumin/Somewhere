@@ -3,12 +3,17 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const stateApi = require("./state.js");
+const controllerModule = require("./controller.js");
 const {
   createController,
+  createTestController,
   mount,
+  mountForTest,
   MOCK_DESTINATION,
   MOCK_ROUTE,
-} = require("./controller.js");
+} = controllerModule;
+const createInspectableController = createTestController ?? createController;
+const mountInspectable = mountForTest ?? mount;
 
 function validConstraints(overrides = {}) {
   return {
@@ -41,7 +46,7 @@ function createScheduler() {
 
 test("start schedules one automatic finding completion and no second commit", () => {
   const timer = createScheduler();
-  const controller = createController({
+  const controller = createInspectableController({
     initialState: stateApi.createInitialState({ firstUse: false }),
     render: () => {},
     schedule: timer.schedule,
@@ -67,7 +72,7 @@ test("finding exits cancel the pending completion and stale callbacks stay inert
 
   for (const { action, expectedError } of exits) {
     const timer = createScheduler();
-    const controller = createController({
+    const controller = createInspectableController({
       initialState: stateApi.createInitialState({ firstUse: false }),
       render: () => {},
       schedule: timer.schedule,
@@ -87,7 +92,7 @@ test("finding exits cancel the pending completion and stale callbacks stay inert
 
 test("destroy cancels a pending finding completion", () => {
   const cancelled = [];
-  const controller = createController({
+  const controller = createInspectableController({
     initialState: stateApi.createInitialState({ firstUse: false }),
     render: () => {},
     schedule: () => 91,
@@ -110,7 +115,7 @@ test("mock destination is complete for arrival but is not exposed on the browser
 test("render receives only public views and getState returns a deep copy", () => {
   const rendered = [];
   const timer = createScheduler();
-  const controller = createController({
+  const controller = createInspectableController({
     initialState: stateApi.createInitialState({ firstUse: false }),
     render: (view) => rendered.push(view),
     schedule: timer.schedule,
@@ -186,7 +191,7 @@ test("mount delegates product and prototype controls through the reducer", () =>
   const controlsRoot = createEventRoot();
   const timer = createScheduler();
   let currentNow = 10_000;
-  const mounted = mount(root, controlsRoot, {
+  const mounted = mountInspectable(root, controlsRoot, {
     initialState: stateApi.createInitialState({ firstUse: false }),
     schedule: timer.schedule,
     cancel: timer.cancel,
@@ -236,11 +241,11 @@ test("mount delegates product and prototype controls through the reducer", () =>
   assert.equal(controlsRoot.listenerCount(), 0);
 });
 
-test("mount wires the Stop, disclosure, confirmed end, and guarded restart sequence", () => {
+test("mount renders guarded review and restarts with one acknowledged Start", () => {
   const root = createEventRoot();
   const controlsRoot = createEventRoot();
   const timer = createScheduler();
-  const mounted = mount(root, controlsRoot, {
+  const mounted = mountInspectable(root, controlsRoot, {
     initialState: stateApi.createInitialState({ firstUse: false }),
     schedule: timer.schedule,
     cancel: timer.cancel,
@@ -249,6 +254,15 @@ test("mount wires the Stop, disclosure, confirmed end, and guarded restart seque
   });
   const form = {
     values: { category: "restaurant", maxWalkMinutes: "20" },
+    reviewVisible: false,
+    querySelector(selector) {
+      if (selector !== '[name="recoveryReviewed"]' || !this.reviewVisible) return null;
+      return {
+        checked: this.values.recoveryReviewed === "yes",
+        reportValidity() {},
+        focus() {},
+      };
+    },
   };
   root.click(productButton("start", { form }));
   timer.scheduled[0].callback();
@@ -266,10 +280,78 @@ test("mount wires the Stop, disclosure, confirmed end, and guarded restart seque
   root.click(productButton("submit-stop-reason", { reason: "safety" }));
   root.click(productButton("new-recommendation"));
   assert.equal(mounted.controller.getState().guardedRecovery, true);
-
+  assert.match(root.innerHTML, /최근 안내 종료 이유/);
+  assert.match(root.innerHTML, /안전 문제/);
+  form.reviewVisible = true;
   root.click(productButton("start", { form }));
   assert.equal(mounted.controller.getState().phase, "constraints");
-  assert.ok(mounted.controller.getState().errors.recoveryReview);
+  assert.equal(mounted.controller.getState().errors.recoveryReview, undefined);
+  form.values.recoveryReviewed = "yes";
   root.click(productButton("start", { form }));
   assert.equal(mounted.controller.getState().phase, "finding");
+});
+
+test("CommonJS test inspection is separate from browser and mounted production APIs", () => {
+  assert.equal(typeof createTestController, "function");
+  assert.equal(typeof mountForTest, "function");
+
+  const rendered = [];
+  const scheduled = [];
+  let interceptedDestination = null;
+  const browserController = globalThis.SomewhereVNextController.createController({
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    render: (publicView) => rendered.push(publicView),
+    schedule: (callback) => { scheduled.push(callback); return scheduled.length; },
+    stateApi: {
+      ...stateApi,
+      reduce(state, action) {
+        if (action.destination) interceptedDestination = action.destination;
+        return stateApi.reduce(state, action);
+      },
+    },
+  });
+  assert.equal(browserController.getState, undefined);
+  browserController.start(validConstraints());
+  scheduled[0]();
+  assert.equal(interceptedDestination, null);
+  assert.equal(rendered.at(-1).destination, null);
+
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = globalThis.SomewhereVNextController.mount(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+  });
+  assert.equal(mounted.controller.getState, undefined);
+
+  const inspected = createTestController({
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    render: () => {},
+  });
+  assert.equal(typeof inspected.getState, "function");
+  mounted.destroy();
+  browserController.destroy();
+});
+
+test("app boot return value cannot inspect private controller state", () => {
+  const previousDocument = globalThis.document;
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  try {
+    delete globalThis.document;
+    delete require.cache[require.resolve("./app.js")];
+    const { boot } = require("./app.js");
+    globalThis.document = {
+      querySelector(selector) {
+        if (selector === "#app") return root;
+        if (selector === "#prototype-controls") return controlsRoot;
+        return null;
+      },
+    };
+    const mounted = boot();
+    assert.equal(mounted.controller.getState, undefined);
+    mounted.destroy();
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
 });

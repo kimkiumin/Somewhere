@@ -62,6 +62,25 @@
     return `<ul class="form-errors">${messages.map((message) => `<li>${escapeHtml(message)}</li>`).join("")}</ul>`;
   }
 
+  function renderGuardedRecovery(view) {
+    if (!view.guardedRecovery) return "";
+    const reasonLabels = {
+      safety: "안전 문제",
+      route_sensor: "길 또는 센서 문제",
+      condition_mismatch: "조건이 맞지 않음",
+      venue_problem: "장소 문제",
+      change_of_mind: "마음이 바뀜",
+      schedule_change: "일정 변경",
+      skipped: "건너뜀",
+    };
+    const reason = reasonLabels[view.recoveryReason] ?? "종료 이유 미확인";
+    return `<fieldset class="recovery-review">
+      <legend>최근 안내 종료 이유</legend>
+      <p>${escapeHtml(reason)}</p>
+      <label><input type="checkbox" name="recoveryReviewed" value="yes" required> 종료 이유와 조건을 다시 확인했어요.</label>
+    </fieldset>`;
+  }
+
   function renderConstraints(view) {
     const constraints = view.constraints || {};
     const category = constraints.category === "cafe" ? "cafe" : "restaurant";
@@ -81,6 +100,7 @@
           <label>식이 조건 <input name="dietary" value="${escapeHtml((constraints.dietary || []).join(", "))}"></label>
           <label>접근성 조건 <input name="accessibility" value="${escapeHtml((constraints.accessibility || []).join(", "))}"></label>
         </details>
+        ${renderGuardedRecovery(view)}
         ${action("조건으로 바로 출발", "start")}
       </form>`;
   }

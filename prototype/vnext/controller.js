@@ -36,7 +36,7 @@
     return JSON.parse(JSON.stringify(value));
   }
 
-  function createController(options = {}) {
+  function createControllerCore(options = {}, inspectable = false) {
     const stateApi = options.stateApi || loadApi(globalScope.SomewhereVNextState, "./state.js");
     if (!stateApi) throw new Error("Somewhere vNext state API is required.");
 
@@ -149,7 +149,20 @@
     }
 
     renderCurrent();
-    return { dispatch, start, simulate, getState, destroy };
+    const controller = { dispatch, start, simulate, destroy };
+    if (inspectable) controller.getState = getState;
+    return controller;
+  }
+
+  function createController(options = {}) {
+    return createControllerCore({
+      ...options,
+      stateApi: loadApi(globalScope.SomewhereVNextState, "./state.js"),
+    });
+  }
+
+  function createTestController(options = {}) {
+    return createControllerCore(options, true);
   }
 
   function splitList(value) {
@@ -159,13 +172,14 @@
       .filter(Boolean);
   }
 
-  function mount(root, controlsRoot, options = {}) {
+  function mountController(root, controlsRoot, options = {}, inspectable = false) {
     if (!root || !controlsRoot) throw new Error("Product and prototype-control roots are required.");
     const screens = options.screens || loadApi(globalScope.SomewhereVNextScreens, "./screens.js");
     if (!screens) throw new Error("Somewhere vNext screen API is required.");
 
     const FormDataType = options.FormData || globalScope.FormData;
-    const controller = createController({
+    const controllerFactory = inspectable ? createTestController : createController;
+    const controller = controllerFactory({
       ...options,
       render: (view) => screens.renderApp(root, controlsRoot, view),
     });
@@ -174,18 +188,27 @@
       return typeof container.contains !== "function" || container.contains(element);
     }
 
-    function readConstraints(button) {
+    function readStartForm(button) {
       const form = button.closest?.('[data-form="constraints"]');
       if (!form || typeof FormDataType !== "function") return null;
+      const recoveryReview = form.querySelector?.('[name="recoveryReviewed"]');
+      if (recoveryReview && !recoveryReview.checked) {
+        recoveryReview.reportValidity?.();
+        recoveryReview.focus?.();
+        return null;
+      }
       const data = new FormDataType(form);
       const budget = String(data.get("budget") ?? "").trim();
       return {
-        category: String(data.get("category") ?? ""),
-        maxWalkMinutes: Number(data.get("maxWalkMinutes")),
-        budget: budget || null,
-        dietary: splitList(data.get("dietary")),
-        accessibility: splitList(data.get("accessibility")),
-        disclosure: "standard",
+        constraints: {
+          category: String(data.get("category") ?? ""),
+          maxWalkMinutes: Number(data.get("maxWalkMinutes")),
+          budget: budget || null,
+          dietary: splitList(data.get("dietary")),
+          accessibility: splitList(data.get("accessibility")),
+          disclosure: "standard",
+        },
+        recoveryReviewed: data.get("recoveryReviewed") === "yes",
       };
     }
 
@@ -213,10 +236,11 @@
       event.preventDefault?.();
       const actionName = button.dataset.action;
       if (actionName === "start") {
-        const constraints = readConstraints(button);
-        if (!constraints) return;
-        const recoveryReviewed = Boolean(controller.getState().errors.recoveryReview);
-        controller.start(constraints, { recoveryReviewed });
+        const startForm = readStartForm(button);
+        if (!startForm) return;
+        controller.start(startForm.constraints, {
+          recoveryReviewed: startForm.recoveryReviewed,
+        });
         return;
       }
       if (actionName === "reveal-destination") {
@@ -256,9 +280,23 @@
     return { controller, destroy };
   }
 
+  function mount(root, controlsRoot, options = {}) {
+    return mountController(root, controlsRoot, options);
+  }
+
+  function mountForTest(root, controlsRoot, options = {}) {
+    return mountController(root, controlsRoot, options, true);
+  }
+
   const browserApi = { createController, mount };
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { ...browserApi, MOCK_DESTINATION, MOCK_ROUTE };
+    module.exports = {
+      ...browserApi,
+      createTestController,
+      mountForTest,
+      MOCK_DESTINATION,
+      MOCK_ROUTE,
+    };
   }
   globalScope.SomewhereVNextController = browserApi;
 })(typeof globalThis !== "undefined" ? globalThis : window);
