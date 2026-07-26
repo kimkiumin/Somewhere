@@ -63,7 +63,13 @@
     }
     if (action.type === "START" && state.phase === "constraints") {
       const result = validateConstraints(action.constraints);
-      if (!result.valid) return { ...state, errors: result.errors };
+      if (!result.valid) {
+        return {
+          ...state,
+          constraints: structuredClone(action.constraints),
+          errors: result.errors,
+        };
+      }
       return {
         ...state,
         phase: "finding",

@@ -38,6 +38,7 @@ test("invalid constraints remain editable and identify exact fields", () => {
   assert.deepEqual(unchanged.errors, {
     maxWalkMinutes: "?꾨낫 ?쒓컙? 1遺??댁긽?댁뼱???⑸땲??",
   });
+  assert.equal(unchanged.constraints.maxWalkMinutes, 0);
 });
 
 test("finding success begins guidance without a ready or second commit state", () => {
