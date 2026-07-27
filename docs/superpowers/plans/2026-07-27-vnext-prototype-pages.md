@@ -22,6 +22,10 @@
 - Do not add a visible prototype badge inside the product canvas or change the approved product sequence.
 - Do not change historical v0.1 files.
 
+## Execution Adjustment
+
+Plan review on 2026-07-27 replaced the proposed YAML-string contract with a real artifact-boundary test. `tests/pages_artifact_contract.test.js` executes `harness/stage-vnext-pages.ps1` against a fixture containing runtime and repository-only files, then verifies that the output contains exactly the six approved runtime files. The Pages workflow invokes the same staging script, so the test covers the behavior that creates the public artifact rather than merely matching workflow source text.
+
 ---
 
 ### Task 1: Lock and implement the isolated Pages artifact

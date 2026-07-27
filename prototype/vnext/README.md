@@ -14,6 +14,10 @@ Use the product canvas for onboarding, conditions, one-action start, compass gui
 
 The separately labeled prototype panel simulates finding, walking, near, arrival, no-fit, low confidence, permission denial, a missing arrival field, feedback eligibility, and reset. These controls are not proposed product UI.
 
+## GitHub Pages Prototype
+
+The runnable prototype is published at <https://kimkiumin.github.io/Somewhere/> by the `Prototype — vNext Sequence` workflow. The Pages artifact contains only the six browser runtime files from this directory; tests, this README, project documents, and the historical v0.1 prototype are not published with the site.
+
 ## Limitations
 
 All destinations, routes, sensor states, timing, and external-map behavior are deterministic mock evidence. Passing this prototype does not establish provider, iPhone, outdoor-navigation, legal, or field feasibility.
