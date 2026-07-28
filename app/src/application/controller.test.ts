@@ -19,6 +19,7 @@ type FakeSensors = {
   readonly permissionCalls: () => number;
   readonly wakeAcquireCalls: () => number;
   readonly wakeReleaseCalls: () => number;
+  readonly setPermission: (outcome: PermissionOutcome) => void;
   readonly emitVisibility: (state: VisibilityState) => void;
   readonly emitLocation: LocationSource["subscribe"] extends (
     onSample: infer Listener,
@@ -35,6 +36,7 @@ type FakeSensors = {
 };
 
 function fakeSensors(permission: PermissionOutcome = { status: "granted" }): FakeSensors {
+  let permissionOutcome = permission;
   let locationListener: Parameters<LocationSource["subscribe"]>[0] | null = null;
   let headingListener: Parameters<HeadingSource["subscribe"]>[0] | null = null;
   let visibilityListener: ((state: VisibilityState) => void) | null = null;
@@ -60,7 +62,7 @@ function fakeSensors(permission: PermissionOutcome = { status: "granted" }): Fak
   const heading: HeadingSource = {
     requestPermissionFromUserGesture() {
       permissionCallCount += 1;
-      return Promise.resolve(permission);
+      return Promise.resolve(permissionOutcome);
     },
     subscribe(onSample) {
       headingListener = onSample;
@@ -108,6 +110,9 @@ function fakeSensors(permission: PermissionOutcome = { status: "granted" }): Fak
     permissionCalls: () => permissionCallCount,
     wakeAcquireCalls: () => wakeAcquireCallCount,
     wakeReleaseCalls: () => wakeReleaseCallCount,
+    setPermission(outcome) {
+      permissionOutcome = outcome;
+    },
     emitVisibility(state) {
       if (visibilityListener !== null) {
         visibilityListener(state);
@@ -202,5 +207,18 @@ describe("sensor controller lifecycle", () => {
       reasons: ["heading-denied"],
     });
     expect(fake.activeCounts().heading).toBe(0);
+  });
+
+  test("retries permission and sensor subscriptions from a new user gesture", async () => {
+    const fake = fakeSensors({ status: "denied" });
+    const controller = createSensorController(fake.ports);
+    await controller.startFromUserGesture();
+    fake.setPermission({ status: "granted" });
+
+    await controller.retryFromUserGesture();
+
+    expect(fake.permissionCalls()).toBe(2);
+    expect(fake.activeCounts()).toEqual({ location: 1, heading: 1 });
+    expect(controller.snapshot().heading.status).toBe("acquiring");
   });
 });

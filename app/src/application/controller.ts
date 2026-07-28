@@ -61,6 +61,7 @@ export type SensorSnapshot = {
 
 export interface SensorController {
   startFromUserGesture(): Promise<void>;
+  retryFromUserGesture(): Promise<void>;
   snapshot(): SensorSnapshot;
   subscribe(listener: (snapshot: SensorSnapshot) => void): Unsubscribe;
   settle(): Promise<void>;
@@ -219,6 +220,24 @@ export function createSensorController(ports: SensorControllerPorts): SensorCont
     });
   }
 
+  function beginAcquisitionFromUserGesture(): Promise<void> {
+    location = { status: "acquiring" };
+    heading = { status: "acquiring" };
+    startSensors();
+
+    const permission = ports.heading.requestPermissionFromUserGesture();
+    const wake = ports.wakeLock.acquire();
+    wakeLock = { status: "acquiring" };
+    notify();
+
+    pendingLifecycle = Promise.all([permission, wake]).then(([permissionOutcome, wakeOutcome]) => {
+      applyPermission(permissionOutcome);
+      applyWakeLock(wakeOutcome);
+      notify();
+    });
+    return pendingLifecycle;
+  }
+
   function handleVisibility(next: VisibilityState): void {
     if (destroyed || next === visibility) {
       return;
@@ -268,23 +287,15 @@ export function createSensorController(ports: SensorControllerPorts): SensorCont
       }
 
       started = true;
-      location = { status: "acquiring" };
-      heading = { status: "acquiring" };
-      startSensors();
-
-      const permission = ports.heading.requestPermissionFromUserGesture();
-      const wake = ports.wakeLock.acquire();
-      wakeLock = { status: "acquiring" };
-      notify();
-
-      pendingLifecycle = Promise.all([permission, wake]).then(
-        ([permissionOutcome, wakeOutcome]) => {
-          applyPermission(permissionOutcome);
-          applyWakeLock(wakeOutcome);
-          notify();
-        },
-      );
-      return pendingLifecycle;
+      return beginAcquisitionFromUserGesture();
+    },
+    retryFromUserGesture() {
+      if (destroyed) {
+        return pendingLifecycle;
+      }
+      started = true;
+      stopSensors();
+      return beginAcquisitionFromUserGesture();
     },
     snapshot,
     subscribe(listener) {

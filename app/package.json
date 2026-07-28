@@ -10,12 +10,14 @@
   "scripts": {
     "dev": "bun --bun vite",
     "build": "bun --bun vite build",
+    "build:harness": "bun --bun vite build --mode test-harness",
     "preview": "bun --bun vite preview",
+    "preview:harness": "bun --bun vite preview --outDir dist-e2e",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome format --write .",
     "test:unit": "vitest run --passWithNoTests",
-    "test:e2e": "playwright test",
+    "test:e2e": "bun run build:harness && playwright test",
     "test:prototype": "node --test ../prototype/app.test.js",
     "verify": "bun run test:prototype && bun run lint && bun run typecheck && bun run test:unit && bun run build && bun run test:e2e"
   },

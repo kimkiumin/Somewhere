@@ -220,6 +220,16 @@ h3 {
   width: 100%;
 }
 
+.button--compact {
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.75rem;
+}
+
+.button--warm {
+  background: var(--color-warm);
+}
+
 .button-row,
 .safety-row {
   gap: var(--space-3);
@@ -264,6 +274,30 @@ h3 {
 .hidden-panel {
   display: grid;
   gap: var(--space-4);
+}
+
+.hero,
+.state-heading,
+.safety-controls,
+.reveal-panel {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.state-heading--compact {
+  gap: var(--space-2);
+}
+
+.journey-title {
+  font-size: clamp(1.65rem, 7vw, 2rem);
+}
+
+.centered {
+  text-align: center;
+}
+
+.safety-controls {
+  gap: var(--space-3);
 }
 
 .hidden-mark {
@@ -388,6 +422,42 @@ h3 {
 .diagnostics {
   display: grid;
   gap: var(--space-4);
+}
+
+.diagnostics-panel {
+  margin-top: var(--space-4);
+}
+
+.privacy-warning {
+  border-left: 3px solid var(--color-caution);
+  padding-left: var(--space-3);
+  color: var(--color-caution);
+}
+
+.select {
+  min-height: 48px;
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  color: var(--color-text);
+  background: var(--color-panel);
+}
+
+.reveal-panel {
+  border-radius: var(--radius-lg);
+  padding: var(--space-8) var(--space-6);
+  color: var(--color-text);
+  background: var(--color-warm-soft);
+}
+
+.reveal-panel--neutral {
+  background: var(--color-muted);
+}
+
+.reveal-category {
+  color: var(--color-warm);
+  text-transform: uppercase;
 }
 
 .diagnostic-row {

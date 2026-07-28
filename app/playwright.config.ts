@@ -30,7 +30,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `bun run preview --host 127.0.0.1 --port ${previewPort}`,
+    command: `bun run preview:harness --host 127.0.0.1 --port ${previewPort}`,
     url: `http://127.0.0.1:${previewPort}/Somewhere/`,
     reuseExistingServer: false,
     timeout: 120_000,
