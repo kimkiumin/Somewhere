@@ -87,7 +87,7 @@ bun run verify
 ```
 
 `bun run verify` preserves the 11 frozen v0.1 regressions, then runs Biome,
-strict TypeScript, 35 Vitest checks, a production build, and deterministic
+strict TypeScript, 38 Vitest checks, a production build, and deterministic
 Chromium/WebKit flows. No API key, account, database, or paid place provider is
 required.
 
