@@ -1,7 +1,7 @@
 # Prototype Notes
 
-Status: implemented / v0.1  
-Last updated: 2026-07-08
+Status: v0.1 frozen / v0.2 sensor PWA implemented
+Last updated: 2026-07-28
 
 This document records what the prototype currently implements, what it does not implement, and what UX hypotheses it is meant to test.
 
@@ -119,3 +119,25 @@ Do not implement these until v0.1 is reviewed.
 - Physical device mock comparison
 - User testing script
 - App vs hardware comparison test
+
+## 9. v0.2 Sensor PWA
+
+The v0.1 prototype above remains frozen and independently runnable. `/app` is a
+new Vanilla TypeScript/Vite application with:
+
+- real browser Geolocation and device-orientation adapters;
+- iPhone WebKit magnetic heading plus stored NOAA WMM2025 declination;
+- signal age/accuracy gates, Near hysteresis, and three-sample latched arrival;
+- hidden, following, near, arrived, reveal, Give Up, and Reroll states;
+- seven runtime-validated Seoul Forest destinations and no live place API;
+- visibility pause/reacquire and Screen Wake Lock lifecycle;
+- memory-only, explicit-download field diagnostics;
+- a deterministic compile-time browser harness;
+- installable/offline PWA packaging with idle-only update approval;
+- GitHub Actions verification and GitHub Pages deployment.
+
+v0.2 tests the hypothesis that a screen-on, low-attention phone compass can
+support a safe-feeling hidden walk before investing in native packaging. It
+does not claim background navigation, route safety, public destination safety,
+or iPhone hardware acceptance. The physical gate is documented in
+`app/qa/field/README.md`.

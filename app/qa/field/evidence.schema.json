@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kimkiumin.github.io/Somewhere/qa/field/evidence.schema.json",
+  "title": "Somewhere v0.2 field evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "buildSha",
+    "deployedUrl",
+    "device",
+    "software",
+    "browserMode",
+    "environment",
+    "startedAt",
+    "endedAt",
+    "weatherContext",
+    "trace",
+    "outcomes",
+    "notes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "buildSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "deployedUrl": {
+      "const": "https://kimkiumin.github.io/Somewhere/"
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model"],
+      "properties": {
+        "model": {
+          "const": "iPhone 15 Pro Max"
+        }
+      }
+    },
+    "software": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["iosVersion", "safariVersion"],
+      "properties": {
+        "iosVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "safariVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "browserMode": {
+      "enum": ["safari", "home-screen"]
+    },
+    "environment": {
+      "enum": ["open-sky", "urban-canyon"]
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "endedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "weatherContext": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "storedPrivately"],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "storedPrivately": {
+          "const": true
+        }
+      }
+    },
+    "outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "startPermissionReliable",
+        "identityHiddenUntilExit",
+        "northCrossingShortPath",
+        "visibilityFreshRecovery",
+        "wakeLockSustained",
+        "singleSubscriptionPerSource",
+        "noStaleArrow",
+        "noFalseArrival",
+        "arrivalLatched",
+        "safetyControlsReachable"
+      ],
+      "properties": {
+        "startPermissionReliable": {
+          "type": "boolean"
+        },
+        "identityHiddenUntilExit": {
+          "type": "boolean"
+        },
+        "northCrossingShortPath": {
+          "type": "boolean"
+        },
+        "visibilityFreshRecovery": {
+          "type": "boolean"
+        },
+        "wakeLockSustained": {
+          "type": "boolean"
+        },
+        "singleSubscriptionPerSource": {
+          "type": "boolean"
+        },
+        "noStaleArrow": {
+          "type": "boolean"
+        },
+        "noFalseArrival": {
+          "type": "boolean"
+        },
+        "arrivalLatched": {
+          "type": "boolean"
+        },
+        "safetyControlsReachable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}
