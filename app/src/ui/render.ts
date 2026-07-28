@@ -41,13 +41,13 @@ function instrumentHeader(snapshot: JourneyApplicationSnapshot): HTMLElement {
   return header;
 }
 
-function safetyControls(): HTMLElement {
+function safetyControls(includeReveal = true): HTMLElement {
   const wrapper = element("div", "safety-controls");
   const row = element("div", "safety-row");
-  row.append(
-    actionButton("Reveal", "reveal", "button--secondary"),
-    actionButton("Give up", "give-up", "button--caution"),
-  );
+  if (includeReveal) {
+    row.append(actionButton("Reveal", "reveal", "button--secondary"));
+  }
+  row.append(actionButton("Give up", "give-up", "button--caution"));
   wrapper.append(row, actionButton("Reroll", "reroll", "button--quiet button--wide"));
   return wrapper;
 }
@@ -191,7 +191,7 @@ function activeJourneyScreen(main: HTMLElement, snapshot: JourneyApplicationSnap
       heading,
       compass("arrived", "Arrived", "Take in your surroundings"),
       actionButton("Reveal destination", "reveal", "button--primary button--wide button--warm"),
-      safetyControls(),
+      safetyControls(false),
     );
     return;
   }

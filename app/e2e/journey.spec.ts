@@ -23,6 +23,9 @@ test("completes a hidden destination journey without leaking identity", async ({
   await expect(page.getByRole("heading", { name: "Arrived." })).toBeVisible();
 
   await expect(page.getByText("가족마당")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Reveal destination" })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Reveal", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Give up", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Reveal destination" }).click();
   await expect(page.getByRole("heading", { name: "가족마당" })).toBeVisible();
 });

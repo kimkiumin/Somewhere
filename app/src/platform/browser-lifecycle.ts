@@ -52,6 +52,8 @@ export function createBrowserWakeLockSource(
 ): WakeLockSource {
   let sentinel: WakeLockSentinelLike | null = null;
   let sentinelListener: (() => void) | null = null;
+  let pendingAcquire: Promise<WakeLockOutcome> | null = null;
+  let desiredActive = false;
   const listeners = new Set<() => void>();
 
   function detachSentinelListener(): void {
@@ -62,33 +64,55 @@ export function createBrowserWakeLockSource(
   }
 
   return {
-    async acquire(): Promise<WakeLockOutcome> {
+    acquire(): Promise<WakeLockOutcome> {
+      desiredActive = true;
       if (environment === undefined) {
-        return { status: "unsupported" };
+        return Promise.resolve({ status: "unsupported" });
       }
       if (sentinel !== null && !sentinel.released) {
-        return { status: "acquired" };
+        return Promise.resolve({ status: "acquired" });
+      }
+      if (pendingAcquire !== null) {
+        return pendingAcquire;
       }
 
-      try {
-        const nextSentinel = await environment.request();
-        detachSentinelListener();
-        sentinel = nextSentinel;
-        sentinelListener = () => {
-          for (const listener of listeners) {
-            listener();
+      pendingAcquire = (async () => {
+        try {
+          const nextSentinel = await environment.request();
+          detachSentinelListener();
+          sentinel = nextSentinel;
+          sentinelListener = () => {
+            for (const listener of listeners) {
+              listener();
+            }
+          };
+          sentinel.addReleaseListener(sentinelListener);
+          if (!desiredActive) {
+            await sentinel.release();
+            detachSentinelListener();
+            sentinel = null;
           }
-        };
-        sentinel.addReleaseListener(sentinelListener);
-        return { status: "acquired" };
-      } catch (error) {
-        return {
-          status: "error",
-          message: error instanceof Error ? error.message : "Wake Lock request failed.",
-        };
-      }
+          return { status: "acquired" };
+        } catch (error) {
+          return {
+            status: "error",
+            message: error instanceof Error ? error.message : "Wake Lock request failed.",
+          };
+        } finally {
+          pendingAcquire = null;
+        }
+      })();
+      return pendingAcquire;
     },
     async release(): Promise<void> {
+      desiredActive = false;
+      const acquiring = pendingAcquire;
+      if (acquiring !== null) {
+        await Promise.all([acquiring]);
+      }
+      if (desiredActive) {
+        return;
+      }
       const currentSentinel = sentinel;
       if (currentSentinel === null) {
         return;

@@ -1,6 +1,14 @@
 import { describe, expect, test } from "vitest";
 import { createBrowserVisibilitySource, createBrowserWakeLockSource } from "./browser-lifecycle";
 
+function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
+  let resolvePromise: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: resolvePromise };
+}
+
 describe("browser lifecycle adapters", () => {
   test("normalizes visibility and removes the listener", () => {
     const callbacks: { visibility: () => void } = { visibility: () => undefined };
@@ -58,5 +66,75 @@ describe("browser lifecycle adapters", () => {
 
     await source.release();
     expect(sentinelReleaseCount).toBe(1);
+  });
+
+  test("deduplicates acquisition and releases a sentinel that arrives after release", async () => {
+    const request = deferred<{
+      readonly released: boolean;
+      readonly release: () => Promise<void>;
+      readonly addReleaseListener: (listener: () => void) => void;
+      readonly removeReleaseListener: (listener: () => void) => void;
+    }>();
+    let requestCount = 0;
+    let sentinelReleaseCount = 0;
+    const source = createBrowserWakeLockSource({
+      request() {
+        requestCount += 1;
+        return request.promise;
+      },
+    });
+
+    const firstAcquire = source.acquire();
+    const secondAcquire = source.acquire();
+    const release = source.release();
+    request.resolve({
+      released: false,
+      release() {
+        sentinelReleaseCount += 1;
+        return Promise.resolve();
+      },
+      addReleaseListener() {},
+      removeReleaseListener() {},
+    });
+
+    await expect(firstAcquire).resolves.toEqual({ status: "acquired" });
+    await expect(secondAcquire).resolves.toEqual({ status: "acquired" });
+    await release;
+    expect(requestCount).toBe(1);
+    expect(sentinelReleaseCount).toBe(1);
+  });
+
+  test("keeps a shared pending acquisition when visibility immediately needs it again", async () => {
+    const request = deferred<{
+      readonly released: boolean;
+      readonly release: () => Promise<void>;
+      readonly addReleaseListener: (listener: () => void) => void;
+      readonly removeReleaseListener: (listener: () => void) => void;
+    }>();
+    let requestCount = 0;
+    let sentinelReleaseCount = 0;
+    const source = createBrowserWakeLockSource({
+      request() {
+        requestCount += 1;
+        return request.promise;
+      },
+    });
+
+    const firstAcquire = source.acquire();
+    const release = source.release();
+    const resumedAcquire = source.acquire();
+    request.resolve({
+      released: false,
+      release() {
+        sentinelReleaseCount += 1;
+        return Promise.resolve();
+      },
+      addReleaseListener() {},
+      removeReleaseListener() {},
+    });
+
+    await Promise.all([firstAcquire, release, resumedAcquire]);
+    expect(requestCount).toBe(1);
+    expect(sentinelReleaseCount).toBe(0);
   });
 });

@@ -35,7 +35,18 @@ type FakeSensors = {
     : never;
 };
 
-function fakeSensors(permission: PermissionOutcome = { status: "granted" }): FakeSensors {
+function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
+  let resolvePromise: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: resolvePromise };
+}
+
+function fakeSensors(
+  permission: PermissionOutcome = { status: "granted" },
+  acquireWakeLock: () => Promise<WakeLockOutcome> = () => Promise.resolve({ status: "acquired" }),
+): FakeSensors {
   let permissionOutcome = permission;
   let locationListener: Parameters<LocationSource["subscribe"]>[0] | null = null;
   let headingListener: Parameters<HeadingSource["subscribe"]>[0] | null = null;
@@ -88,8 +99,7 @@ function fakeSensors(permission: PermissionOutcome = { status: "granted" }): Fak
   const wakeLock: WakeLockSource = {
     acquire() {
       wakeAcquireCallCount += 1;
-      const outcome: WakeLockOutcome = { status: "acquired" };
-      return Promise.resolve(outcome);
+      return acquireWakeLock();
     },
     release() {
       wakeReleaseCallCount += 1;
@@ -193,6 +203,24 @@ describe("sensor controller lifecycle", () => {
       capturedAtMs: 10_000,
     });
     expect(controller.snapshot().guidance.status).toBe("live");
+  });
+
+  test("releases a Wake Lock that finishes acquiring after the page becomes hidden", async () => {
+    const wake = deferred<WakeLockOutcome>();
+    const fake = fakeSensors({ status: "granted" }, () => wake.promise);
+    const controller = createSensorController(fake.ports);
+
+    const start = controller.startFromUserGesture();
+    fake.emitVisibility("hidden");
+    wake.resolve({ status: "acquired" });
+    await start;
+
+    expect(controller.snapshot().wakeLock.status).toBe("released");
+    expect(controller.snapshot().guidance).toEqual({
+      status: "paused",
+      reasons: ["visibility-hidden"],
+    });
+    expect(fake.wakeReleaseCalls()).toBe(2);
   });
 
   test("keeps a denied heading as a recoverable paused state", async () => {

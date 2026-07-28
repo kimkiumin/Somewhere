@@ -212,12 +212,20 @@ export function createSensorController(ports: SensorControllerPorts): SensorCont
     }
   }
 
-  function acquireWakeLock(): Promise<void> {
+  async function applyWakeLockForCurrentVisibility(outcome: WakeLockOutcome): Promise<void> {
+    if (outcome.status === "acquired" && (visibility === "hidden" || destroyed)) {
+      await ports.wakeLock.release();
+      wakeLock = { status: "released" };
+      return;
+    }
+    applyWakeLock(outcome);
+  }
+
+  async function acquireWakeLock(): Promise<void> {
     wakeLock = { status: "acquiring" };
-    return ports.wakeLock.acquire().then((outcome) => {
-      applyWakeLock(outcome);
-      notify();
-    });
+    const outcome = await ports.wakeLock.acquire();
+    await applyWakeLockForCurrentVisibility(outcome);
+    notify();
   }
 
   function beginAcquisitionFromUserGesture(): Promise<void> {
@@ -230,11 +238,13 @@ export function createSensorController(ports: SensorControllerPorts): SensorCont
     wakeLock = { status: "acquiring" };
     notify();
 
-    pendingLifecycle = Promise.all([permission, wake]).then(([permissionOutcome, wakeOutcome]) => {
-      applyPermission(permissionOutcome);
-      applyWakeLock(wakeOutcome);
-      notify();
-    });
+    pendingLifecycle = Promise.all([permission, wake]).then(
+      async ([permissionOutcome, wakeOutcome]) => {
+        applyPermission(permissionOutcome);
+        await applyWakeLockForCurrentVisibility(wakeOutcome);
+        notify();
+      },
+    );
     return pendingLifecycle;
   }
 
