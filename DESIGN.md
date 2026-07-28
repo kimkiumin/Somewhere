@@ -15,13 +15,13 @@ Blind Compass feels like a quiet field instrument: calm, analog, slightly myster
 | Surface/muted | `--color-muted` | `#e6ede3` | `#20271f` | Safe status, secondary bands |
 | Surface/deep | `--color-deep` | `#17231c` | `#f5f1e8` | Compass stage and primary actions |
 | Text/primary | `--color-text` | `#17231c` | `#f7f3ea` | Main copy |
-| Text/secondary | `--color-text-muted` | `#697266` | `#aab3a7` | Hints, metadata |
+| Text/secondary | `--color-text-muted` | `#5d665b` | `#aab3a7` | Hints, metadata |
 | Text/inverse | `--color-text-inverse` | `#fffdf8` | `#17231c` | Text on dark surfaces |
 | Border/default | `--color-border` | `#d8ddd2` | `#30382f` | Dividers and controls |
 | Accent/primary | `--color-accent` | `#2d5b73` | `#8fbdd2` | Direction, focus, active cue |
-| Accent/warm | `--color-warm` | `#b66a42` | `#d89a73` | Arrival and reveal cue |
+| Accent/warm | `--color-warm` | `#8f5233` | `#d89a73` | Arrival and reveal cue |
 | Status/safe | `--color-safe` | `#3f6b4a` | `#8cc99a` | Safety confirmation |
-| Status/caution | `--color-caution` | `#8b6230` | `#e0b16b` | Give up, uncertainty |
+| Status/caution | `--color-caution` | `#805827` | `#e0b16b` | Give up, uncertainty |
 
 ### Rules
 
