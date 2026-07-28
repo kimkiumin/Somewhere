@@ -6,6 +6,25 @@ Build and refine a mobile-first prototype for a hidden-destination compass adven
 
 The user does not know the destination. The app gives only minimal direction and distance cues. The user follows those cues and discovers the destination at the end.
 
+## Current v0.2 Working Surface
+
+- Treat `/prototype` as the frozen v0.1 reference. Preserve its 11 Node tests
+  and do not import it at runtime.
+- Build current work in `/app` with Bun, strict TypeScript, Vite, Biome,
+  Vitest, and Playwright.
+- Real GPS, iPhone `webkitCompassHeading`, visibility recovery, and screen Wake
+  Lock are intentionally in v0.2. The older v0.1 “no real GPS” rules below
+  apply only to `/prototype`.
+- Keep browser APIs in `/app/src/platform`, pure math/state in
+  `/app/src/domain`, orchestration in `/app/src/application`, and DOM/CSS in
+  `/app/src/ui`.
+- The production bundle always uses real browser adapters. Deterministic
+  sensors are allowed only in the separately compiled test-harness mode.
+- The first field area is the manually curated Seoul Forest bundle. Do not add
+  a live or paid place API.
+- No background or locked-screen navigation promise. If it becomes required,
+  apply the native-pivot gate in `/app/qa/field/README.md`.
+
 ## Core Flow
 
 ```text

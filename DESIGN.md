@@ -15,13 +15,13 @@ Blind Compass feels like a quiet field instrument: calm, analog, slightly myster
 | Surface/muted | `--color-muted` | `#e6ede3` | `#20271f` | Safe status, secondary bands |
 | Surface/deep | `--color-deep` | `#17231c` | `#f5f1e8` | Compass stage and primary actions |
 | Text/primary | `--color-text` | `#17231c` | `#f7f3ea` | Main copy |
-| Text/secondary | `--color-text-muted` | `#697266` | `#aab3a7` | Hints, metadata |
+| Text/secondary | `--color-text-muted` | `#5d665b` | `#aab3a7` | Hints, metadata |
 | Text/inverse | `--color-text-inverse` | `#fffdf8` | `#17231c` | Text on dark surfaces |
 | Border/default | `--color-border` | `#d8ddd2` | `#30382f` | Dividers and controls |
 | Accent/primary | `--color-accent` | `#2d5b73` | `#8fbdd2` | Direction, focus, active cue |
-| Accent/warm | `--color-warm` | `#b66a42` | `#d89a73` | Arrival and reveal cue |
+| Accent/warm | `--color-warm` | `#8f5233` | `#d89a73` | Arrival and reveal cue |
 | Status/safe | `--color-safe` | `#3f6b4a` | `#8cc99a` | Safety confirmation |
-| Status/caution | `--color-caution` | `#8b6230` | `#e0b16b` | Give up, uncertainty |
+| Status/caution | `--color-caution` | `#805827` | `#e0b16b` | Give up, uncertainty |
 
 ### Rules
 
@@ -83,6 +83,9 @@ All spacing derives from a base of 4px.
 
 - Controls and counters have stable dimensions to prevent state text from shifting the compass.
 - The primary action area remains reachable near the lower half of the screen.
+- Mobile frames include all four `env(safe-area-inset-*)` values.
+- Interactive targets are at least 48px high; icon-only controls are not used in the journey.
+- At 390×844 and 430×932, the compass, status, Reveal, and Give Up controls fit in the first viewport.
 
 ## 5. Components
 
@@ -118,6 +121,30 @@ All spacing derives from a base of 4px.
 - **Accessibility**: no hidden destination name appears before reveal.
 - **Motion**: subtle opacity update on distance change.
 
+### Signal Status
+- **Structure**: short status label, one plain-language explanation, optional Retry action.
+- **Variants**: acquiring, paused, denied, unsupported, recovered.
+- **States**: the direction arrow is absent whenever guidance is not live.
+- **Accessibility**: status text is the source of truth; color never carries the state alone.
+- **Copy**: names the next safe action without exposing developer-state vocabulary.
+
+### Safety Controls
+- **Structure**: Reveal and Give Up remain a stable two-column row during hidden, following, near, paused, and arrived states.
+- **Variants**: Reveal uses secondary emphasis; Give Up uses quiet caution.
+- **States**: never disabled because of sensor quality.
+- **Placement**: Reroll follows the safety row and may sit below the first viewport.
+
+### Diagnostics Drawer
+- **Structure**: capability table, subscription counts, trace controls, environment label.
+- **Variants**: closed summary and expanded details.
+- **Privacy**: warns that exported coordinates are sensitive; traces are memory-only until Download.
+- **States**: Download, Discard, and Close are explicit text controls.
+
+### Primitive Showcase
+- The implementation reference is `/Somewhere/showcase.html`.
+- It must display every button variant, signal state, compass state, hidden panel, safety row, and diagnostics surface before consumer screens are approved.
+- A showcase failure blocks new screen-level styling.
+
 ## 6. Motion & Interaction
 
 ### Timing
@@ -133,6 +160,8 @@ All spacing derives from a base of 4px.
 - Only `transform` and `opacity` are animated.
 - Respect `prefers-reduced-motion`.
 - Motion must communicate state change, not decoration.
+- Compass angles cross north by the shortest path; reduced-motion mode applies the target angle immediately.
+- Low-frequency state changes may re-render a screen. High-frequency heading changes update only the compass needle transform.
 
 ## 7. Depth & Surface
 
@@ -147,3 +176,19 @@ Mixed, with border-led panels and one dark tonal compass stage.
 | Tonal/deep | `var(--color-deep)` | Compass stage |
 
 Depth stays quiet. No floating decorative shapes, no map-like backgrounds, and no nested card stacks.
+
+## 8. v0.2 State Contract
+
+| Product state | Compass | Accent | Essential controls |
+|---|---|---|---|
+| Idle | Quiet instrument preview | Deep green | Start adventure |
+| Acquiring | Dial present, arrow absent | Muted blue | Reveal, Give Up, Reroll |
+| Hidden | Destination identity absent | Deep green | Begin walk, Reveal, Give Up, Reroll |
+| Following | Live arrow and distance | Compass blue | Reveal, Give Up, Reroll |
+| Paused | Arrow absent, reason visible | Caution | Retry, Reveal, Give Up, Reroll |
+| Near | Live arrow, stronger proximity copy | Compass blue | Reveal, Give Up, Reroll |
+| Arrived | Arrow no longer required | Warm orange | Reveal, Give Up, Reroll |
+| Revealed | Destination identity visible | Warm orange | Start again |
+| Give Up | Neutral safe exit | Muted green | Start again |
+
+Developer phase labels, raw permission enums, and mock-data badges never appear in the consumer journey. Raw values live only in the explicitly opened diagnostics drawer.

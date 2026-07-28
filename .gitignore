@@ -16,12 +16,17 @@ yarn-error.log*
 .playwright-cli/
 output/
 .omo/
+playwright-report/
+test-results/
 
-# Dependencies / build outputs, only needed if a framework is added later
+# Dependencies / build outputs
 node_modules/
 dist/
+dist-e2e/
 build/
 .cache/
+.vite/
+.vitest/
 
 # Environment files
 .env
