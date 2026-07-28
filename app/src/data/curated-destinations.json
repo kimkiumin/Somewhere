@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "fieldArea": {
+    "id": "seoul-forest",
+    "center": {
+      "latitude": 37.5446443,
+      "longitude": 127.0373769
+    },
+    "validRadiusM": 2000,
+    "startZoneNote": "Manually inspected personal field-test area in Seoul Forest. Direction is not a route; remain on public paths and obey crossings.",
+    "declination": {
+      "degreesEast": -9.01145,
+      "model": "WMM2025",
+      "calculatedAt": "2026-07-28",
+      "reviewAfter": "2027-07-28",
+      "source": "NOAA NCEI WMM2025, Seoul Forest center"
+    }
+  },
+  "destinations": [
+    {
+      "id": "family-yard",
+      "coordinates": {
+        "latitude": 37.5450338,
+        "longitude": 127.0396172
+      },
+      "hint": "An open place where the park breathes.",
+      "estimatedMinutes": 5,
+      "reveal": {
+        "name": "가족마당",
+        "category": "Open lawn",
+        "description": "A broad public lawn in the heart of Seoul Forest."
+      },
+      "curation": {
+        "note": "Outdoor public landmark; verify crossings and current access during the walk.",
+        "reviewedAt": "2026-07-28",
+        "safeForPersonalFieldTest": true
+      }
+    },
+    {
+      "id": "gallery-garden",
+      "coordinates": {
+        "latitude": 37.5416232,
+        "longitude": 127.040134
+      },
+      "hint": "A quieter garden waits between textures.",
+      "estimatedMinutes": 9,
+      "reveal": {
+        "name": "갤러리정원",
+        "category": "Garden",
+        "description": "A landscaped garden space within Seoul Forest."
+      },
+      "curation": {
+        "note": "Outdoor public landmark; remain on park paths.",
+        "reviewedAt": "2026-07-28",
+        "safeForPersonalFieldTest": true
+      }
+    },
+    {
+      "id": "mirror-pond",
+      "coordinates": {
+        "latitude": 37.544255,
+        "longitude": 127.0410374
+      },
+      "hint": "Still water holds the sky.",
+      "estimatedMinutes": 7,
+      "reveal": {
+        "name": "거울연못",
+        "category": "Pond",
+        "description": "A reflective pond framed by trees and open sky."
+      },
+      "curation": {
+        "note": "Outdoor public landmark; stay behind pond edges and on paths.",
+        "reviewedAt": "2026-07-28",
+        "safeForPersonalFieldTest": true
+      }
+    },
+    {
+      "id": "war-horse-statue",
+      "coordinates": {
+        "latitude": 37.5440292,
+        "longitude": 127.0421788
+      },
+      "hint": "A still figure remembers motion.",
+      "estimatedMinutes": 9,
+      "reveal": {
+        "name": "군마상",
+        "category": "Sculpture",
+        "description": "A horse sculpture marking a piece of the site's history."
+      },
+      "curation": {
+        "note": "Outdoor public landmark; approach using marked paths.",
+        "reviewedAt": "2026-07-28",
+        "safeForPersonalFieldTest": true
+      }
+    },
+    {
+      "id": "deer-enclosure",
+      "coordinates": {
+        "latitude": 37.5428489,
+        "longitude": 127.0348065
+      },
+      "hint": "Quiet movement may appear beyond a boundary.",
+      "estimatedMinutes": 8,
+      "reveal": {
+        "name": "사슴우리",
+        "category": "Animal enclosure",
+        "description": "A public viewing area for deer inside Seoul Forest."
+      },
+      "curation": {
+        "note": "Outdoor public viewing point; do not enter restricted areas.",
+        "reviewedAt": "2026-07-28",
+        "safeForPersonalFieldTest": true
+      }
+    },
+    {
+      "id": "visitor-center",
+      "coordinates": {
+        "latitude": 37.5430767,
+        "longitude": 127.0418024
+      },
+      "hint": "A place for questions, rest, and orientation.",
+      "estimatedMinutes": 9,
+      "reveal": {
+        "name": "서울숲 방문자센터",
+        "category": "Visitor center",
+        "description": "The visitor information point for Seoul Forest."
+      },
+      "curation": {
+        "note": "Use the exterior landmark if the facility is closed.",
+        "reviewedAt": "2026-07-28",
+        "safeForPersonalFieldTest": true
+      }
+    },
+    {
+      "id": "seoul-forest-lake",
+      "coordinates": {
+        "latitude": 37.5447953,
+        "longitude": 127.0383738
+      },
+      "hint": "Find a wider glint between the trees.",
+      "estimatedMinutes": 4,
+      "reveal": {
+        "name": "서울숲호수",
+        "category": "Lake",
+        "description": "A waterside landmark near the center of Seoul Forest."
+      },
+      "curation": {
+        "note": "Outdoor public landmark; remain on the waterside path.",
+        "reviewedAt": "2026-07-28",
+        "safeForPersonalFieldTest": true
+      }
+    }
+  ]
+}
