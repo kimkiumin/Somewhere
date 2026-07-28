@@ -128,12 +128,12 @@ Somewhere/
 ├─ data/                              # existing v0.1 fixtures
 ├─ app/
 │  ├─ package.json
-│  ├─ package-lock.json
+│  ├─ bun.lock
 │  ├─ tsconfig.json
 │  ├─ vite.config.ts
 │  ├─ vitest.config.ts
 │  ├─ playwright.config.ts
-│  ├─ eslint.config.js
+│  ├─ biome.json
 │  ├─ index.html
 │  ├─ src/
 │  │  ├─ domain/
@@ -170,8 +170,9 @@ Start with these cohesive files. Split them only when measured complexity
 demands it; do not pre-create generic event buses, command registries, stores,
 or provider frameworks.
 
-`/app` owns its ESM package and lockfile. Node 24 is pinned by major locally,
-in `engines`, and in Actions. Dependencies are installed with `npm ci`.
+`/app` owns its ESM package and lockfile. Bun 1.3.14 is pinned locally and in
+Actions, while Node 24 remains pinned for the frozen prototype regression and
+browser tooling compatibility. Dependencies are installed with `bun ci`.
 
 ## 5. Dependency rules
 
@@ -503,27 +504,27 @@ milestone.
 From `/app`:
 
 ```text
-npm run dev             Ubuntu desktop development
-npm run typecheck       strict tsc --noEmit
-npm run lint            type-aware ESLint
-npm run test:unit       Vitest in Node
-npm run test:e2e        Playwright deterministic browser flows
-npm run test:prototype  frozen v0.1 Node regression
-npm run build           production Vite build
-npm run verify          all gates in a fixed order
+bun run dev             Ubuntu desktop development
+bun run typecheck       strict tsc --noEmit
+bun run lint            Biome 2 recommended + type-aware rules
+bun run test:unit       Vitest in Node
+bun run test:e2e        Playwright deterministic browser flows
+bun run test:prototype  frozen v0.1 Node regression
+bun run build           production Vite build
+bun run verify          all gates in a fixed order
 ```
 
 Vite transpilation is not type checking, so `typecheck` is a separate required
 gate. The one-time Ubuntu browser setup is:
 
 ```text
-npx playwright install --with-deps chromium webkit
+bunx playwright install --with-deps chromium webkit
 ```
 
-Type-aware `typescript-eslint` rules are part of verification. In addition to
-its recommended type-checked set, enable `no-floating-promises`,
-`no-misused-promises`, and `switch-exhaustiveness-check`; these directly protect
-the asynchronous capability lifecycle and discriminated state handling.
+Biome 2 recommended project/type domains and `noFloatingPromises` are part of
+verification. Strict TypeScript plus explicit exhaustive `assertNever` checks
+protect discriminated state handling. Biome's type inference is intentionally
+paired with `tsc`; neither gate substitutes for the other.
 
 ### TypeScript baseline
 
@@ -580,10 +581,11 @@ real-device gate are the meaningful safety evidence.
 Use one staged GitHub Actions workflow:
 
 1. Checkout.
-2. Set up Node 24 with npm cache keyed by `app/package-lock.json`.
-3. `npm ci` in `/app`.
+2. Set up Bun 1.3.14 with cache keyed by `app/bun.lock`, and Node 24 for the
+   frozen prototype regression.
+3. `bun ci` in `/app`.
 4. Install Playwright Chromium and WebKit with their Ubuntu dependencies.
-5. `npm run verify`.
+5. `bun run verify`.
 6. Upload the verified production `app/dist` artifact.
 7. On `main` only, deploy that artifact to GitHub Pages with Pages write and
    OIDC permissions scoped to the deploy job.
