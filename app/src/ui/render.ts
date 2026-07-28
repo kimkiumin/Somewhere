@@ -3,6 +3,7 @@ import type { JourneyApplicationSnapshot } from "../application/journey-applicat
 export type UiState = {
   readonly diagnosticsOpen: boolean;
   readonly environmentLabel: "open-sky" | "urban-canyon" | "indoor" | "other";
+  readonly updateAvailable: boolean;
 };
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -112,7 +113,7 @@ function hiddenPanel(snapshot: JourneyApplicationSnapshot): HTMLElement {
   return panel;
 }
 
-function idleScreen(main: HTMLElement): void {
+function idleScreen(main: HTMLElement, uiState: UiState): void {
   const hero = element("section", "hero");
   hero.append(
     element("p", "eyebrow", "A quiet field instrument"),
@@ -133,6 +134,14 @@ function idleScreen(main: HTMLElement): void {
       "Screen-on field test · Seoul Forest · No background navigation",
     ),
   );
+  if (uiState.updateAvailable) {
+    const update = element("aside", "update-notice");
+    update.append(
+      element("p", "small-copy", "A verified Somewhere update is ready."),
+      actionButton("Update Somewhere", "accept-update", "button--secondary"),
+    );
+    main.append(update);
+  }
 }
 
 function hiddenScreen(main: HTMLElement, snapshot: JourneyApplicationSnapshot): void {
@@ -336,7 +345,7 @@ export function renderSomewhere(
 
   switch (snapshot.journey.phase) {
     case "idle":
-      idleScreen(main);
+      idleScreen(main, uiState);
       break;
     case "selecting":
       main.append(
@@ -391,6 +400,7 @@ export function renderKey(snapshot: JourneyApplicationSnapshot, uiState: UiState
     wakeLock: snapshot.sensors.wakeLock.status,
     diagnosticsOpen: uiState.diagnosticsOpen,
     environmentLabel: uiState.environmentLabel,
+    updateAvailable: uiState.updateAvailable,
     diagnosticEventCount: uiState.diagnosticsOpen ? snapshot.diagnosticEventCount : null,
   });
 }

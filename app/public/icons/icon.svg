@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Somewhere compass">
+  <rect width="512" height="512" rx="112" fill="#f5f1e8"/>
+  <circle cx="256" cy="256" r="176" fill="#17231c"/>
+  <circle cx="256" cy="256" r="116" fill="none" stroke="#fffdf8" stroke-opacity=".22" stroke-width="4"/>
+  <path d="M256 116 302 270 256 250 210 270Z" fill="#2d5b73"/>
+  <circle cx="256" cy="256" r="26" fill="#fffdf8"/>
+  <circle cx="256" cy="256" r="12" fill="#b66a42"/>
+</svg>

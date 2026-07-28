@@ -1,6 +1,9 @@
 import type { DiagnosticSessionMetadata } from "./application/diagnostics";
 import type { JourneyApplication } from "./application/journey-application";
+import { createPwaUpdateController, type PwaUpdateController } from "./application/pwa-update";
 import { createProductionComposition, createTestComposition } from "./composition";
+import { createBrowserPwaUpdateSource } from "./platform/browser-pwa";
+import { createScriptedPwaUpdateSource } from "./testkit/pwa-update-source";
 import { createCompassAnimator } from "./ui/compass";
 import { renderKey, renderSomewhere, type UiState } from "./ui/render";
 import "./ui/styles.css";
@@ -55,10 +58,11 @@ function downloadTrace(application: JourneyApplication, uiState: UiState): void 
   queueMicrotask(() => URL.revokeObjectURL(url));
 }
 
-function mount(application: JourneyApplication): void {
+function mount(application: JourneyApplication, pwaUpdates: PwaUpdateController): void {
   let uiState: UiState = {
     diagnosticsOpen: false,
     environmentLabel: "other",
+    updateAvailable: pwaUpdates.snapshot().status === "available",
   };
   let lastRenderKey = "";
   const animator = createCompassAnimator(root);
@@ -86,7 +90,17 @@ function mount(application: JourneyApplication): void {
     }
   }
 
-  const stopApplication = application.subscribe(() => render());
+  const stopApplication = application.subscribe((snapshot) => {
+    pwaUpdates.setJourneyPhase(snapshot.journey.phase);
+    render();
+  });
+  const stopPwaUpdates = pwaUpdates.subscribe((snapshot) => {
+    uiState = {
+      ...uiState,
+      updateAvailable: snapshot.status === "available",
+    };
+    render(true);
+  });
   root.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) {
       return;
@@ -131,6 +145,9 @@ function mount(application: JourneyApplication): void {
       case "discard-diagnostics":
         application.discardDiagnostics();
         break;
+      case "accept-update":
+        pwaUpdates.accept().catch((error: unknown) => renderFatal(normalizedError(error)));
+        break;
     }
   });
   root.addEventListener("change", (event) => {
@@ -155,6 +172,7 @@ function mount(application: JourneyApplication): void {
     "pagehide",
     () => {
       stopApplication();
+      stopPwaUpdates();
       animator.destroy();
       application.destroy().catch(() => undefined);
     },
@@ -169,12 +187,25 @@ function bootstrap(): void {
     if (composition.testApi === null) {
       throw new Error("Test harness composition is missing its control API.");
     }
+    const scriptedUpdates = createScriptedPwaUpdateSource();
+    createBrowserPwaUpdateSource().listen(() => undefined);
+    Reflect.set(composition.testApi, "triggerUpdate", () => scriptedUpdates.emitReady());
     Reflect.set(window, "somewhereTest", composition.testApi);
-    mount(composition.application);
+    mount(
+      composition.application,
+      createPwaUpdateController(scriptedUpdates, composition.application.snapshot().journey.phase),
+    );
     return;
   }
 
-  mount(createProductionComposition().application);
+  const composition = createProductionComposition();
+  mount(
+    composition.application,
+    createPwaUpdateController(
+      createBrowserPwaUpdateSource(),
+      composition.application.snapshot().journey.phase,
+    ),
+  );
 }
 
 try {

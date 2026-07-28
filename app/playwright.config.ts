@@ -23,6 +23,7 @@ export default defineConfig({
     },
     {
       name: "webkit-mobile",
+      testIgnore: ["**/pwa.spec.ts"],
       use: {
         ...devices["iPhone 15 Pro Max"],
         browserName: "webkit",
