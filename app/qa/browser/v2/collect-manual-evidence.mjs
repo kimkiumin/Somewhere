@@ -8,6 +8,8 @@ import {
 } from "../../../../scripts/release/source-cleanliness.mjs";
 import { collectPreparedEvidence } from "./prepared-evidence.mjs";
 
+const ACCESSIBILITY_PROJECTS = ["chromium-mobile", "webkit-mobile"];
+
 function argumentsMap(values) {
   const result = new Map();
   for (let index = 0; index < values.length; index += 2) {
@@ -60,6 +62,62 @@ async function artifact(evidence, relative) {
   return value;
 }
 
+function accessibilityPaths() {
+  return ACCESSIBILITY_PROJECTS.flatMap((project) => [
+    `accessibility/${project}-keyboard-focus.png`,
+    `accessibility/${project}-reduced-motion.png`,
+    `accessibility/${project}-text-resize-200.png`,
+    `accessibility/${project}.json`,
+  ]).sort();
+}
+
+export async function collectManualPreparedEvidence(options, dependencies = {}) {
+  const source = captureCleanSource(options.repo);
+  await rm(path.join(options.outputDir, "accessibility"), { force: true, recursive: true });
+  const collection = await collectPreparedEvidence(options, dependencies);
+  try {
+    const expectedPaths = accessibilityPaths();
+    const observedPaths = await files(options.outputDir, "accessibility");
+    if (
+      observedPaths.length !== expectedPaths.length ||
+      observedPaths.some((value, index) => value !== expectedPaths[index])
+    ) {
+      throw new TypeError("INCOMPLETE_ACCESSIBILITY_ARTIFACTS");
+    }
+    const accessibility = Object.fromEntries(
+      await Promise.all(
+        ACCESSIBILITY_PROJECTS.map(async (project) => {
+          const report = JSON.parse(
+            await readFile(path.join(options.outputDir, `accessibility/${project}.json`), "utf8"),
+          );
+          if (report.project !== project) throw new TypeError("INCOMPLETE_ACCESSIBILITY_EVIDENCE");
+          return [project, report];
+        }),
+      ),
+    );
+    const augmented = {
+      ...collection,
+      observations: { ...collection.observations, accessibility },
+      artifacts: [
+        ...collection.artifacts,
+        ...(await Promise.all(
+          expectedPaths.map((relative) => artifact(options.outputDir, relative)),
+        )),
+      ],
+    };
+    const temporary = `${options.output}.tmp-accessibility-${process.pid}`;
+    await writeFile(temporary, `${JSON.stringify(augmented, null, 2)}\n`);
+    assertSameCleanSource(options.repo, source);
+    await rename(temporary, options.output);
+    assertSameCleanSource(options.repo, source);
+    return augmented;
+  } catch (error) {
+    await rm(`${options.output}.tmp-accessibility-${process.pid}`, { force: true });
+    await rm(options.output, { force: true });
+    throw error;
+  }
+}
+
 async function main() {
   const options = argumentsMap(process.argv.slice(2));
   const repo = path.resolve(options.get("--repo") ?? ".");
@@ -78,7 +136,7 @@ async function main() {
       throw new TypeError("UNKNOWN_PREPARED_ARGUMENT");
     }
     const output = path.resolve(options.get("--output") ?? "");
-    await collectPreparedEvidence({
+    await collectManualPreparedEvidence({
       baseUrl: options.get("--base-url") ?? "",
       buildReceipt: path.resolve(options.get("--build-receipt") ?? ""),
       output,
@@ -199,4 +257,4 @@ async function main() {
   process.stdout.write(`${output}\n`);
 }
 
-await main();
+if (import.meta.main) await main();

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import {
@@ -9,6 +9,47 @@ import {
 import { validatePreparedEvidence } from "./prepared-evidence-validator.mjs";
 
 const digest = z.string().regex(/^sha256:[a-f0-9]{64}$/);
+const ACCESSIBILITY_PROJECTS = ["chromium-mobile", "webkit-mobile"];
+const accessibilityReportSchema = z
+  .object({
+    keyboardFocus: z
+      .object({
+        focusVisible: z.literal(true),
+        input: z.literal("Tab"),
+        outlineStyle: z.literal("solid"),
+        outlineWidthCssPx: z.number().min(3),
+        screenshot: z.string(),
+        targetRole: z.literal("button"),
+      })
+      .strict(),
+    project: z.enum(["chromium-mobile", "webkit-mobile"]),
+    reducedMotion: z
+      .object({
+        animationName: z.literal("none"),
+        mediaQueryMatches: z.literal(true),
+        requested: z.literal("reduce"),
+        screenshot: z.string(),
+      })
+      .strict(),
+    report: z.string(),
+    schemaVersion: z.literal(1),
+    textResize200: z
+      .object({
+        clippedTextCount: z.literal(0),
+        cssViewport: z.object({ height: z.literal(780), width: z.literal(320) }).strict(),
+        horizontalOverflow: z.literal(false),
+        screenshot: z.string(),
+        textScalePercent: z.literal(200),
+      })
+      .strict(),
+  })
+  .strict();
+const accessibilitySchema = z
+  .object({
+    "chromium-mobile": accessibilityReportSchema,
+    "webkit-mobile": accessibilityReportSchema,
+  })
+  .strict();
 const artifactSchema = z
   .object({
     path: z
@@ -83,6 +124,81 @@ function sha256(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
+function accessibilityPaths() {
+  return ACCESSIBILITY_PROJECTS.flatMap((project) => [
+    `accessibility/${project}-keyboard-focus.png`,
+    `accessibility/${project}-reduced-motion.png`,
+    `accessibility/${project}-text-resize-200.png`,
+    `accessibility/${project}.json`,
+  ]).sort();
+}
+
+async function writeVerdict(output, value) {
+  await mkdir(path.dirname(output), { recursive: true });
+  const temporary = `${output}.tmp-${process.pid}`;
+  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`);
+  await rename(temporary, output);
+}
+
+export async function validateManualPreparedEvidence(options) {
+  const source = captureCleanSource(options.repo);
+  try {
+    const baseVerdict = await validatePreparedEvidence(options);
+    const collection = JSON.parse(
+      await readFile(path.join(options.input, "collection.json"), "utf8"),
+    );
+    let accessibility;
+    try {
+      accessibility = accessibilitySchema.parse(collection.observations?.accessibility);
+    } catch {
+      throw new TypeError("INCOMPLETE_ACCESSIBILITY_EVIDENCE");
+    }
+    const expectedPaths = accessibilityPaths();
+    const observedPaths = collection.artifacts
+      .map((item) => item.path)
+      .filter((item) => item.startsWith("accessibility/"))
+      .sort();
+    if (
+      observedPaths.length !== expectedPaths.length ||
+      observedPaths.some((value, index) => value !== expectedPaths[index])
+    ) {
+      throw new TypeError("INCOMPLETE_ACCESSIBILITY_ARTIFACTS");
+    }
+    for (const project of ACCESSIBILITY_PROJECTS) {
+      const expected = accessibility[project];
+      if (
+        expected.project !== project ||
+        expected.report !== `accessibility/${project}.json` ||
+        expected.keyboardFocus.screenshot !== `accessibility/${project}-keyboard-focus.png` ||
+        expected.reducedMotion.screenshot !== `accessibility/${project}-reduced-motion.png` ||
+        expected.textResize200.screenshot !== `accessibility/${project}-text-resize-200.png`
+      ) {
+        throw new TypeError("INCOMPLETE_ACCESSIBILITY_EVIDENCE");
+      }
+      const report = JSON.parse(await readFile(path.join(options.input, expected.report), "utf8"));
+      if (JSON.stringify(report) !== JSON.stringify(expected)) {
+        throw new TypeError("ACCESSIBILITY_REPORT_MISMATCH");
+      }
+    }
+    const verdict = {
+      ...baseVerdict,
+      accessibilityProjects: ACCESSIBILITY_PROJECTS,
+    };
+    assertSameCleanSource(options.repo, source);
+    await writeVerdict(options.output, verdict);
+    assertSameCleanSource(options.repo, source);
+    return verdict;
+  } catch (error) {
+    await rm(options.output, { force: true });
+    await writeVerdict(options.output, {
+      schemaVersion: 1,
+      gate: "FAIL",
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
 async function files(directory, prefix = "") {
   const found = [];
   for (const entry of await readdir(path.join(directory, prefix), { withFileTypes: true })) {
@@ -114,7 +230,7 @@ async function main() {
       throw new TypeError("UNKNOWN_PREPARED_ARGUMENT");
     }
     const output = path.resolve(options.get("--output") ?? "");
-    await validatePreparedEvidence({
+    await validateManualPreparedEvidence({
       buildReceipt: path.resolve(options.get("--build-receipt") ?? ""),
       input: path.resolve(options.get("--input") ?? ""),
       output,
@@ -195,4 +311,4 @@ async function main() {
   );
 }
 
-await main();
+if (import.meta.main) await main();

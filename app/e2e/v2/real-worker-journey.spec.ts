@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { captureAccessibilityEvidence } from "../../qa/browser/v2/fixtures/accessibility-evidence";
 import {
   capture,
   control,
@@ -234,6 +235,8 @@ test("production mobile surface is private, offline-safe, accessible, and contai
     ).toEqual([]);
     await capture(page, `real-start-${viewport.width}x${viewport.height}`);
   }
+
+  await captureAccessibilityEvidence(page);
 
   // When: the installed service worker reloads offline and storage is inspected.
   await page.setViewportSize({ height: 844, width: 390 });
