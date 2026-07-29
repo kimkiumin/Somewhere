@@ -13,6 +13,10 @@
   ],
   "scripts": {
     "db:migrate:local": "bun run --cwd server db:migrate:local",
+    "local:v2:prepare": "bash scripts/release/local-v2-prepare.sh",
+    "local:v2:serve": "bash scripts/release/local-v2-serve.sh",
+    "local:v2:start-for-qa": "bash scripts/release/local-v2-start-for-qa.sh",
+    "test:e2e:v2": "bun run --cwd app test:e2e:v2",
     "verify": "bun run verify:baseline && bun run test:contracts",
     "verify:baseline": "bun -e 'const child=Bun.spawn([\"bun\",\"run\",\"--cwd\",\"app\",\"verify\"],{stdout:\"inherit\",stderr:\"inherit\"});const code=await child.exited;const {rm}=await import(\"node:fs/promises\");for(const path of [\"app/dist\",\"app/dist-e2e\",\"app/test-results\",\"app/playwright-report\",\"output/playwright\"]){await rm(path,{recursive:true,force:true});}process.exit(code);'",
     "test:contracts": "bun run --cwd contracts test",

@@ -6,7 +6,7 @@ export type RequestPolicy = Readonly<{
 export function localLoopbackRequestPolicy(url: URL): RequestPolicy | undefined {
   const port = Number(url.port);
   if (
-    url.protocol !== "http:" ||
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
     url.hostname !== "127.0.0.1" ||
     !Number.isInteger(port) ||
     port < 1024 ||
@@ -81,10 +81,32 @@ export async function validateMutationRequest(
 }
 
 export function validateSessionRequest(request: Request, policy: RequestPolicy): boolean {
+  if (request.headers.get("host") !== policy.canonicalHost || request.method !== "GET") {
+    return false;
+  }
+  const origin = request.headers.get("origin");
+  if (origin !== null) {
+    return (
+      origin === policy.canonicalOrigin &&
+      (!request.headers.has("sec-fetch-site") ||
+        request.headers.get("sec-fetch-site") === "same-origin")
+    );
+  }
   return (
-    request.headers.get("host") === policy.canonicalHost &&
-    request.headers.get("origin") === policy.canonicalOrigin &&
-    (!request.headers.has("sec-fetch-site") ||
-      request.headers.get("sec-fetch-site") === "same-origin")
+    request.headers.get("sec-fetch-site") === "same-origin" &&
+    request.headers.get("sec-fetch-mode") === "cors" &&
+    request.headers.get("sec-fetch-dest") === "empty" &&
+    isExactOriginReferer(request.headers.get("referer"), policy.canonicalOrigin)
   );
+}
+
+function isExactOriginReferer(referer: string | null, canonicalOrigin: string): boolean {
+  if (referer === null) {
+    return false;
+  }
+  try {
+    return new URL(referer).origin === canonicalOrigin;
+  } catch {
+    return false;
+  }
 }

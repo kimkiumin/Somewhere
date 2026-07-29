@@ -15,7 +15,7 @@ export function startScreen(main: HTMLElement): void {
     heading(
       "숨겨진 목적지",
       "어딘가로 떠나볼까요?",
-      "꼭 필요한 조건만 정하면 비교 목록 없이 한 곳을 골라드려요.",
+      "꼭 필요한 조건만 정하면 비교 목록 없이 한\u00a0곳을 골라드려요.",
     ),
     compass("idle", "?", "목적지는 출발 뒤에도 숨겨져요"),
     actionButton("시작하기", "open-constraints", "button--primary button--wide"),

@@ -1,4 +1,4 @@
-import type { JourneyProjectionV1 } from "@somewhere/contracts";
+import { type JourneyProjectionV1, JourneyProjectionV1Schema } from "@somewhere/contracts";
 import type {
   FeedbackCapabilityRecord,
   FeedbackCapabilityStore,
@@ -69,6 +69,7 @@ export function createV2Store(options: V2StoreOptions): V2Store {
   const listeners = new Set<(snapshot: V2StoreSnapshot) => void>();
   let current: V2StoreSnapshot = { status: "idle", projection: null, failure: null };
   let retryOperation: (() => Promise<void>) | null = null;
+  let recoveryRequest: Promise<RecoveryIntent> | null = null;
 
   function publish(next: V2StoreSnapshot): void {
     current = next;
@@ -176,6 +177,7 @@ export function createV2Store(options: V2StoreOptions): V2Store {
       return () => listeners.delete(listener);
     },
     async create(body) {
+      recoveryRequest = null;
       const key = options.idempotencyKeys.next();
       const operation = () => options.api.createJourney(body, key);
       retryOperation = () => run(operation);
@@ -213,16 +215,36 @@ export function createV2Store(options: V2StoreOptions): V2Store {
       await options.feedbackCapabilities.clear();
       options.api.clearVolatile();
       retryOperation = null;
+      recoveryRequest = null;
       publish({ status: "idle", projection: null, failure: null });
     },
-    async requestRecovery() {
+    requestRecovery() {
+      if (recoveryRequest !== null) {
+        return recoveryRequest;
+      }
       const active = projection();
-      const result = await options.api.requestRecovery(
-        active.journeyId,
-        active.sequence,
-        options.idempotencyKeys.next(),
-      );
-      return result;
+      recoveryRequest = options.api
+        .requestRecovery(active.journeyId, active.sequence, options.idempotencyKeys.next())
+        .then((result) => {
+          const latest = projection();
+          if (latest.journeyId !== active.journeyId || latest.sequence !== active.sequence) {
+            throw new TypeError("Recovery intent authority changed during request");
+          }
+          publish({
+            status: "ready",
+            projection: JourneyProjectionV1Schema.parse({
+              ...latest,
+              sequence: latest.sequence + 1,
+            }),
+            failure: null,
+          });
+          return result;
+        })
+        .catch((error) => {
+          recoveryRequest = null;
+          throw error;
+        });
+      return recoveryRequest;
     },
     async confirmRecovery(intent, constraints, reviewedFields) {
       const active = projection();

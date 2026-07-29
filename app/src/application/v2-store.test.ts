@@ -191,4 +191,49 @@ describe("V2 journey store", () => {
     expect(reset.feedback.record).toBeNull();
     expect(reset.store.snapshot().status).toBe("idle");
   });
+
+  test("advances recovery intent sequence once and confirms from that authority", async () => {
+    // Given: a completed projection and two duplicate UI requests for one recovery intent.
+    const context = fixture(projection("completed"));
+    await context.store.create(CREATE_BODY);
+    const before = context.store.snapshot().projection;
+    if (before === null) {
+      throw new TypeError("Expected a completed projection");
+    }
+
+    // When: both callers await the intent and one confirmation follows.
+    const [first, duplicate] = await Promise.all([
+      context.store.requestRecovery(),
+      context.store.requestRecovery(),
+    ]);
+    await context.store.confirmRecovery(first, CREATE_BODY.constraints, first.requiredReviewFields);
+
+    // Then: the intent mutates sequence once and confirmation sends the new sequence.
+    expect(duplicate).toEqual(first);
+    expect(context.api.calls.filter((call) => call.kind === "request-recovery")).toHaveLength(1);
+    expect(context.store.snapshot().projection?.sequence).toBe(before.sequence + 1);
+    expect(context.api.calls.at(-1)).toMatchObject({
+      expectedSequence: before.sequence + 1,
+      kind: "confirm-recovery",
+    });
+  });
+
+  test("does not advance recovery sequence when the intent request fails", async () => {
+    // Given: a completed projection whose recovery intent request will be rejected.
+    const context = fixture(projection("completed"));
+    await context.store.create(CREATE_BODY);
+    const before = context.store.snapshot().projection?.sequence;
+    const failure = new V2ApiError(409, "sequence_conflict", `req_v1.${"A".repeat(22)}`, true);
+    context.api.requestRecovery = async () => {
+      throw failure;
+    };
+
+    // When: the recovery intent request fails.
+    await expect(context.store.requestRecovery()).rejects.toMatchObject({
+      code: "sequence_conflict",
+    });
+
+    // Then: local authority remains unchanged.
+    expect(context.store.snapshot().projection?.sequence).toBe(before);
+  });
 });

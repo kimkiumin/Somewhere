@@ -137,12 +137,8 @@ async function issueIntent(
   const responseBody = JSON.stringify({
     contractVersion: 1,
     expiresAt,
-    issuedAt: now,
-    previousDestinationExcluded: true,
-    reasonPolicyVersion: "stop-reasons-v1",
     recoveryIntentId: intentId,
     requiredReviewFields: ["all-constraints"],
-    status: "review-required",
   });
   const result = await stub.transition({
     bodyDigest: await sha256(body),

@@ -297,6 +297,17 @@ describe("V2 journey application facade", () => {
     expect(context.store.snapshot().projection?.phase).toBe("completed");
 
     const intent = await context.application.requestRecovery();
+    let emittedAfterReset = false;
+    const stopResetProbe = context.store.subscribe((snapshot) => {
+      if (!emittedAfterReset && snapshot.status === "idle") {
+        emittedAfterReset = true;
+        context.rig.emitLocation({
+          accuracyM: 8,
+          capturedAtMs: context.rig.nowMs() + 2,
+          coordinates: { latitude: 37.554, longitude: 127.039_6 },
+        });
+      }
+    });
     const replacement = context.application.confirmRecovery(intent, intent.requiredReviewFields);
     await Promise.resolve();
     context.rig.emitLocation({
@@ -305,6 +316,7 @@ describe("V2 journey application facade", () => {
       coordinates: { latitude: 37.554, longitude: 127.039_6 },
     });
     await replacement;
+    stopResetProbe();
 
     expect(
       context.api.calls
@@ -328,6 +340,7 @@ describe("V2 journey application facade", () => {
       kind: "create",
       body: { recoveryCapability: `rc_v1.${"A".repeat(43)}` },
     });
+    expect(context.api.calls.filter((call) => call.kind === "create")).toHaveLength(2);
   });
 
   test("TASK17_V2_REACTION reads and records an identity-free delayed reaction", async () => {

@@ -46,7 +46,11 @@ function stopConfirmation(main: HTMLElement): void {
   dialog.append(
     element("p", "eyebrow", "방향 안내를 멈췄어요"),
     title,
-    element("p", "body-copy muted", "계속하면 같은 여정을 안전한 새 신호부터 이어갑니다."),
+    element(
+      "p",
+      "body-copy muted",
+      "계속하면 같은 여정을 안전한\u00a0새\u00a0신호부터 이어갑니다.",
+    ),
   );
   const row = element("div", "safety-row");
   row.append(
@@ -115,10 +119,12 @@ function recoveryReview(main: HTMLElement, intent: RecoveryIntent): void {
     element("p", "body-copy muted", "이전 장소를 제외하고 새로운 한 곳을 찾아요."),
   );
   const list = element("ul", "review-list");
+  const reviewFieldLabels: Readonly<Record<string, string>> = {
+    constraints: "카테고리 · 거리 · 예산",
+    "all-constraints": "카테고리 · 거리 · 예산 전체",
+  };
   for (const field of intent.requiredReviewFields) {
-    list.append(
-      element("li", undefined, field === "constraints" ? "카테고리 · 거리 · 예산" : field),
-    );
+    list.append(element("li", undefined, reviewFieldLabels[field] ?? "필수 조건"));
   }
   panel.append(
     list,
@@ -151,35 +157,47 @@ export function renderSomewhere(
   uiState: UiState,
 ): void {
   const main = element("main", "app-shell");
-  main.dataset.appScreen = "";
+  let appScreen = "guidance";
   main.append(instrumentHeader());
   if (uiState.feedbackPrompt !== null) {
+    appScreen = "feedback";
     feedbackScreen(main, uiState.feedbackPrompt);
   } else if (uiState.recoveryIntent !== null) {
+    appScreen = "recovery-review";
     recoveryReview(main, uiState.recoveryIntent);
   } else if (uiState.routeRecoveryOpen) {
+    appScreen = "route-recovery";
     routeRecovery(main);
   } else if (uiState.stopPending || snapshot.projection?.phase === "paused") {
+    appScreen = "stop-confirmation";
     stopConfirmation(main);
   } else if (snapshot.projection?.phase === "stopped") {
+    appScreen = "stop-reason";
     reasonScreen(main);
   } else if (snapshot.projection?.phase === "completed") {
+    appScreen = "completed";
     completedScreen(main, snapshot);
   } else if (snapshot.projection?.phase === "finding" || snapshot.journey.phase === "selecting") {
+    appScreen = "finding";
     findingScreen(main);
   } else if (snapshot.projection?.phase === "ready" || snapshot.journey.phase === "hidden") {
+    appScreen = "ready";
     readyScreen(main, snapshot);
   } else if (snapshot.projection === null && snapshot.journey.phase === "idle") {
     if (uiState.setup === "start") {
+      appScreen = "start";
       startScreen(main);
     } else if (uiState.setup === "constraints") {
+      appScreen = "constraints";
       constraintsScreen(main);
     } else {
+      appScreen = "finding";
       findingScreen(main);
     }
   } else {
     guidanceScreen(main, snapshot);
   }
+  main.dataset.appScreen = appScreen;
   if (
     uiState.updateAvailable &&
     snapshot.projection === null &&
@@ -192,7 +210,13 @@ export function renderSomewhere(
     );
     main.append(update);
   }
-  root.querySelector(":scope > main")?.replaceWith(main) ?? root.prepend(main);
+  const previousMain = root.querySelector<HTMLElement>(":scope > main");
+  const screenChanged =
+    previousMain !== null && previousMain.dataset.appScreen !== main.dataset.appScreen;
+  previousMain?.replaceWith(main) ?? root.prepend(main);
+  if (screenChanged) {
+    root.ownerDocument.defaultView?.scrollTo({ behavior: "instant", left: 0, top: 0 });
+  }
   let live = root.querySelector<HTMLElement>("[data-app-live]");
   if (live === null) {
     live = element("p", "sr-only");

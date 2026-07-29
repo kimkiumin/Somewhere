@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "sourceTree": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "buildDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "collectedAt": "2000-01-01T00:00:00.000Z",
+  "maxAgeMinutes": 30,
+  "artifacts": [
+    {
+      "path": "visual/stale.png",
+      "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 24,
+      "width": 1,
+      "height": 1
+    }
+  ],
+  "verdict": "PASS"
+}

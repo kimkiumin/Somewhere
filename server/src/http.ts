@@ -9,6 +9,7 @@ import { OperationsRuntimeControl } from "./operations/runtime-control";
 import { localLoopbackRequestPolicy, validateSessionRequest } from "./security/request";
 import { InMemorySessionRepository, SessionService } from "./security/session";
 import { importHmacKey, randomBase64Url } from "./security/tokens";
+import { handleV2LocalControl, v2RuntimeNow } from "./testing/v2-local-control";
 
 export type HttpBoundaryDependencies = Readonly<{
   now: () => number;
@@ -36,6 +37,11 @@ export function handleRequest(
     return request.method === "GET"
       ? handleOperationsHealth(env, dependencies?.now() ?? Date.now())
       : methodNotAllowed("GET");
+  }
+  if (env !== undefined && pathname === "/api/test/v2-control") {
+    return handleV2LocalControl(request, env.ENVIRONMENT, env.DB).then(
+      (response) => response ?? publicError("not_found"),
+    );
   }
   if (pathname === "/api/v1/session" && request.method === "GET") {
     return handleSession(request, env, dependencies);
@@ -85,7 +91,7 @@ async function handleRuntimeFeedback(
   env: Env,
   dependencies: HttpBoundaryDependencies | undefined,
 ): Promise<Response> {
-  const now = dependencies?.now() ?? Date.now();
+  const now = dependencies?.now() ?? v2RuntimeNow(env.ENVIRONMENT);
   const operations = await new OperationsRuntimeControl(env.DB satisfies Database).authorize(
     request,
     env.ENVIRONMENT,
@@ -187,7 +193,7 @@ async function handleRuntimeJourney(
 async function createRuntimeDependencies(env: Env): Promise<HttpBoundaryDependencies> {
   const key = await loadSessionHmacKey(env.DB);
   return {
-    now: Date.now,
+    now: () => v2RuntimeNow(env.ENVIRONMENT),
     sessionService: new SessionService(new D1HttpSessionRepository(env.DB satisfies Database), key),
   };
 }

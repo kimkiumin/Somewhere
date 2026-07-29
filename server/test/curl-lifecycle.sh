@@ -109,6 +109,17 @@ reason_body='{"contractVersion":1,"reason":"skip","reasonPolicyVersion":"stop-re
 
 intent_body='{"contractVersion":1,"action":"new-recommendation"}'
 [[ "$(mutate recovery recovery 8 J "$intent_body")" == 201 ]] || fail "recovery intent"
+intent_keys="$(bun -e '
+  const value = await Bun.file(process.argv[1]).json();
+  process.stdout.write(Object.keys(value).sort().join(","));
+' "$TMP_DIR/recovery.body")"
+[[ "$intent_keys" == "contractVersion,expiresAt,recoveryIntentId,requiredReviewFields" ]] \
+  || fail "recovery intent keys $intent_keys"
+[[ "$(mutate recovery-replay recovery 8 J "$intent_body")" == 201 ]] || fail "recovery replay"
+cmp -s "$TMP_DIR/recovery.body" "$TMP_DIR/recovery-replay.body" \
+  || fail "recovery replay not byte-equivalent"
+rg -qi '^idempotent-replayed: true' "$TMP_DIR/recovery-replay.headers" \
+  || fail "recovery replay header"
 intent_id="$(json_field "$TMP_DIR/recovery.body" recoveryIntentId)"
 confirm_recovery_body='{"contractVersion":1,"recoveryIntentId":"'"$intent_id"'","reviewedFields":["all-constraints"],"constraints":'"$CONSTRAINTS"'}'
 [[ "$(mutate recovery-confirm recovery/confirm 9 K "$confirm_recovery_body")" == 201 ]] || fail "recovery confirm"

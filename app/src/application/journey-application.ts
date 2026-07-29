@@ -490,25 +490,33 @@ export function createV2JourneyApplication(
       return options.store.requestRecovery();
     },
     async confirmRecovery(intent, reviewedFields) {
-      await options.sensors.startFromUserGesture();
-      sensors = options.sensors.snapshot();
-      if (sensors.location.status !== "live") {
-        await new Promise<void>((resolve) => {
-          recoveryLocationReady = resolve;
+      if (creating) {
+        return;
+      }
+      creating = true;
+      try {
+        await options.sensors.startFromUserGesture();
+        sensors = options.sensors.snapshot();
+        if (sensors.location.status !== "live") {
+          await new Promise<void>((resolve) => {
+            recoveryLocationReady = resolve;
+          });
+        }
+        if (sensors.location.status !== "live") {
+          throw new TypeError("Fresh location is required for recovery");
+        }
+        const body = options.createBody({
+          accuracyM: sensors.location.sample.accuracyM,
+          capturedAtMs: sensors.location.sample.capturedAtMs,
+          latitude: sensors.location.sample.coordinates.latitude,
+          longitude: sensors.location.sample.coordinates.longitude,
         });
+        const grant = await options.store.confirmRecovery(intent, body.constraints, reviewedFields);
+        await options.store.reset();
+        await options.store.create({ ...body, recoveryCapability: grant.recoveryCapability });
+      } finally {
+        creating = false;
       }
-      if (sensors.location.status !== "live") {
-        throw new TypeError("Fresh location is required for recovery");
-      }
-      const body = options.createBody({
-        accuracyM: sensors.location.sample.accuracyM,
-        capturedAtMs: sensors.location.sample.capturedAtMs,
-        latitude: sensors.location.sample.coordinates.latitude,
-        longitude: sensors.location.sample.coordinates.longitude,
-      });
-      const grant = await options.store.confirmRecovery(intent, body.constraints, reviewedFields);
-      await options.store.reset();
-      await options.store.create({ ...body, recoveryCapability: grant.recoveryCapability });
     },
     eligibleFeedback: () => options.store.eligibleFeedback(),
     recordReaction(feedbackId, reaction) {
