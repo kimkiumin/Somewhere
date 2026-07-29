@@ -20,11 +20,13 @@ export type ActiveRoute = Readonly<{
 }>;
 
 export type SelectedSnapshot = Readonly<{
+  createRequestDigest?: string;
   destinationSnapshotCiphertext: string;
   disclosure: Readonly<{
     category: "cafe" | "restaurant";
     hint: string;
   }>;
+  receiptDigest?: string;
   selectionReceiptId: string;
 }>;
 
@@ -125,6 +127,7 @@ export type ReadyJourneyInput = Readonly<{
   browserBindingDigest: string;
   expiresAt: number;
   journeyId: string;
+  preparedRoute?: ActiveRoute;
   selectedSnapshot: SelectedSnapshot;
   sequence: number;
   writeEpoch: number;

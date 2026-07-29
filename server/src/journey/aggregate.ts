@@ -86,7 +86,7 @@ function withOutcome(
 
 export function createReadyJourney(input: ReadyJourneyInput): JourneyState {
   return {
-    activeRoute: undefined,
+    activeRoute: input.preparedRoute,
     browserBindingDigest: input.browserBindingDigest,
     contractVersion: 1,
     expiresAt: input.expiresAt,
@@ -149,7 +149,9 @@ export function transitionJourney(state: JourneyState, command: JourneyCommand):
   switch (command.type) {
     case "commit":
       return state.phase === "ready"
-        ? withOutcome(state, command, { phase: "committed" })
+        ? withOutcome(state, command, {
+            phase: state.activeRoute === undefined ? "committed" : "following",
+          })
         : unchanged(state, "illegal_transition");
     case "route-activate":
       if (

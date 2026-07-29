@@ -31,9 +31,15 @@ export class InMemorySessionRepository implements SessionRepository {
 export type IssuedSession = Readonly<{
   bindingDigest: string;
   cookie: string;
+  csrfExpiresAt: number;
   csrfToken: string;
   expiresAt: number;
 }>;
+
+export type AuthenticatedSession = SessionRecord &
+  Readonly<{
+    sessionToken: string;
+  }>;
 
 export class SessionService {
   constructor(
@@ -64,6 +70,7 @@ export class SessionService {
     return {
       bindingDigest,
       cookie: `${SESSION_COOKIE_NAME}=${sessionToken}; Secure; HttpOnly; SameSite=Strict; Path=/`,
+      csrfExpiresAt: record.csrfExpiresAt,
       csrfToken,
       expiresAt: record.expiresAt,
     };
@@ -73,7 +80,7 @@ export class SessionService {
     rawCookie: string | undefined,
     csrfToken: string | undefined,
     now: number,
-  ): Promise<SessionRecord | undefined> {
+  ): Promise<AuthenticatedSession | undefined> {
     const token = rawCookie === undefined ? undefined : parseSessionCookie(rawCookie);
     if (
       token === undefined ||
@@ -87,7 +94,23 @@ export class SessionService {
       return undefined;
     }
     const candidate = await hmacDigest(this.hmacKey, csrfToken);
-    return fixedSizeEqual(candidate, record.csrfDigest) ? record : undefined;
+    return fixedSizeEqual(candidate, record.csrfDigest)
+      ? { ...record, sessionToken: token }
+      : undefined;
+  }
+
+  async authenticateCookie(
+    rawCookie: string | undefined,
+    now: number,
+  ): Promise<AuthenticatedSession | undefined> {
+    const token = rawCookie === undefined ? undefined : parseSessionCookie(rawCookie);
+    if (token === undefined) {
+      return undefined;
+    }
+    const record = await this.repository.find(await hmacDigest(this.hmacKey, token));
+    return record === undefined || record.expiresAt <= now
+      ? undefined
+      : { ...record, sessionToken: token };
   }
 }
 

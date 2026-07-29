@@ -1,11 +1,10 @@
+import { D1HttpSessionRepository, loadSessionHmacKey } from "./api/d1-session";
+import { API_HEADERS, jsonResponse, methodNotAllowed, publicError } from "./api/http-response";
+import { handleJourneyApi } from "./api/journey-controller";
+import type { Database } from "./db/database";
 import { validateSessionRequest } from "./security/request";
 import { InMemorySessionRepository, SessionService } from "./security/session";
 import { importHmacKey, randomBase64Url } from "./security/tokens";
-
-const API_HEADERS = {
-  "cache-control": "no-store, private",
-  "content-type": "application/json; charset=utf-8",
-} as const;
 
 export type HttpBoundaryDependencies = Readonly<{
   now: () => number;
@@ -14,6 +13,7 @@ export type HttpBoundaryDependencies = Readonly<{
 
 export function handleRequest(
   request: Request,
+  env?: Env,
   dependencies?: HttpBoundaryDependencies,
 ): Response | Promise<Response> {
   const { pathname } = new URL(request.url);
@@ -24,7 +24,16 @@ export function handleRequest(
     });
   }
   if (pathname === "/api/v1/session" && request.method === "GET") {
-    return handleSession(request, dependencies);
+    return handleSession(request, env, dependencies);
+  }
+  if (env !== undefined && pathname === "/api/v1/session") {
+    return methodNotAllowed("GET");
+  }
+  if (env !== undefined && pathname.startsWith("/api/v1/journeys")) {
+    return handleRuntimeJourney(request, env, dependencies);
+  }
+  if (env !== undefined) {
+    return publicError("not_found");
   }
   return new Response(JSON.stringify({ error: { code: "not_found" } }), {
     headers: API_HEADERS,
@@ -34,18 +43,28 @@ export function handleRequest(
 
 async function handleSession(
   request: Request,
+  env: Env | undefined,
   dependencies: HttpBoundaryDependencies | undefined,
 ): Promise<Response> {
   const url = new URL(request.url);
-  if (
-    !validateSessionRequest(request, {
-      canonicalHost: url.host,
-      canonicalOrigin: url.origin,
-    })
-  ) {
-    return publicError(403, "request_forbidden");
+  const requestPolicy =
+    env?.ENVIRONMENT === "local"
+      ? {
+          canonicalHost: "127.0.0.1:8787",
+          canonicalOrigin: "http://127.0.0.1:8787",
+        }
+      : {
+          canonicalHost: url.host,
+          canonicalOrigin: url.origin,
+        };
+  if (!validateSessionRequest(request, requestPolicy)) {
+    return legacyPublicError(403, "request_forbidden");
   }
-  const boundary = dependencies ?? (await createEphemeralDependencies());
+  const boundary =
+    dependencies ??
+    (env === undefined
+      ? await createEphemeralDependencies()
+      : await createRuntimeDependencies(env));
   const session = await boundary.sessionService.issueOrRefresh(
     request.headers.get("cookie") ?? undefined,
     boundary.now(),
@@ -54,13 +73,37 @@ async function handleSession(
     JSON.stringify({
       contractVersion: 1,
       csrfToken: session.csrfToken,
-      expiresAt: session.expiresAt,
+      csrfExpiresAt: session.csrfExpiresAt,
+      sessionExpiresAt: session.expiresAt,
     }),
     {
       headers: { ...API_HEADERS, "set-cookie": session.cookie },
       status: 200,
     },
   );
+}
+
+async function handleRuntimeJourney(
+  request: Request,
+  env: Env,
+  dependencies: HttpBoundaryDependencies | undefined,
+): Promise<Response> {
+  const boundary = dependencies ?? (await createRuntimeDependencies(env));
+  const key = await loadSessionHmacKey(env.DB);
+  const response = await handleJourneyApi(request, env, {
+    hmacKey: key,
+    now: boundary.now,
+    sessionService: boundary.sessionService,
+  });
+  return response ?? publicError("not_found");
+}
+
+async function createRuntimeDependencies(env: Env): Promise<HttpBoundaryDependencies> {
+  const key = await loadSessionHmacKey(env.DB);
+  return {
+    now: Date.now,
+    sessionService: new SessionService(new D1HttpSessionRepository(env.DB satisfies Database), key),
+  };
 }
 
 async function createEphemeralDependencies(): Promise<HttpBoundaryDependencies> {
@@ -71,9 +114,9 @@ async function createEphemeralDependencies(): Promise<HttpBoundaryDependencies> 
   };
 }
 
-function publicError(status: number, code: string): Response {
-  return new Response(
-    JSON.stringify({
+function legacyPublicError(status: number, code: string): Response {
+  return jsonResponse(
+    {
       contractVersion: 1,
       error: {
         code,
@@ -81,7 +124,7 @@ function publicError(status: number, code: string): Response {
         requestId: `req_v1.${randomBase64Url(16)}`,
         retryable: false,
       },
-    }),
-    { headers: API_HEADERS, status },
+    },
+    status,
   );
 }

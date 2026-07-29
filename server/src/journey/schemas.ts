@@ -19,6 +19,7 @@ const routeSchema = z
 
 const selectedSnapshotSchema = z
   .object({
+    createRequestDigest: digestSchema.optional(),
     destinationSnapshotCiphertext: z.string().min(1).max(8_192),
     disclosure: z
       .object({
@@ -27,6 +28,7 @@ const selectedSnapshotSchema = z
       })
       .strict()
       .readonly(),
+    receiptDigest: digestSchema.optional(),
     selectionReceiptId: idSchema,
   })
   .strict()
@@ -37,6 +39,7 @@ export const readyJourneyInputSchema = z
     browserBindingDigest: digestSchema,
     expiresAt: positiveIntegerSchema,
     journeyId: idSchema,
+    preparedRoute: routeSchema.optional(),
     selectedSnapshot: selectedSnapshotSchema,
     sequence: nonnegativeIntegerSchema,
     writeEpoch: positiveIntegerSchema,

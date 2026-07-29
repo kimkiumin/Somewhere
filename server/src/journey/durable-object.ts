@@ -18,6 +18,25 @@ type SafeMutationResult = Readonly<{
   sequence: number;
 }>;
 
+export type InternalJourneySnapshot = Readonly<{
+  activeRoute:
+    | Readonly<{
+        geometry: readonly (readonly [number, number])[];
+        originZoneRef: string;
+        routeDigest: string;
+      }>
+    | undefined;
+  phase: string;
+  revealed: boolean;
+  selectedSnapshot: Readonly<{
+    createRequestDigest?: string;
+    destinationSnapshotCiphertext: string;
+    receiptDigest?: string;
+    selectionReceiptId: string;
+  }>;
+  sequence: number;
+}>;
+
 export class JourneyDurableObject extends DurableObject<Env> {
   private deleted = false;
   private readonly store: JourneySqliteStore;
@@ -29,13 +48,61 @@ export class JourneyDurableObject extends DurableObject<Env> {
 
   async initialize(value: unknown): Promise<SafeMutationResult> {
     const input = readyJourneyInputSchema.parse(value);
-    const state = this.store.initialize(createReadyJourney(input));
+    const receiptDigest = input.selectedSnapshot.receiptDigest;
+    const readyInput = {
+      browserBindingDigest: input.browserBindingDigest,
+      expiresAt: input.expiresAt,
+      journeyId: input.journeyId,
+      selectedSnapshot: {
+        destinationSnapshotCiphertext: input.selectedSnapshot.destinationSnapshotCiphertext,
+        disclosure: input.selectedSnapshot.disclosure,
+        selectionReceiptId: input.selectedSnapshot.selectionReceiptId,
+        ...(input.selectedSnapshot.createRequestDigest === undefined
+          ? {}
+          : { createRequestDigest: input.selectedSnapshot.createRequestDigest }),
+        ...(input.selectedSnapshot.receiptDigest === undefined
+          ? {}
+          : { receiptDigest: input.selectedSnapshot.receiptDigest }),
+      },
+      sequence: input.sequence,
+      writeEpoch: input.writeEpoch,
+      ...(input.preparedRoute === undefined ? {} : { preparedRoute: input.preparedRoute }),
+    };
+    const state = this.store.initialize(
+      createReadyJourney(readyInput),
+      receiptDigest === undefined
+        ? undefined
+        : {
+            attempts: 0,
+            eventDigest: receiptDigest,
+            eventId: `activation_${receiptDigest.slice(0, 48)}`,
+            eventType: "journey.activated",
+            expiresAt: input.expiresAt,
+            nextAttemptAt: Date.now() + 1_000,
+            status: "pending",
+            writeEpoch: input.writeEpoch,
+          },
+    );
     await this.scheduleAlarm();
     return {
       kind: "applied",
       outcomeCiphertext: undefined,
       phase: state.phase,
       revealed: state.revealed,
+      sequence: state.sequence,
+    };
+  }
+
+  async snapshot(browserBindingDigest: string): Promise<InternalJourneySnapshot | undefined> {
+    const state = this.store.readState();
+    if (state === null || state.browserBindingDigest !== browserBindingDigest || this.deleted) {
+      return undefined;
+    }
+    return {
+      activeRoute: state.activeRoute,
+      phase: state.phase,
+      revealed: state.revealed,
+      selectedSnapshot: state.selectedSnapshot,
       sequence: state.sequence,
     };
   }

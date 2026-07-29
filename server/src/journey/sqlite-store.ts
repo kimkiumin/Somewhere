@@ -30,7 +30,7 @@ export class JourneySqliteStore {
     );
   }
 
-  initialize(state: JourneyState): JourneyState {
+  initialize(state: JourneyState, activation?: OutboxRecord): JourneyState {
     return this.storage.transactionSync(() => {
       const existing = this.readState();
       if (existing !== null) {
@@ -40,6 +40,16 @@ export class JourneySqliteStore {
         "INSERT INTO journey_state (singleton, payload) VALUES (1, ?)",
         JSON.stringify(state),
       );
+      if (activation !== undefined) {
+        this.storage.sql.exec(
+          "INSERT INTO journey_outbox (event_id, payload, status, next_attempt_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+          activation.eventId,
+          JSON.stringify(activation),
+          activation.status,
+          activation.nextAttemptAt,
+          activation.expiresAt,
+        );
+      }
       return state;
     });
   }
@@ -59,6 +69,17 @@ export class JourneySqliteStore {
       feedback: parsed.feedback,
       openStop: parsed.openStop,
       routeRepair: parsed.routeRepair,
+      selectedSnapshot: {
+        destinationSnapshotCiphertext: parsed.selectedSnapshot.destinationSnapshotCiphertext,
+        disclosure: parsed.selectedSnapshot.disclosure,
+        selectionReceiptId: parsed.selectedSnapshot.selectionReceiptId,
+        ...(parsed.selectedSnapshot.createRequestDigest === undefined
+          ? {}
+          : { createRequestDigest: parsed.selectedSnapshot.createRequestDigest }),
+        ...(parsed.selectedSnapshot.receiptDigest === undefined
+          ? {}
+          : { receiptDigest: parsed.selectedSnapshot.receiptDigest }),
+      },
     };
   }
 
