@@ -24,6 +24,10 @@ objects. Their provenance and hashes are recorded in
 The executable backend operations boundary and its intentionally unresolved
 external launch gates are summarized in the
 [V2 pilot backend operations runbook](operations/v2-pilot-backend.md).
+Exact-tree preparation, F1–F4 evidence, cleanup, and public-release blockers
+are defined in the [V2 release runbook](operations/v2-release.md). The
+[machine-readable authority map](authority-map-v2.json) is the release scope
+source of truth.
 
 V2 has no active Reroll control. Its recovery model is immediate Stop pause,
 explicit stop confirmation, and a guarded new recommendation only after the

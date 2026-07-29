@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "todos": [
+    { "id": 1, "subject": "Preserve the verified v0.2 baseline", "evidenceAny": ["baseline/evidence.sha256"] },
+    { "id": 2, "subject": "Import the approved V2 blueprint authority", "evidenceAny": ["docs/blueprint/SOURCE_RECEIPT.md"] },
+    { "id": 3, "subject": "Freeze the Somewhere V2 wire contracts", "evidenceAny": ["task-3", "contracts/test"] },
+    { "id": 4, "subject": "Unify the Somewhere V2 workspace", "evidenceAny": ["task-4", "bun.lock"] },
+    { "id": 5, "subject": "Scaffold the Somewhere V2 Cloudflare Worker", "evidenceAny": ["task-5", "server/wrangler.jsonc"] },
+    { "id": 6, "subject": "Persist V2 evidence without location history", "evidenceAny": ["task-6", "server/migrations"] },
+    { "id": 7, "subject": "Select only reviewed V2 destinations and routes", "evidenceAny": ["task-7", "server/data"] },
+    { "id": 8, "subject": "Secure anonymous V2 sessions and admission", "evidenceAny": ["task-8", "server/test/security-adversarial-todo8.test.ts"] },
+    { "id": 9, "subject": "Serialize V2 journeys in Durable Objects", "evidenceAny": ["task-9", "server/test/journey-do-todo9.test.ts"] },
+    { "id": 10, "subject": "Deliver the first truthful hidden journey slice", "evidenceAny": ["task-10/EVIDENCE.md"] },
+    { "id": 11, "subject": "Complete the V2 journey lifecycle", "evidenceAny": ["task-11/final-artifact-sha256.txt"] },
+    { "id": 12, "subject": "Make asynchronous journey work recoverable", "evidenceAny": ["task-12/EVIDENCE.md"] },
+    { "id": 13, "subject": "Add private delayed journey feedback", "evidenceAny": ["task-13", "server/test/feedback-deletion.test.ts"] },
+    { "id": 14, "subject": "Operationalize the V2 pilot backend", "evidenceAny": ["task-14/SHA256SUMS"] },
+    { "id": 15, "subject": "Connect the phone client to the V2 API", "evidenceAny": ["task-15/EVIDENCE.md"] },
+    { "id": 16, "subject": "Guide the V2 journey along trusted routes", "evidenceAny": ["task-16/manifest.md"] },
+    { "id": 17, "subject": "Create the complete Somewhere V2 phone journey", "evidenceAny": ["task-17/SCENARIOS.md"] },
+    { "id": 18, "subject": "Keep private journey data out of PWA caches", "evidenceAny": ["task-18/EVIDENCE.md"] },
+    { "id": 19, "subject": "Verify the real V2 mobile service end to end", "evidenceAny": ["task-19"] },
+    { "id": 20, "subject": "Gate the Somewhere V2 staging release", "evidenceAny": ["task-20"] },
+    { "id": 21, "subject": "Define the V2 iPhone release evidence gate", "evidenceAny": ["task-21"] },
+    { "id": 22, "subject": "Document and streamline the complete V2 service", "evidenceAny": ["task-22"] }
+  ]
+}

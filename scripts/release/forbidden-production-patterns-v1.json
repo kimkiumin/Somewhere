@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "patterns": [
+    { "id": "deterministic-sensor-control", "literal": "__SOMEWHERE_E2E_SENSOR_CONTROL__" },
+    { "id": "curated-destination-authority", "literal": "CuratedDestinationSource" },
+    { "id": "private-feedback-capability", "literal": "feedbackCapabilityRaw" },
+    { "id": "raw-route-provider-payload", "literal": "providerRawPayload" },
+    { "id": "test-harness-mode", "literal": "test-harness" },
+    { "id": "field-diagnostics-build", "literal": "field-diagnostics" }
+  ]
+}

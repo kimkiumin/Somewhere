@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.invalid/schemas/lane-verdict-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "lane", "finalSha", "sourceTree", "planSha256", "policy", "repositoryGate", "externalGate", "checksDigest", "cleanupDigest"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "lane": { "enum": ["F1", "F2", "F3", "F4"] },
+    "finalSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sourceTree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "planSha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "policy": { "type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": { "path": { "type": "string" }, "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" } } },
+    "repositoryGate": { "enum": ["PASS", "BLOCK", "FAIL"] },
+    "externalGate": { "enum": ["PASS", "BLOCK", "FAIL"] },
+    "checksDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "cleanupDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

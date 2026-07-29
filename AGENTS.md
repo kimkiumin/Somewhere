@@ -2,7 +2,8 @@
 
 ## Project Goal
 
-Build and refine a mobile-first prototype for a hidden-destination compass adventure experience.
+Build and operate the mobile-only V2 hidden-destination service defined by
+`BLUEPRINT.md`, while preserving v0.1/v0.2 as historical regression evidence.
 
 The user does not know the destination. The app gives only minimal direction and distance cues. The user follows those cues and discovers the destination at the end.
 
@@ -27,7 +28,7 @@ explicit stop confirmation, and guarded new recommendation only after a journey
 has ended. Preserve the older documents and tests as versioned evidence rather
 than rewriting them to look like V2.
 
-## Current v0.2 Working Surface
+## Historical v0.2 Working Surface
 
 - Treat `/prototype` as the frozen v0.1 reference. Preserve its 11 Node tests
   and do not import it at runtime.
