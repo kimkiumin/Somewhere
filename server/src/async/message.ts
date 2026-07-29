@@ -98,6 +98,10 @@ export async function parseAsyncMessage(value: unknown): Promise<AsyncMessage> {
   return message;
 }
 
+export function parsePoisonMessage(value: unknown): PoisonMessage {
+  return poisonMessageSchema.parse(value);
+}
+
 export function buildPoisonMessage(
   input: Readonly<{
     failedAt: number;

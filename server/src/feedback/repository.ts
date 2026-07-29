@@ -18,6 +18,7 @@ const feedbackRowSchema = z
     feedback_id: z.string(),
     journey_hmac_digest: z.string().length(64),
     prompt_version: z.string(),
+    write_epoch: z.number().int().positive(),
   })
   .strict()
   .readonly();
@@ -27,6 +28,7 @@ const outcomeSchema = z
     feedback_id: z.string(),
     idempotency_digest: z.string().length(64),
     request_digest: z.string().length(64),
+    write_epoch: z.number().int().positive(),
   })
   .strict()
   .readonly();
@@ -45,7 +47,14 @@ export type FeedbackReaction =
     }>;
 
 export class FeedbackRepository {
-  constructor(private readonly database: Database) {}
+  constructor(
+    private readonly database: Database,
+    private readonly writeEpoch: number,
+  ) {
+    if (!Number.isInteger(writeEpoch) || writeEpoch < 1) {
+      throw new RangeError("Feedback write epoch must be a positive integer");
+    }
+  }
 
   async issue(
     input: Readonly<{
@@ -60,7 +69,7 @@ export class FeedbackRepository {
   ): Promise<void> {
     await this.database
       .prepare(
-        "INSERT OR IGNORE INTO feedback_eligibility (eligibility_id, journey_hmac_digest, capability_digest, eligibility_state, due_at, expires_at, consumed_at, feedback_id, prompt_version, consent_granted, consent_binding_digest, consumption_digest) VALUES (?, ?, ?, 'eligible', ?, ?, NULL, ?, 'feedback-prompt-v1', ?, ?, NULL)",
+        "INSERT OR IGNORE INTO feedback_eligibility (eligibility_id, journey_hmac_digest, capability_digest, eligibility_state, due_at, expires_at, consumed_at, feedback_id, prompt_version, consent_granted, consent_binding_digest, consumption_digest, write_epoch) VALUES (?, ?, ?, 'eligible', ?, ?, NULL, ?, 'feedback-prompt-v1', ?, ?, NULL, ?)",
       )
       .bind(
         `eligibility:${input.capabilityDigest.slice(0, 48)}`,
@@ -71,6 +80,7 @@ export class FeedbackRepository {
         input.feedbackId,
         input.consentGranted ? 1 : 0,
         input.bindingDigest ?? null,
+        this.writeEpoch,
       )
       .run();
   }
@@ -95,7 +105,7 @@ export class FeedbackRepository {
     return firstParsed(
       this.database
         .prepare(
-          "SELECT capability_digest, consent_binding_digest, consent_granted, consumed_at, consumption_digest, due_at, eligibility_state, expires_at, feedback_id, journey_hmac_digest, prompt_version FROM feedback_eligibility WHERE capability_digest = ?",
+          "SELECT capability_digest, consent_binding_digest, consent_granted, consumed_at, consumption_digest, due_at, eligibility_state, expires_at, feedback_id, journey_hmac_digest, prompt_version, write_epoch FROM feedback_eligibility WHERE capability_digest = ?",
         )
         .bind(capabilityDigest),
       feedbackRowSchema,
@@ -105,18 +115,18 @@ export class FeedbackRepository {
   async expire(capabilityDigest: string, now: number): Promise<void> {
     await this.database
       .prepare(
-        "UPDATE feedback_eligibility SET eligibility_state = 'expired' WHERE capability_digest = ? AND expires_at <= ? AND eligibility_state = 'eligible'",
+        "UPDATE feedback_eligibility SET eligibility_state = 'expired', write_epoch = ? WHERE capability_digest = ? AND expires_at <= ? AND eligibility_state = 'eligible' AND write_epoch <= ?",
       )
-      .bind(capabilityDigest, now)
+      .bind(this.writeEpoch, capabilityDigest, now, this.writeEpoch)
       .run();
   }
 
   async revokeJourney(journeyDigest: string): Promise<void> {
     await this.database
       .prepare(
-        "UPDATE feedback_eligibility SET eligibility_state = 'revoked' WHERE journey_hmac_digest = ? AND eligibility_state = 'eligible'",
+        "UPDATE feedback_eligibility SET eligibility_state = 'revoked', write_epoch = ? WHERE journey_hmac_digest = ? AND eligibility_state = 'eligible' AND write_epoch <= ?",
       )
-      .bind(journeyDigest)
+      .bind(this.writeEpoch, journeyDigest, this.writeEpoch)
       .run();
   }
 
@@ -156,6 +166,9 @@ export class FeedbackRepository {
     if (eligibility.eligibility_state !== "eligible") {
       return { kind: "capability_invalid" };
     }
+    if (eligibility.write_epoch > this.writeEpoch) {
+      return { kind: "capability_invalid" };
+    }
     if (eligibility.due_at > input.now) {
       return { kind: "not_due" };
     }
@@ -166,48 +179,79 @@ export class FeedbackRepository {
     ) {
       return { kind: "consent_required" };
     }
-    await this.database
-      .prepare(
-        "UPDATE feedback_eligibility SET eligibility_state = 'consumed', consumed_at = ?, consumption_digest = ? WHERE capability_digest = ? AND feedback_id = ? AND eligibility_state = 'eligible' AND due_at <= ? AND expires_at > ? AND consent_granted = 1",
-      )
-      .bind(
-        input.now,
-        input.idempotencyDigest,
-        input.capabilityDigest,
-        input.feedbackId,
-        input.now,
-        input.now,
-      )
-      .run();
-    const consumed = await this.find(input.capabilityDigest);
-    if (consumed?.consumption_digest !== input.idempotencyDigest) {
+    const batch = this.database.batch;
+    if (batch === undefined) {
+      throw new TypeError("Atomic feedback batch is unavailable");
+    }
+    await batch.call(this.database, [
+      this.database
+        .prepare(
+          "UPDATE feedback_eligibility SET eligibility_state = 'consumed', consumed_at = ?, consumption_digest = ?, write_epoch = ? WHERE capability_digest = ? AND feedback_id = ? AND eligibility_state = 'eligible' AND due_at <= ? AND expires_at > ? AND consent_granted = 1 AND write_epoch <= ?",
+        )
+        .bind(
+          input.now,
+          input.idempotencyDigest,
+          this.writeEpoch,
+          input.capabilityDigest,
+          input.feedbackId,
+          input.now,
+          input.now,
+          this.writeEpoch,
+        ),
+      this.database
+        .prepare(
+          `INSERT OR IGNORE INTO place_reactions (
+             reaction_id, reaction_code, reaction_version, category, response_delay_band,
+             policy_digest, recorded_at, expires_at, write_epoch
+           )
+           SELECT ?, ?, 1, 'cafe', ?, ?, ?, ?, ?
+           FROM feedback_eligibility
+           WHERE capability_digest = ? AND feedback_id = ?
+             AND eligibility_state = 'consumed' AND consumption_digest = ?
+             AND write_epoch = ?`,
+        )
+        .bind(
+          `reaction:${input.idempotencyDigest.slice(0, 48)}`,
+          input.reaction,
+          delayBand(input.now - eligibility.due_at),
+          FEEDBACK_POLICY_DIGEST,
+          input.now,
+          input.now + 180 * DAY,
+          this.writeEpoch,
+          input.capabilityDigest,
+          input.feedbackId,
+          input.idempotencyDigest,
+          this.writeEpoch,
+        ),
+      this.database
+        .prepare(
+          `INSERT OR IGNORE INTO feedback_reaction_outcomes (
+             capability_digest, idempotency_digest, request_digest,
+             feedback_id, expires_at, write_epoch
+           )
+           SELECT ?, ?, ?, ?, ?, ?
+           FROM feedback_eligibility
+           WHERE capability_digest = ? AND feedback_id = ?
+             AND eligibility_state = 'consumed' AND consumption_digest = ?
+             AND write_epoch = ?`,
+        )
+        .bind(
+          input.capabilityDigest,
+          input.idempotencyDigest,
+          requestDigest,
+          input.feedbackId,
+          eligibility.expires_at,
+          this.writeEpoch,
+          input.capabilityDigest,
+          input.feedbackId,
+          input.idempotencyDigest,
+          this.writeEpoch,
+        ),
+    ]);
+    const outcome = await this.findOutcome(input.capabilityDigest);
+    if (outcome?.idempotency_digest !== input.idempotencyDigest) {
       return { kind: "idempotency_conflict" };
     }
-    await this.database
-      .prepare(
-        "INSERT INTO place_reactions (reaction_id, reaction_code, reaction_version, category, response_delay_band, policy_digest, recorded_at, expires_at) VALUES (?, ?, 1, 'cafe', ?, ?, ?, ?)",
-      )
-      .bind(
-        `reaction:${input.idempotencyDigest.slice(0, 48)}`,
-        input.reaction,
-        delayBand(input.now - consumed.due_at),
-        FEEDBACK_POLICY_DIGEST,
-        input.now,
-        input.now + 180 * DAY,
-      )
-      .run();
-    await this.database
-      .prepare(
-        "INSERT INTO feedback_reaction_outcomes (capability_digest, idempotency_digest, request_digest, feedback_id, expires_at) VALUES (?, ?, ?, ?, ?)",
-      )
-      .bind(
-        input.capabilityDigest,
-        input.idempotencyDigest,
-        requestDigest,
-        input.feedbackId,
-        consumed.expires_at,
-      )
-      .run();
     return { feedbackId: input.feedbackId, kind: "recorded" };
   }
 
@@ -215,7 +259,7 @@ export class FeedbackRepository {
     return firstParsed(
       this.database
         .prepare(
-          "SELECT feedback_id, idempotency_digest, request_digest FROM feedback_reaction_outcomes WHERE capability_digest = ?",
+          "SELECT feedback_id, idempotency_digest, request_digest, write_epoch FROM feedback_reaction_outcomes WHERE capability_digest = ?",
         )
         .bind(capabilityDigest),
       outcomeSchema,

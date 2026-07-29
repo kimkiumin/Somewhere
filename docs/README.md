@@ -21,6 +21,10 @@ The approved blueprint files were copied byte-for-byte from their source Git
 objects. Their provenance and hashes are recorded in
 [`blueprint/SOURCE_RECEIPT.md`](blueprint/SOURCE_RECEIPT.md).
 
+The executable backend operations boundary and its intentionally unresolved
+external launch gates are summarized in the
+[V2 pilot backend operations runbook](operations/v2-pilot-backend.md).
+
 V2 has no active Reroll control. Its recovery model is immediate Stop pause,
 explicit stop confirmation, and a guarded new recommendation only after the
 journey has ended. Reroll requirements in older files apply only to their

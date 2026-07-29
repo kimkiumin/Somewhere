@@ -71,16 +71,17 @@ export class DeletionRepository {
       .run();
   }
 
-  async writeTombstone(intent: PendingDelete): Promise<void> {
+  async writeTombstone(intent: PendingDelete, writeEpoch: number): Promise<void> {
     const bucket = Math.floor(intent.requested_at / 3_600_000) * 3_600_000;
     await this.database
       .prepare(
-        "INSERT INTO journey_tombstones (journey_hmac_digest, delete_request_digest, terminal_type, coarse_utc_bucket, write_epoch, replay_status, expires_at, replay_expires_at) VALUES (?, ?, 'deleted', ?, 2, 204, ?, ?) ON CONFLICT(journey_hmac_digest) DO NOTHING",
+        "INSERT INTO journey_tombstones (journey_hmac_digest, delete_request_digest, terminal_type, coarse_utc_bucket, write_epoch, replay_status, expires_at, replay_expires_at) VALUES (?, ?, 'deleted', ?, ?, 204, ?, ?) ON CONFLICT(journey_hmac_digest) DO NOTHING",
       )
       .bind(
         intent.journey_hmac_digest,
         intent.delete_request_digest,
         bucket,
+        writeEpoch,
         intent.requested_at + 48 * 60 * 60 * 1_000,
         intent.requested_at + 24 * 60 * 60 * 1_000,
       )

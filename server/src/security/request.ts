@@ -3,6 +3,20 @@ export type RequestPolicy = Readonly<{
   canonicalOrigin: string;
 }>;
 
+export function localLoopbackRequestPolicy(url: URL): RequestPolicy | undefined {
+  const port = Number(url.port);
+  if (
+    url.protocol !== "http:" ||
+    url.hostname !== "127.0.0.1" ||
+    !Number.isInteger(port) ||
+    port < 1024 ||
+    port > 65_535
+  ) {
+    return undefined;
+  }
+  return { canonicalHost: url.host, canonicalOrigin: url.origin };
+}
+
 export type RequestRejection =
   | "request_forbidden"
   | "payload_too_large"

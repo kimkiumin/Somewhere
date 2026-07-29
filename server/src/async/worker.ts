@@ -58,6 +58,7 @@ export async function consumeQueueBatch(
     dlq: DlqPort;
     now: number;
     repository: AsyncConsumePort;
+    retryDelaySeconds?: number;
   }>,
 ): Promise<void> {
   if (input.batch.messages.length > MAX_BATCH_COUNT) {
@@ -76,7 +77,7 @@ export async function consumeQueueBatch(
       const decision = retryDecision(queued.attempts);
       switch (decision.kind) {
         case "retry":
-          queued.retry({ delaySeconds: decision.delaySeconds });
+          queued.retry({ delaySeconds: input.retryDelaySeconds ?? decision.delaySeconds });
           continue;
         case "poison":
           if (parsed === undefined) {

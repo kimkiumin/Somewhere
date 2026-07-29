@@ -59,10 +59,28 @@ class SqlitePreparedQuery implements PreparedQuery {
     });
     return undefined;
   }
+
+  render(): string {
+    return bindSql(this.query, this.values);
+  }
 }
 
 export class SqliteDatabase implements Database {
   constructor(private readonly path: string) {}
+
+  async batch(statements: readonly PreparedQuery[]): Promise<readonly unknown[]> {
+    const queries = statements.map((statement) => {
+      if (!(statement instanceof SqlitePreparedQuery)) {
+        throw new TypeError("SQLite fixture batch received a foreign statement");
+      }
+      return `${statement.render()};`;
+    });
+    execFileSync("sqlite3", [this.path], {
+      encoding: "utf8",
+      input: [".bail on", "BEGIN IMMEDIATE;", ...queries, "COMMIT;"].join("\n"),
+    });
+    return [];
+  }
 
   prepare(query: string): PreparedQuery {
     return new SqlitePreparedQuery(this.path, query);

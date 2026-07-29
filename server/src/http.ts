@@ -3,7 +3,10 @@ import { handleFeedbackApi } from "./api/feedback-controller";
 import { API_HEADERS, jsonResponse, methodNotAllowed, publicError } from "./api/http-response";
 import { handleJourneyApi } from "./api/journey-controller";
 import type { Database } from "./db/database";
-import { validateSessionRequest } from "./security/request";
+import { OPERATIONS_SCHEMA } from "./operations/health";
+import { OperationsHealthRepository } from "./operations/health-repository";
+import { OperationsRuntimeControl } from "./operations/runtime-control";
+import { localLoopbackRequestPolicy, validateSessionRequest } from "./security/request";
 import { InMemorySessionRepository, SessionService } from "./security/session";
 import { importHmacKey, randomBase64Url } from "./security/tokens";
 
@@ -23,6 +26,16 @@ export function handleRequest(
       headers: API_HEADERS,
       status: 200,
     });
+  }
+  if (pathname === "/api/v1/operations/schema") {
+    return request.method === "GET"
+      ? jsonResponse(OPERATIONS_SCHEMA, 200)
+      : methodNotAllowed("GET");
+  }
+  if (pathname === "/api/v1/operations/health") {
+    return request.method === "GET"
+      ? handleOperationsHealth(env, dependencies?.now() ?? Date.now())
+      : methodNotAllowed("GET");
   }
   if (pathname === "/api/v1/session" && request.method === "GET") {
     return handleSession(request, env, dependencies);
@@ -45,13 +58,44 @@ export function handleRequest(
   });
 }
 
+async function handleOperationsHealth(env: Env | undefined, now: number): Promise<Response> {
+  if (env === undefined) {
+    return jsonResponse(
+      {
+        ...OPERATIONS_SCHEMA,
+        admissionState: "BOOT_BLOCKED",
+        externalGates: "BLOCK",
+        generatedAt: now,
+        status: "blocked",
+        writeEpoch: null,
+        writeFenceMode: null,
+      },
+      200,
+    );
+  }
+  const health = await new OperationsHealthRepository(env.DB satisfies Database).load(
+    env.ENVIRONMENT,
+    now,
+  );
+  return jsonResponse(health, 200);
+}
+
 async function handleRuntimeFeedback(
   request: Request,
   env: Env,
   dependencies: HttpBoundaryDependencies | undefined,
 ): Promise<Response> {
+  const now = dependencies?.now() ?? Date.now();
+  const operations = await new OperationsRuntimeControl(env.DB satisfies Database).authorize(
+    request,
+    env.ENVIRONMENT,
+    now,
+  );
+  if (!operations.allowed) {
+    return publicError("service_unavailable");
+  }
   const key = await loadSessionHmacKey(env.DB);
-  const response = await handleFeedbackApi(request, env, key, dependencies?.now() ?? Date.now());
+  const response = await handleFeedbackApi(request, env, key, now, operations.writeEpoch);
   return response ?? publicError("not_found");
 }
 
@@ -63,10 +107,10 @@ async function handleSession(
   const url = new URL(request.url);
   const requestPolicy =
     env?.ENVIRONMENT === "local"
-      ? {
-          canonicalHost: "127.0.0.1:8787",
-          canonicalOrigin: "http://127.0.0.1:8787",
-        }
+      ? (localLoopbackRequestPolicy(url) ?? {
+          canonicalHost: "invalid.local",
+          canonicalOrigin: "http://invalid.local",
+        })
       : {
           canonicalHost: url.host,
           canonicalOrigin: url.origin,
@@ -79,9 +123,25 @@ async function handleSession(
     (env === undefined
       ? await createEphemeralDependencies()
       : await createRuntimeDependencies(env));
+  const now = boundary.now();
+  if (env !== undefined) {
+    const boundSession = await boundary.sessionService.authenticateCookie(
+      request.headers.get("cookie") ?? undefined,
+      now,
+    );
+    const operations = await new OperationsRuntimeControl(env.DB satisfies Database).authorizeClass(
+      boundSession === undefined ? "NEW_WORK" : "SAFETY_SERVER",
+      request,
+      env.ENVIRONMENT,
+      now,
+    );
+    if (!operations.allowed) {
+      return publicError("service_unavailable");
+    }
+  }
   const session = await boundary.sessionService.issueOrRefresh(
     request.headers.get("cookie") ?? undefined,
-    boundary.now(),
+    now,
   );
   return new Response(
     JSON.stringify({
@@ -103,11 +163,23 @@ async function handleRuntimeJourney(
   dependencies: HttpBoundaryDependencies | undefined,
 ): Promise<Response> {
   const boundary = dependencies ?? (await createRuntimeDependencies(env));
+  const operations = await new OperationsRuntimeControl(env.DB satisfies Database).authorize(
+    request,
+    env.ENVIRONMENT,
+    boundary.now(),
+  );
+  if (!operations.allowed) {
+    return publicError("service_unavailable");
+  }
   const key = await loadSessionHmacKey(env.DB);
   const response = await handleJourneyApi(request, env, {
     hmacKey: key,
     now: boundary.now,
+    ...(operations.reserveNewWork === undefined
+      ? {}
+      : { reserveNewWork: operations.reserveNewWork }),
     sessionService: boundary.sessionService,
+    writeEpoch: operations.writeEpoch,
   });
   return response ?? publicError("not_found");
 }

@@ -10,12 +10,17 @@
     "run_worker_first": ["/api/*"]
   },
   "observability": {
-    "enabled": false,
+    "enabled": true,
     "logs": {
-      "invocation_logs": false
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false,
+      "persist": true
     },
     "traces": {
-      "enabled": false
+      "enabled": false,
+      "head_sampling_rate": 0,
+      "persist": false
     }
   },
   "vars": {
@@ -53,6 +58,12 @@
         "max_batch_timeout": 5,
         "max_retries": 4,
         "dead_letter_queue": "somewhere-events-dlq-local"
+      },
+      {
+        "queue": "somewhere-events-dlq-local",
+        "max_batch_size": 100,
+        "max_batch_timeout": 1,
+        "max_retries": 0
       }
     ]
   },
@@ -68,6 +79,12 @@
   "env": {
     "staging": {
       "name": "somewhere-api-staging",
+      "services": [
+        {
+          "binding": "OPERATIONS_AUTHORITY",
+          "service": "somewhere-operations-authority-staging"
+        }
+      ],
       "vars": {
         "ENVIRONMENT": "staging"
       },
@@ -109,6 +126,12 @@
     },
     "production": {
       "name": "somewhere-api-production",
+      "services": [
+        {
+          "binding": "OPERATIONS_AUTHORITY",
+          "service": "somewhere-operations-authority-production"
+        }
+      ],
       "vars": {
         "ENVIRONMENT": "production"
       },

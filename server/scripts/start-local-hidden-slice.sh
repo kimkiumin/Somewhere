@@ -3,11 +3,16 @@ set -euo pipefail
 
 readonly SERVER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly ROOT_DIR="$(cd "$SERVER_DIR/.." && pwd)"
-readonly PORT=8787
+readonly PORT="${SOMEWHERE_LOCAL_PORT:-8787}"
 readonly HOST=127.0.0.1
 
-if curl --silent --fail --max-time 1 "http://$HOST:$PORT/api/v1/health" >/dev/null 2>&1; then
-  printf 'port %s is already serving HTTP\n' "$PORT" >&2
+if [[ ! "$PORT" =~ ^[0-9]+$ || "$PORT" -lt 1024 || "$PORT" -gt 65535 ]]; then
+  printf 'invalid local port\n' >&2
+  exit 2
+fi
+
+if ss -H -ltn "sport = :$PORT" | grep -q .; then
+  printf 'port %s is already in use\n' "$PORT" >&2
   exit 2
 fi
 

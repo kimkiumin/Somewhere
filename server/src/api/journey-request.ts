@@ -1,4 +1,4 @@
-import { validateMutationRequest } from "../security/request";
+import { localLoopbackRequestPolicy, validateMutationRequest } from "../security/request";
 import { parseStrictBody } from "../security/schema";
 import type { AuthenticatedSession, SessionService } from "../security/session";
 import { hmacDigest } from "../security/tokens";
@@ -24,7 +24,14 @@ export type JourneySnapshot = LifecycleSnapshot &
 export type JourneyControllerDependencies = Readonly<{
   hmacKey: CryptoKey;
   now: () => number;
+  reserveNewWork?: (idempotencyKey: string) => Promise<NewWorkReservation | undefined>;
   sessionService: SessionService;
+  writeEpoch: number;
+}>;
+
+export type NewWorkReservation = Readonly<{
+  finalize(): Promise<void>;
+  release(): Promise<void>;
 }>;
 
 export async function projectSnapshot(
@@ -119,6 +126,9 @@ function requestPolicy(
 ): Readonly<{ canonicalHost: string; canonicalOrigin: string }> {
   const url = new URL(request.url);
   return url.hostname === "127.0.0.1"
-    ? { canonicalHost: "127.0.0.1:8787", canonicalOrigin: "http://127.0.0.1:8787" }
+    ? (localLoopbackRequestPolicy(url) ?? {
+        canonicalHost: "invalid.local",
+        canonicalOrigin: "http://invalid.local",
+      })
     : { canonicalHost: url.host, canonicalOrigin: url.origin };
 }

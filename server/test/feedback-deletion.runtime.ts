@@ -17,7 +17,7 @@ describe("Todo13 feedback deletion Workers runtime", () => {
     const key = await loadSessionHmacKey(env.DB);
     const consented = await issueFeedbackCapability(key);
     const localOnly = await issueFeedbackCapability(key);
-    const repository = new FeedbackRepository(env.DB);
+    const repository = new FeedbackRepository(env.DB, 1);
     await repository.issue({
       capabilityDigest: consented.digest,
       consentGranted: true,
@@ -73,9 +73,9 @@ describe("Todo13 feedback deletion Workers runtime", () => {
 async function migrateFeedbackRuntime(): Promise<void> {
   const statements = [
     "CREATE TABLE http_runtime_keys (key_name TEXT PRIMARY KEY, key_material TEXT NOT NULL) STRICT",
-    "CREATE TABLE feedback_eligibility (eligibility_id TEXT PRIMARY KEY, journey_hmac_digest TEXT NOT NULL, capability_digest TEXT NOT NULL UNIQUE, eligibility_state TEXT NOT NULL, due_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, consumed_at INTEGER, feedback_id TEXT NOT NULL UNIQUE, prompt_version TEXT NOT NULL, consent_granted INTEGER NOT NULL, consent_binding_digest TEXT, consumption_digest TEXT) STRICT",
-    "CREATE TABLE place_reactions (reaction_id TEXT PRIMARY KEY, reaction_code TEXT NOT NULL, reaction_version INTEGER NOT NULL, category TEXT NOT NULL, response_delay_band TEXT NOT NULL, policy_digest TEXT NOT NULL, recorded_at INTEGER NOT NULL, expires_at INTEGER NOT NULL) STRICT",
-    "CREATE TABLE feedback_reaction_outcomes (capability_digest TEXT PRIMARY KEY, idempotency_digest TEXT NOT NULL, request_digest TEXT NOT NULL, feedback_id TEXT NOT NULL, expires_at INTEGER NOT NULL) STRICT",
+    "CREATE TABLE feedback_eligibility (eligibility_id TEXT PRIMARY KEY, journey_hmac_digest TEXT NOT NULL, capability_digest TEXT NOT NULL UNIQUE, eligibility_state TEXT NOT NULL, due_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, consumed_at INTEGER, feedback_id TEXT NOT NULL UNIQUE, prompt_version TEXT NOT NULL, consent_granted INTEGER NOT NULL, consent_binding_digest TEXT, consumption_digest TEXT, write_epoch INTEGER NOT NULL) STRICT",
+    "CREATE TABLE place_reactions (reaction_id TEXT PRIMARY KEY, reaction_code TEXT NOT NULL, reaction_version INTEGER NOT NULL, category TEXT NOT NULL, response_delay_band TEXT NOT NULL, policy_digest TEXT NOT NULL, recorded_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, write_epoch INTEGER NOT NULL) STRICT",
+    "CREATE TABLE feedback_reaction_outcomes (capability_digest TEXT PRIMARY KEY, idempotency_digest TEXT NOT NULL, request_digest TEXT NOT NULL, feedback_id TEXT NOT NULL, expires_at INTEGER NOT NULL, write_epoch INTEGER NOT NULL) STRICT",
   ] as const;
   for (const statement of statements) {
     await env.DB.prepare(statement).run();

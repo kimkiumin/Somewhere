@@ -31,7 +31,7 @@ describe("typed operational D1 repositories", () => {
 
   it("persists only digested session guards and minimized feedback state", async () => {
     // Given: a migrated D1 database.
-    const repository = new SessionRepository(migratedDatabase());
+    const repository = new SessionRepository(migratedDatabase(), 1);
 
     // When: a guard, consent, eligibility, and unlinkable reaction are recorded.
     const guard = await repository.putGuard({

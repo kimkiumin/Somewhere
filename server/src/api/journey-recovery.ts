@@ -153,7 +153,7 @@ async function issueIntent(
     now,
     outcomeCiphertext: await sealForSession(responseBody, session.sessionToken),
     type: "recovery-intent",
-    writeEpoch: 1,
+    writeEpoch: dependencies.writeEpoch,
   });
   if (result.kind === "replay" && result.outcomeCiphertext !== undefined) {
     return replayResponse(result.outcomeCiphertext, session.sessionToken, 201);
@@ -214,7 +214,7 @@ async function issueCapability(
     now,
     outcomeCiphertext: await sealForSession(responseBody, session.sessionToken),
     type: "recovery-confirm",
-    writeEpoch: 1,
+    writeEpoch: dependencies.writeEpoch,
   });
   if (result.kind === "replay" && result.outcomeCiphertext !== undefined) {
     return replayResponse(result.outcomeCiphertext, session.sessionToken, 201);

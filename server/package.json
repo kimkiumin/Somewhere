@@ -9,8 +9,8 @@
     "hidden:start": "bash scripts/start-local-hidden-slice.sh",
     "hidden:stop": "bash scripts/stop-local-hidden-slice.sh",
     "hidden:curl": "bash test/curl-hidden-slice.sh",
-    "lint": "biome check src/index.ts src/http.ts src/environment.ts src/api src/async src/db src/deletion src/feedback src/journey src/privacy src/provider src/security test vitest.config.ts",
-    "test": "vitest run",
+    "lint": "biome check src/index.ts src/http.ts src/environment.ts src/admission src/api src/async src/db src/deletion src/feedback src/journey src/observability src/operations src/privacy src/provider src/security test vitest.config.ts",
+    "test": "bun ../scripts/operations/vitest-compat.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

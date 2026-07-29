@@ -11,6 +11,7 @@ type EnvironmentConfig = Readonly<{
     consumers?: readonly Binding[];
     producers?: readonly Binding[];
   }>;
+  services?: readonly Binding[];
 }>;
 
 type WorkerConfig = EnvironmentConfig &
@@ -79,17 +80,26 @@ describe("worker-config", () => {
     const serialized = environments.map((environment) => JSON.stringify(environment));
 
     // Then: every environment is complete and no deployed binding is reused.
-    for (const environment of environments) {
+    for (const [index, environment] of environments.entries()) {
       expect(environment?.d1_databases).toHaveLength(1);
       expect(environment?.durable_objects?.bindings).toHaveLength(1);
       expect(environment?.queues?.producers).toHaveLength(2);
-      expect(environment?.queues?.consumers).toHaveLength(1);
+      expect(environment?.queues?.consumers).toHaveLength(index === 0 ? 2 : 1);
       expect(environment?.queues?.consumers?.[0]).toMatchObject({
         max_batch_size: 100,
         max_retries: 4,
       });
+      expect(environment?.services ?? []).toHaveLength(index === 0 ? 0 : 1);
     }
     expect(new Set(serialized)).toHaveLength(3);
+    expect(config.env?.["staging"]?.services?.[0]).toEqual({
+      binding: "OPERATIONS_AUTHORITY",
+      service: "somewhere-operations-authority-staging",
+    });
+    expect(config.env?.["production"]?.services?.[0]).toEqual({
+      binding: "OPERATIONS_AUTHORITY",
+      service: "somewhere-operations-authority-production",
+    });
     expect(config.triggers?.crons).toEqual(["*/5 * * * *"]);
   });
 
@@ -102,9 +112,18 @@ describe("worker-config", () => {
 
     // Then: the platform does not retain full journey URLs in logs or traces.
     expect(observability).toEqual({
-      enabled: false,
-      logs: { invocation_logs: false },
-      traces: { enabled: false },
+      enabled: true,
+      logs: {
+        enabled: true,
+        head_sampling_rate: 1,
+        invocation_logs: false,
+        persist: true,
+      },
+      traces: {
+        enabled: false,
+        head_sampling_rate: 0,
+        persist: false,
+      },
     });
   });
 });

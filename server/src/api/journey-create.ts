@@ -1,5 +1,7 @@
+import type { z } from "zod";
 import { JourneyCreateBodyV1Schema } from "../../../contracts/src/journey";
 
+import type { JourneyDurableObject } from "../journey/durable-object";
 import { hmacDigest, isCanonicalToken, randomBase64Url } from "../security/tokens";
 import { jsonResponse, publicError } from "./http-response";
 import { buildJourneyPreparation } from "./journey-composition";
@@ -89,21 +91,84 @@ export async function createJourney(
     if (now > guard.last_stopped_at + 120_000) {
       return publicError("capability_expired");
     }
+  }
+  const reservation =
+    dependencies.reserveNewWork === undefined
+      ? undefined
+      : await dependencies.reserveNewWork(rawIdempotencyKey);
+  if (dependencies.reserveNewWork !== undefined && reservation === undefined) {
+    return publicError("service_unavailable");
+  }
+  return runReservedNewWork(reservation, () =>
+    createReservedJourney({
+      body: body.data,
+      bodyDigest,
+      dependencies,
+      env,
+      journeyDigest,
+      journeyId,
+      now,
+      session,
+      stub,
+    }),
+  );
+}
+
+export async function runReservedNewWork(
+  reservation: Awaited<ReturnType<NonNullable<JourneyControllerDependencies["reserveNewWork"]>>>,
+  operation: () => Promise<Response>,
+): Promise<Response> {
+  let response: Response;
+  try {
+    response = await operation();
+  } catch (error) {
+    await reservation?.release();
+    throw error;
+  }
+  if (response.status >= 400) {
+    await reservation?.release();
+  } else {
+    await reservation?.finalize();
+  }
+  return response;
+}
+
+async function createReservedJourney(
+  input: Readonly<{
+    body: z.infer<typeof JourneyCreateBodyV1Schema>;
+    bodyDigest: string;
+    dependencies: JourneyControllerDependencies;
+    env: Env;
+    journeyDigest: string;
+    journeyId: string;
+    now: number;
+    session: Awaited<ReturnType<typeof authenticateMutation>>;
+    stub: DurableObjectStub<JourneyDurableObject>;
+  }>,
+): Promise<Response> {
+  if (input.session === undefined) {
+    return publicError("session_expired");
+  }
+  if (input.body.recoveryCapability !== null) {
+    const capabilityDigest = await hmacDigest(
+      input.dependencies.hmacKey,
+      `${input.body.recoveryCapability}\0${JSON.stringify(input.body.constraints)}`,
+    );
     if (
       !(await consumeRecoveryDigest({
-        bindingDigest: session.bindingDigest,
-        database: env.DB,
+        bindingDigest: input.session.bindingDigest,
+        database: input.env.DB,
         digest: capabilityDigest,
-        now,
+        now: input.now,
       }))
     ) {
       return publicError("capability_invalid");
     }
   }
   const prepared = await buildJourneyPreparation({
-    body: body.data,
-    journeyId,
-    now: new Date(now),
+    body: input.body,
+    journeyId: input.journeyId,
+    now: new Date(input.now),
     requestId: `req_v1.${randomBase64Url(16)}`,
   });
   if (prepared.kind === "error") {
@@ -111,37 +176,37 @@ export async function createJourney(
   }
   if (
     !(await persistPreparation({
-      bindingDigest: session.bindingDigest,
-      bodyDigest,
-      database: env.DB,
-      journeyDigest,
-      now,
+      bindingDigest: input.session.bindingDigest,
+      bodyDigest: input.bodyDigest,
+      database: input.env.DB,
+      journeyDigest: input.journeyDigest,
+      now: input.now,
       prepared,
     }))
   ) {
     return publicError("invalid_transition");
   }
-  await stub.initialize({
-    browserBindingDigest: session.bindingDigest,
-    expiresAt: now + 24 * 60 * 60 * 1_000,
-    journeyId,
+  await input.stub.initialize({
+    browserBindingDigest: input.session.bindingDigest,
+    expiresAt: input.now + 24 * 60 * 60 * 1_000,
+    journeyId: input.journeyId,
     preparedRoute: {
       geometry: prepared.route.geometry,
       originZoneRef: prepared.route.originZoneRef,
       routeDigest: prepared.route.routeDigest.slice(7),
     },
     selectedSnapshot: {
-      createRequestDigest: bodyDigest,
-      destinationSnapshotCiphertext: await sealForSession(prepared, session.sessionToken),
+      createRequestDigest: input.bodyDigest,
+      destinationSnapshotCiphertext: await sealForSession(prepared, input.session.sessionToken),
       disclosure: {
-        category: body.data.constraints.category,
+        category: input.body.constraints.category,
         hint: prepared.disclosure.representativeCategories.join(" / "),
       },
       receiptDigest: prepared.receipt.receiptDigest,
       selectionReceiptId: prepared.receipt.receiptId,
     },
     sequence: 1,
-    writeEpoch: 1,
+    writeEpoch: input.dependencies.writeEpoch,
   });
   return jsonResponse(
     projectLifecycleJourney(prepared, {

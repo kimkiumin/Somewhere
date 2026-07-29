@@ -62,7 +62,10 @@ export type FeedbackEligibilityRecord = z.infer<typeof eligibilitySchema>;
 export type ReactionRecord = z.infer<typeof reactionSchema>;
 
 export class SessionRepository {
-  constructor(private readonly database: Database) {}
+  constructor(
+    private readonly database: Database,
+    private readonly writeEpoch: number,
+  ) {}
 
   async putGuard(value: unknown): Promise<SessionGuardRecord> {
     const record = parseBoundary(sessionGuardSchema, value);
@@ -161,6 +164,6 @@ export class SessionRepository {
       reaction: "dislike" | "like" | "love" | "did_not_visit";
     }>,
   ): Promise<FeedbackReaction> {
-    return new FeedbackRepository(this.database).consume(input);
+    return new FeedbackRepository(this.database, this.writeEpoch).consume(input);
   }
 }

@@ -16,11 +16,12 @@ export async function handleFeedbackApi(
   env: Env,
   hmacKey: CryptoKey,
   now: number,
+  writeEpoch = 1,
 ): Promise<Response | undefined> {
   const pathname = new URL(request.url).pathname;
   if (pathname === "/api/v1/feedback/eligible") {
     return request.method === "GET"
-      ? eligibleFeedback(request, env, hmacKey, now)
+      ? eligibleFeedback(request, env, hmacKey, now, writeEpoch)
       : methodNotAllowed("GET");
   }
   const match = REACTION_PATH.exec(pathname);
@@ -32,7 +33,7 @@ export async function handleFeedbackApi(
     return publicError("invalid_request");
   }
   return request.method === "POST"
-    ? recordReaction(request, env, hmacKey, now, feedbackId)
+    ? recordReaction(request, env, hmacKey, now, feedbackId, writeEpoch)
     : methodNotAllowed("POST");
 }
 
@@ -41,12 +42,13 @@ async function eligibleFeedback(
   env: Env,
   hmacKey: CryptoKey,
   now: number,
+  writeEpoch: number,
 ): Promise<Response> {
   const digest = await authorizeFeedbackCapability(request.headers.get("authorization"), hmacKey);
   if (digest === undefined) {
     return publicError("capability_invalid");
   }
-  const repository = new FeedbackRepository(env.DB);
+  const repository = new FeedbackRepository(env.DB, writeEpoch);
   const eligibility = await repository.find(digest);
   if (eligibility === null || eligibility.eligibility_state !== "eligible") {
     return publicError("capability_invalid");
@@ -79,6 +81,7 @@ async function recordReaction(
   hmacKey: CryptoKey,
   now: number,
   feedbackId: string,
+  writeEpoch: number,
 ): Promise<Response> {
   const parsed = await parseMutationBody(request, 1_024, new Set(["contractVersion", "reaction"]));
   if ("error" in parsed) {
@@ -99,7 +102,7 @@ async function recordReaction(
   if (rawKey === null || !isCanonicalToken(rawKey, "ik_v1", 32)) {
     return publicError("idempotency_conflict");
   }
-  const result = await new FeedbackRepository(env.DB).consume({
+  const result = await new FeedbackRepository(env.DB, writeEpoch).consume({
     capabilityDigest,
     feedbackId,
     idempotencyDigest: await hmacDigest(hmacKey, `${capabilityDigest}\0${rawKey}`),

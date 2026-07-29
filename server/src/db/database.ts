@@ -10,6 +10,7 @@ export interface PreparedQuery {
 }
 
 export interface Database {
+  batch?(statements: readonly PreparedQuery[]): Promise<readonly unknown[]>;
   prepare(query: string): PreparedQuery;
 }
 

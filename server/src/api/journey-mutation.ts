@@ -139,7 +139,7 @@ export async function mutateJourney(
     idempotencyKeyDigest: await hmacDigest(dependencies.hmacKey, rawKey),
     now,
     outcomeCiphertext: await sealForSession(responseBody, session.sessionToken),
-    writeEpoch: 1,
+    writeEpoch: dependencies.writeEpoch,
     ...commandDetails,
   });
   if (result.kind === "replay" && result.outcomeCiphertext !== undefined) {
@@ -156,6 +156,7 @@ export async function mutateJourney(
         hmacKey: dependencies.hmacKey,
         journeyId,
         rawCapability: replayedArrival.feedbackCapability,
+        writeEpoch: dependencies.writeEpoch,
       });
     }
     return new Response(replay, {
@@ -185,6 +186,7 @@ export async function mutateJourney(
       hmacKey: dependencies.hmacKey,
       journeyId,
       rawCapability: feedbackCapability.raw,
+      writeEpoch: dependencies.writeEpoch,
     });
   }
   return new Response(responseBody, { headers: JSON_HEADERS, status: 200 });
@@ -213,9 +215,10 @@ async function persistFeedbackEligibility(
     hmacKey: CryptoKey;
     journeyId: string;
     rawCapability: string;
+    writeEpoch: number;
   }>,
 ): Promise<void> {
-  const repository = new FeedbackRepository(input.database);
+  const repository = new FeedbackRepository(input.database, input.writeEpoch);
   const capability = await describeFeedbackCapability(input.rawCapability, input.hmacKey);
   await repository.issue({
     bindingDigest: input.bindingDigest,
@@ -295,7 +298,7 @@ export async function deleteJourney(
       },
       inventory: () => repository.inventory(journeyDigest),
       loadStage: async () => intent.stage,
-      writeTombstone: () => repository.writeTombstone(intent),
+      writeTombstone: () => repository.writeTombstone(intent, dependencies.writeEpoch),
     });
     return result.kind === "complete"
       ? new Response(null, {

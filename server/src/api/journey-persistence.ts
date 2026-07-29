@@ -253,14 +253,21 @@ export async function writeDeleteTombstone(
     deleteRequestDigest: string;
     journeyDigest: string;
     now: number;
+    writeEpoch: number;
   }>,
 ): Promise<void> {
   const bucket = Math.floor(input.now / 3_600_000) * 3_600_000;
   await input.database
     .prepare(
-      "INSERT INTO journey_tombstones (journey_hmac_digest, delete_request_digest, terminal_type, coarse_utc_bucket, write_epoch, replay_status, expires_at) VALUES (?, ?, 'deleted', ?, 2, 204, ?) ON CONFLICT(journey_hmac_digest) DO NOTHING",
+      "INSERT INTO journey_tombstones (journey_hmac_digest, delete_request_digest, terminal_type, coarse_utc_bucket, write_epoch, replay_status, expires_at) VALUES (?, ?, 'deleted', ?, ?, 204, ?) ON CONFLICT(journey_hmac_digest) DO NOTHING",
     )
-    .bind(input.journeyDigest, input.deleteRequestDigest, bucket, input.now + 48 * 60 * 60 * 1_000)
+    .bind(
+      input.journeyDigest,
+      input.deleteRequestDigest,
+      bucket,
+      input.writeEpoch,
+      input.now + 48 * 60 * 60 * 1_000,
+    )
     .run();
 }
 

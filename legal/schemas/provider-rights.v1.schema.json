@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.example/schemas/provider-rights.v1.json",
+  "title": "Somewhere provider rights review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "providerId",
+    "adapterVersion",
+    "environment",
+    "reviewedReleaseDigest",
+    "terms",
+    "rights",
+    "dataFlow",
+    "quota",
+    "credential",
+    "evidence",
+    "decision"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "providerId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$" },
+    "adapterVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "environment": { "enum": ["staging", "production"] },
+    "reviewedReleaseDigest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "terms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentUrl", "versionOrPublishedAt", "reviewedAt", "expiresAt"],
+      "properties": {
+        "documentUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "versionOrPublishedAt": { "type": "string", "minLength": 1 },
+        "reviewedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "search",
+        "routing",
+        "storeRaw",
+        "storeDerived",
+        "cacheTtlSeconds",
+        "display",
+        "attribution",
+        "manualFixture",
+        "commercialPilot",
+        "geographies",
+        "deletionMechanism"
+      ],
+      "properties": {
+        "search": { "const": true },
+        "routing": { "const": true },
+        "storeRaw": { "type": "boolean" },
+        "storeDerived": { "const": true },
+        "cacheTtlSeconds": { "type": "integer", "minimum": 0, "maximum": 2592000 },
+        "display": { "const": true },
+        "attribution": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "manualFixture": { "type": "boolean" },
+        "commercialPilot": { "const": true },
+        "geographies": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Z]{2}$" }
+        },
+        "deletionMechanism": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "dataFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpointOrigins",
+        "methods",
+        "sendsPreciseOrigin",
+        "sendsDestination",
+        "processingRegions",
+        "providerRetentionDays",
+        "subprocessorEvidenceDigest"
+      ],
+      "properties": {
+        "endpointOrigins": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "format": "uri", "pattern": "^https://" }
+        },
+        "methods": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["GET", "POST"] }
+        },
+        "sendsPreciseOrigin": { "type": "boolean" },
+        "sendsDestination": { "type": "boolean" },
+        "processingRegions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 2, "maxLength": 64 }
+        },
+        "providerRetentionDays": { "type": "integer", "minimum": 0, "maximum": 3650 },
+        "subprocessorEvidenceDigest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "quota": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "hardDailyCap",
+        "billableFallback",
+        "payer",
+        "checkedAt",
+        "reservationOwner"
+      ],
+      "properties": {
+        "unit": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "hardDailyCap": { "type": "integer", "minimum": 1 },
+        "billableFallback": { "const": false },
+        "payer": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "checkedAt": { "type": "string", "format": "date-time" },
+        "reservationOwner": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "credential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bindingName", "scopeDigest", "rotatedAt", "expiresAt"],
+      "properties": {
+        "bindingName": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,63}$" },
+        "scopeDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "rotatedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "legalReviewer",
+        "securityReviewer",
+        "signedAt",
+        "artifactDigest"
+      ],
+      "properties": {
+        "owner": { "$ref": "#/$defs/attestor" },
+        "legalReviewer": { "$ref": "#/$defs/attestor" },
+        "securityReviewer": { "$ref": "#/$defs/attestor" },
+        "signedAt": { "type": "string", "format": "date-time" },
+        "artifactDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "decision": { "enum": ["PASS", "BLOCK"] }
+  },
+  "$defs": {
+    "attestor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "role", "organization", "attestationDigest"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "role": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "organization": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "attestationDigest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

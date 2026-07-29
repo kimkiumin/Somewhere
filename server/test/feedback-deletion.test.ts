@@ -46,7 +46,18 @@ describe("Todo13 feedback deletion", () => {
     if (existsSync(todo13Migration)) {
       executeSql(path, readFileSync(todo13Migration, "utf8"));
     }
-    const repository = new SessionRepository(new SqliteDatabase(path));
+    executeSql(
+      path,
+      readFileSync(resolve(process.cwd(), "migrations/0004_operations_control.sql"), "utf8"),
+    );
+    executeSql(
+      path,
+      readFileSync(
+        resolve(process.cwd(), "migrations/0005_operations_epoch_extensions.sql"),
+        "utf8",
+      ),
+    );
+    const repository = new SessionRepository(new SqliteDatabase(path), 1);
     await repository.insertFeedbackEligibility({
       capability_digest: CAPABILITY_DIGEST,
       consumed_at: null,
@@ -91,7 +102,18 @@ describe("Todo13 feedback deletion", () => {
       path,
       readFileSync(resolve(process.cwd(), "migrations/0003_feedback_deletion.sql"), "utf8"),
     );
-    const repository = new FeedbackRepository(new SqliteDatabase(path));
+    executeSql(
+      path,
+      readFileSync(resolve(process.cwd(), "migrations/0004_operations_control.sql"), "utf8"),
+    );
+    executeSql(
+      path,
+      readFileSync(
+        resolve(process.cwd(), "migrations/0005_operations_epoch_extensions.sql"),
+        "utf8",
+      ),
+    );
+    const repository = new FeedbackRepository(new SqliteDatabase(path), 1);
     const arrivalAt = 1_785_283_200_000;
     const dueAt = arrivalAt + 60 * 60 * 1_000;
     const expiresAt = arrivalAt + 7 * 24 * 60 * 60 * 1_000;
@@ -267,7 +289,7 @@ describe("Todo13 feedback deletion", () => {
     const database = new SqliteDatabase(path);
     const now = 1_785_283_200_000;
     const sessionBindingDigest = "d".repeat(64);
-    await new SessionRepository(database).putGuard({
+    await new SessionRepository(database, 1).putGuard({
       active_journey_digest: JOURNEY_DIGEST,
       create_request_digest: "e".repeat(64),
       expires_at: now + 86_400_000,
@@ -311,7 +333,7 @@ describe("Todo13 feedback deletion", () => {
       },
       inventory: () => repository.inventory(JOURNEY_DIGEST),
       loadStage: async () => intent.stage,
-      writeTombstone: () => repository.writeTombstone(intent),
+      writeTombstone: () => repository.writeTombstone(intent, 1),
     });
 
     // Then: 204 eligibility conditions exist with only the disclosed survivors.
@@ -323,13 +345,14 @@ describe("Todo13 feedback deletion", () => {
     expect(
       queryJson(
         path,
-        "SELECT delete_request_digest, expires_at, replay_expires_at FROM journey_tombstones",
+        "SELECT delete_request_digest, expires_at, replay_expires_at, write_epoch FROM journey_tombstones",
       ),
     ).toEqual([
       {
         delete_request_digest: "f".repeat(64),
         expires_at: now + 48 * 60 * 60 * 1_000,
         replay_expires_at: now + 24 * 60 * 60 * 1_000,
+        write_epoch: 1,
       },
     ]);
     expect(
