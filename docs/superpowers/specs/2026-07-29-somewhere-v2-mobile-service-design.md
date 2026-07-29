@@ -12,9 +12,12 @@ This document converts the approved Somewhere V2 product blueprint into a decisi
 The source priority for this design is:
 
 1. the owner's latest direction: complete the mobile service and real backend without adding tablet or desktop product scope;
-2. the approved V2 blueprint in Git commit `1cd08b3`, dated 2026-07-21;
-3. the current v0.2 sensor PWA as implementation evidence, not as the V2 product contract;
-4. current official platform documentation and the research record listed in [Section 25](#25-evidence-and-source-record).
+2. the repository-local [`BLUEPRINT.md`](../../../BLUEPRINT.md) and linked [`docs/blueprint/`](../../blueprint/) documents, imported byte-for-byte from approved Git commit `1cd08b3`, dated 2026-07-21; these are the authoritative approved V2 product direction;
+3. this design for implementation details that do not conflict with the blueprint;
+4. the current v0.2 sensor PWA as implementation evidence, not as the V2 product contract;
+5. current official platform documentation and the research record listed in [Section 25](#25-evidence-and-source-record).
+
+Import provenance, source blob IDs, and SHA-256 values are recorded in [`docs/blueprint/SOURCE_RECEIPT.md`](../../blueprint/SOURCE_RECEIPT.md). Copying those objects into this lineage does not merge the sibling history.
 
 The repository baseline inspected for this design is commit `84359bd343692f8d12da0ebe955b6ffad34b46d5`. The working tree already contains unrelated v0.2 audit and refactor changes. This design does not authorize resetting, staging, or rewriting those changes.
 

@@ -2,9 +2,34 @@
 
 Use this index before applying a document to current work.
 
-## Current v0.2 application
+## Current V2 authority
 
-For `/app`, use the following order when sources disagree:
+For V2 product and backend work, use this exact order when sources disagree:
+
+1. The project owner's latest explicit direction.
+2. Root [`BLUEPRINT.md`](../BLUEPRINT.md) and the linked
+   [`blueprint/`](blueprint/) documents. These are the authoritative approved
+   V2 product direction.
+3. The current
+   [V2 mobile-service design](superpowers/specs/2026-07-29-somewhere-v2-mobile-service-design.md)
+   for implementation details that do not conflict with the blueprint.
+4. Executable V2 contracts, code, and tests as implementation evidence; they
+   must not silently override items 1–3.
+5. The v0.2 application and frozen v0.1 prototype as historical evidence only.
+
+The approved blueprint files were copied byte-for-byte from their source Git
+objects. Their provenance and hashes are recorded in
+[`blueprint/SOURCE_RECEIPT.md`](blueprint/SOURCE_RECEIPT.md).
+
+V2 has no active Reroll control. Its recovery model is immediate Stop pause,
+explicit stop confirmation, and a guarded new recommendation only after the
+journey has ended. Reroll requirements in older files apply only to their
+historical version.
+
+## Historical v0.2 application
+
+To understand the preserved v0.2 `/app` behavior, use the following historical
+order:
 
 1. The latest explicit product decision from the project owner.
 2. Root [`README.md`](../README.md), [`AGENTS.md`](../AGENTS.md), and
@@ -16,8 +41,9 @@ For `/app`, use the following order when sources disagree:
    as implementation-plan history.
 
 The dated v0.2 design records why the current architecture exists, but current
-code and tests supersede details changed during verification, including
-heading-silence handling and lifecycle cleanup.
+v0.2 code and tests supersede details changed during verification, including
+heading-silence handling and lifecycle cleanup. This historical order does not
+override the V2 authority order above.
 
 ## Frozen v0.1 prototype
 
