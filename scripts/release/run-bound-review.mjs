@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import {
@@ -14,6 +14,33 @@ import {
 const specification = {
   required: ["--profile", "--sha", "--source-tree", "--inputs", "--output"],
 };
+const blockedCredentials = [
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_API_KEY",
+  "CLOUDFLARE_EMAIL",
+  "CLOUDFLARE_ACCOUNT_ID",
+  "CLOUDFLARE_ZONE_ID",
+  "CF_API_TOKEN",
+  "CF_API_KEY",
+  "CF_API_EMAIL",
+  "CF_ACCESS_CLIENT_ID",
+  "CF_ACCESS_CLIENT_SECRET",
+  "CLOUDFLARE_ACCESS_CLIENT_ID",
+  "CLOUDFLARE_ACCESS_CLIENT_SECRET",
+  "CLOUDFLARE_API_BASE_URL",
+  "SOMEWHERE_API_BASE_URL",
+];
+
+function reviewerEnvironment() {
+  const environment = { ...process.env };
+  for (const name of blockedCredentials) delete environment[name];
+  if (typeof environment.CODEX_HOME !== "string" || environment.CODEX_HOME === "") {
+    throw new TypeError("reviewer CODEX_HOME is required");
+  }
+  environment.CODEX_HOME = resolve(environment.CODEX_HOME);
+  environment.HOME = environment.HOME ?? dirname(environment.CODEX_HOME);
+  return environment;
+}
 
 async function review(options) {
   const repo = resolve(".");
@@ -34,7 +61,8 @@ async function review(options) {
   ) {
     throw new TypeError("unsafe reviewer profile");
   }
-  const version = await run(["codex2", "--version"], { cwd: repo, env: process.env });
+  const environment = reviewerEnvironment();
+  const version = await run(["codex2", "--version"], { cwd: repo, env: environment });
   const observedVersion = version.stdout.toString().trim();
   if (version.exitCode !== 0 || observedVersion !== profile.runner.version) {
     throw new TypeError("reviewer runner version mismatch");
@@ -71,7 +99,7 @@ async function review(options) {
       "--output-last-message",
       responsePath,
       prompt,
-    ], { cwd: repo, env: { ...process.env, CODEX_HOME: process.env.CODEX_HOME ?? "/home/tjrgus/.codex2" } });
+    ], { cwd: repo, env: environment });
     if (invoked.exitCode !== 0) throw new TypeError(`reviewer runner failed: ${invoked.stderr.toString().trim()}`);
     const response = await readJson(responsePath);
     if (

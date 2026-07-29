@@ -94,6 +94,38 @@ describe("Todo 22 release registry", () => {
     expect(result.stdout.toString()).toContain("--output");
   });
 
+  test("uses one installed app-local Playwright runner for final browser lanes", async () => {
+    const root = await temporaryDirectory("final-playwright-list");
+    try {
+      const registry = await readJson(
+        resolve(repo, "scripts/release/final-lane-commands-v1.json"),
+      );
+      for (const id of ["chromium", "webkit"]) {
+        const command = registry.lanes.F3.find((entry) => entry.id === id);
+        expect(command.argv.slice(0, 3)).toEqual([
+          "bun",
+          "app/node_modules/@playwright/test/cli.js",
+          "test",
+        ]);
+        expect(command.argv).not.toContain("bunx");
+        expect(command.argv).not.toContain("--package");
+        const environment = {
+          SOMEWHERE_PREPARED_BASE_URL: "https://127.0.0.1:8788",
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME: resolve(root, `${id}.xml`),
+          V2_EVIDENCE_DIR: resolve(root, `${id}-evidence`),
+        };
+        const argv = command.argv.map((value) =>
+          value.replaceAll("${TEMP_ROOT}", root).replaceAll("${FINAL_ROOT}", root)
+        );
+        const listed = run(repo, [...argv, "--list"], environment);
+        expect(listed.exitCode).toBe(0);
+        expect(listed.stdout.toString()).toContain("Total: 4 tests in 1 file");
+      }
+    } finally {
+      await removeTemporaryDirectory(root);
+    }
+  });
+
   test("scope audit catches stale cost, API, Reroll, bearing, and release claims", async () => {
     const root = await temporaryDirectory("scope-mutation");
     try {

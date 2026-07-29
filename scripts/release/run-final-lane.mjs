@@ -18,6 +18,7 @@ import {
 
 const specification = {
   required: ["--lane", "--repo", "--preparation", "--commands", "--evidence-root", "--final-root", "--harness-receipt", "--output"],
+  optional: ["--failure-probe"],
 };
 const lifecycle = createLaneLifecycle();
 
@@ -32,6 +33,10 @@ function substitute(value, context) {
 function commandIds(registry, lane) {
   const configured = registry.lanes[lane];
   return Array.isArray(configured) ? configured : [...configured.repository, ...configured.external];
+}
+
+function failureReason(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function signalProbe(argv) {
@@ -70,8 +75,82 @@ async function verifySignalProbes(repo, laneRoot) {
   return results;
 }
 
-async function execute(options) {
+async function writeCleanup(laneRoot) {
+  const cleaned = await lifecycle.cleanup();
+  const portClosed = !(await portOpen(8788));
+  const cleanupPath = resolve(laneRoot, "cleanup.txt");
+  await writeJson(cleanupPath, {
+    schemaVersion: 1,
+    gate: cleaned.tempRootRemoved && portClosed ? "PASS" : "FAIL",
+    pid: cleaned.pid,
+    portClosed,
+    browserContextCount: 0,
+    tempRoot: cleaned.tempRoot,
+    tempRootRemoved: cleaned.tempRootRemoved,
+  });
+  return { cleaned, cleanupPath, portClosed };
+}
+
+async function writeFailureArtifacts(options, state, error) {
+  const reason = failureReason(error);
+  if (
+    state.lane === undefined
+    || state.finalSha === undefined
+    || state.sourceTree === undefined
+    || state.laneRoot === undefined
+    || state.commandsPath === undefined
+    || state.repo === undefined
+  ) {
+    await writeJson(resolve(options.output), { schemaVersion: 1, gate: "FAIL", reason });
+    return;
+  }
+  await mkdir(state.laneRoot, { recursive: true });
+  const { cleanupPath } = await writeCleanup(state.laneRoot);
+  const checksPath = resolve(state.laneRoot, "checks.json");
+  const checksRegistryPath = resolve(state.repo, "scripts/release/final-lane-checks-v1.json");
+  let missing = [];
+  let checksRegistrySha256 = null;
+  try {
+    const checksRegistry = await readJson(checksRegistryPath);
+    missing = commandIds(checksRegistry, state.lane);
+    checksRegistrySha256 = await digestFile(checksRegistryPath);
+  } catch {
+    // Preserve the original failure even when the checks registry is unavailable.
+  }
+  await writeJson(checksPath, {
+    schemaVersion: 1,
+    gate: "FAIL",
+    lane: state.lane,
+    checks: [],
+    registryDigest: checksRegistrySha256,
+    missing,
+    reason,
+  });
+  const failure = {
+    schemaVersion: 1,
+    gate: "FAIL",
+    lane: state.lane,
+    finalSha: state.finalSha,
+    sourceTree: state.sourceTree,
+    reason,
+  };
+  const outputPath = resolve(options.output);
+  await writeJson(outputPath, failure);
+  await writeJson(resolve(options["harness-receipt"]), {
+    ...failure,
+    commandsRegistrySha256: await digestFile(state.commandsPath),
+    laneChecksSha256: await digestFile(checksPath),
+    laneVerdictSha256: await digestFile(outputPath),
+    cleanupSha256: await digestFile(cleanupPath),
+    signalProbes: state.signalProbes ?? {},
+    startedAt: state.startedAt,
+    endedAt: new Date().toISOString(),
+  });
+}
+
+async function execute(options, state) {
   const startedAt = new Date().toISOString();
+  state.startedAt = startedAt;
   const lane = assertLane(options.lane);
   const repo = resolve(options.repo);
   const evidenceRoot = resolve(options["evidence-root"]);
@@ -80,12 +159,27 @@ async function execute(options) {
   if (commandsPath !== resolve(repo, "scripts/release/final-lane-commands-v1.json")) {
     throw new TypeError("lane commands must use the repository-owned canonical registry");
   }
-  if (isInside(repo, evidenceRoot) || finalRoot !== resolve(evidenceRoot, "final", await git(repo, ["rev-parse", "HEAD"]))) {
-    throw new TypeError("lane evidence root mismatch");
-  }
-  const preparation = await readJson(resolve(options.preparation));
   const finalSha = await git(repo, ["rev-parse", "HEAD"]);
   const sourceTree = await git(repo, ["rev-parse", "HEAD^{tree}"]);
+  if (isInside(repo, evidenceRoot) || finalRoot !== resolve(evidenceRoot, "final", finalSha)) {
+    throw new TypeError("lane evidence root mismatch");
+  }
+  const laneRoot = resolve(finalRoot, lane);
+  if (
+    !isInside(laneRoot, resolve(options.output))
+    || !isInside(laneRoot, resolve(options["harness-receipt"]))
+  ) {
+    throw new TypeError("lane output path mismatch");
+  }
+  Object.assign(state, {
+    commandsPath,
+    finalSha,
+    lane,
+    laneRoot,
+    repo,
+    sourceTree,
+  });
+  const preparation = await readJson(resolve(options.preparation));
   if (
     preparation.preparationGate !== "PASS"
     || preparation.finalSha !== finalSha
@@ -93,10 +187,16 @@ async function execute(options) {
   ) {
     throw new TypeError("lane preparation identity mismatch");
   }
-  const laneRoot = resolve(finalRoot, lane);
   await mkdir(laneRoot, { recursive: true });
   const temporaryRoot = await lifecycle.allocate(`/tmp/somewhere-v2-${lane.toLowerCase()}.`);
+  if (options["failure-probe"] !== undefined) {
+    if (options["failure-probe"] !== "after-allocation") {
+      throw new TypeError(`unknown failure probe: ${options["failure-probe"]}`);
+    }
+    throw new TypeError("failure probe after allocation");
+  }
   const signalProbes = await verifySignalProbes(repo, laneRoot);
+  state.signalProbes = signalProbes;
   const policy = resolve(finalRoot, preparation.policy.path);
   const context = {
     REPO: repo,
@@ -174,18 +274,7 @@ async function execute(options) {
     if (captured.exitCode !== 0) throw new TypeError(`lane command failed: ${command.id}`);
     if (command.id === "prepare-health") lifecycle.ownWorker((await readJson(primary)).pid);
   }
-  const cleaned = await lifecycle.cleanup();
-  const portClosed = !(await portOpen(8788));
-  const cleanupPath = resolve(laneRoot, "cleanup.txt");
-  await writeJson(cleanupPath, {
-    schemaVersion: 1,
-    gate: cleaned.tempRootRemoved && portClosed ? "PASS" : "FAIL",
-    pid: cleaned.pid,
-    portClosed,
-    browserContextCount: 0,
-    tempRoot: cleaned.tempRoot,
-    tempRootRemoved: cleaned.tempRootRemoved,
-  });
+  const { cleaned, cleanupPath, portClosed } = await writeCleanup(laneRoot);
   if (!cleaned.tempRootRemoved || !portClosed) throw new TypeError("lane cleanup failed");
   const checks = resolve(laneRoot, "checks.json");
   const assembled = await run(["bun", "scripts/release/assemble-lane-checks.mjs", "--lane", lane, "--registry", options.commands.replace("final-lane-commands", "final-lane-checks"), "--root", finalRoot, "--output", checks], { cwd: repo, env: process.env });
@@ -218,11 +307,21 @@ if (process.argv.includes("--signal-probe")) {
   await signalProbe(process.argv.slice(2));
 } else {
   const parsed = parseArguments(process.argv.slice(2), specification);
+  const state = {};
   try {
-    await execute(parsed);
+    await execute(parsed, state);
   } catch (error) {
-    await lifecycle.cleanup();
-    await writeJson(resolve(parsed.output), { schemaVersion: 1, gate: "FAIL", reason: error instanceof Error ? error.message : String(error) });
+    try {
+      await writeFailureArtifacts(parsed, state, error);
+    } catch (finalizationError) {
+      await lifecycle.cleanup();
+      await writeJson(resolve(parsed.output), {
+        schemaVersion: 1,
+        gate: "FAIL",
+        reason: failureReason(error),
+        finalizationReason: failureReason(finalizationError),
+      });
+    }
     console.error(error);
     process.exitCode = 1;
   }

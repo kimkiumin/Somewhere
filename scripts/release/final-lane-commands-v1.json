@@ -95,14 +95,14 @@
         "id": "chromium",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F3/playwright-chromium.xml",
-        "argv": ["bunx", "--package", "@playwright/test@1.62.0", "playwright", "test", "app/e2e/v2/real-worker-journey.spec.ts", "--config", "app/playwright.v2.config.ts", "--project", "chromium-mobile", "--reporter=junit", "--output", "${TEMP_ROOT}/chromium"],
+        "argv": ["bun", "app/node_modules/@playwright/test/cli.js", "test", "app/e2e/v2/real-worker-journey.spec.ts", "--config", "app/playwright.v2.config.ts", "--project", "chromium-mobile", "--reporter=junit", "--output", "${TEMP_ROOT}/chromium"],
         "environment": { "SOMEWHERE_PREPARED_BASE_URL": "${BASE_URL}", "PLAYWRIGHT_JUNIT_OUTPUT_NAME": "${FINAL_ROOT}/F3/playwright-chromium.xml", "V2_EVIDENCE_DIR": "${TEMP_ROOT}/chromium-evidence" }
       },
       {
         "id": "webkit",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F3/playwright-webkit.xml",
-        "argv": ["bunx", "--package", "@playwright/test@1.62.0", "playwright", "test", "app/e2e/v2/real-worker-journey.spec.ts", "--config", "app/playwright.v2.config.ts", "--project", "webkit-mobile", "--reporter=junit", "--output", "${TEMP_ROOT}/webkit"],
+        "argv": ["bun", "app/node_modules/@playwright/test/cli.js", "test", "app/e2e/v2/real-worker-journey.spec.ts", "--config", "app/playwright.v2.config.ts", "--project", "webkit-mobile", "--reporter=junit", "--output", "${TEMP_ROOT}/webkit"],
         "environment": { "SOMEWHERE_PREPARED_BASE_URL": "${BASE_URL}", "PLAYWRIGHT_JUNIT_OUTPUT_NAME": "${FINAL_ROOT}/F3/playwright-webkit.xml", "V2_EVIDENCE_DIR": "${TEMP_ROOT}/webkit-evidence" }
       },
       {
