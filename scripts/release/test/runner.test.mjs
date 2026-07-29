@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { access, mkdir, readFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 import {
@@ -11,6 +11,40 @@ import {
 } from "./release-testkit.mjs";
 
 const repo = resolve(import.meta.dir, "../../..");
+const materializeScript = resolve(repo, "scripts/release/materialize-planned-tree.mjs");
+
+function git(fixtureRepo, arguments_) {
+  const result = run(fixtureRepo, ["git", ...arguments_]);
+  if (result.exitCode !== 0) throw new TypeError(result.stderr.toString().trim());
+  return result.stdout.toString();
+}
+
+async function createMaterializationFixture(root) {
+  const fixtureRepo = resolve(root, "repository");
+  await mkdir(fixtureRepo, { recursive: true });
+  await writeJson(resolve(fixtureRepo, "package.json"), {
+    name: "@somewhere/materialization-fixture",
+    private: true,
+  });
+  await writeFile(resolve(fixtureRepo, "content.txt"), "committed fixture content\n");
+  git(fixtureRepo, ["init", "--quiet"]);
+  git(fixtureRepo, ["add", "package.json", "content.txt"]);
+  git(fixtureRepo, [
+    "-c",
+    "user.name=Somewhere Test",
+    "-c",
+    "user.email=test@somewhere.invalid",
+    "commit",
+    "--quiet",
+    "-m",
+    "fixture",
+  ]);
+  return {
+    repo: fixtureRepo,
+    tree: git(fixtureRepo, ["rev-parse", "HEAD^{tree}"]).trim(),
+    status: git(fixtureRepo, ["status", "--porcelain=v1"]),
+  };
+}
 
 describe("Prepared Worker launcher", () => {
   test("fails before allocation when the requested port is already occupied", async () => {
@@ -95,17 +129,16 @@ describe("Exact tree materialization", () => {
   test("materializes the named Git tree outside the repository without touching source state", async () => {
     const root = await temporaryDirectory("materialize");
     try {
-      const tree = run(repo, ["git", "rev-parse", "HEAD^{tree}"]).stdout.toString().trim();
-      const before = run(repo, ["git", "status", "--porcelain=v1"]).stdout.toString();
+      const fixture = await createMaterializationFixture(root);
       const destination = resolve(root, "tree");
       const receipt = resolve(root, "receipt.json");
       const result = run(repo, [
         "bun",
-        "scripts/release/materialize-planned-tree.mjs",
+        materializeScript,
         "--repo",
-        repo,
+        fixture.repo,
         "--tree",
-        tree,
+        fixture.tree,
         "--destination",
         destination,
         "--receipt",
@@ -115,11 +148,17 @@ describe("Exact tree materialization", () => {
       expect((await readJson(receipt))).toMatchObject({
         schemaVersion: 1,
         gate: "PASS",
-        sourceTree: tree,
+        sourceTree: fixture.tree,
         destination,
       });
-      expect(await readFile(resolve(destination, "package.json"), "utf8")).toContain("@somewhere/workspace");
-      expect(run(repo, ["git", "status", "--porcelain=v1"]).stdout.toString()).toBe(before);
+      expect(await readJson(resolve(destination, "package.json"))).toEqual({
+        name: "@somewhere/materialization-fixture",
+        private: true,
+      });
+      expect(await readFile(resolve(destination, "content.txt"), "utf8")).toBe(
+        "committed fixture content\n",
+      );
+      expect(git(fixture.repo, ["status", "--porcelain=v1"])).toBe(fixture.status);
     } finally {
       await removeTemporaryDirectory(root);
     }
@@ -127,17 +166,16 @@ describe("Exact tree materialization", () => {
 
   test("rejects a destination inside the repository", async () => {
     const root = await temporaryDirectory("materialize-reject");
-    const destination = resolve(repo, ".forbidden-release-tree");
     try {
-      await mkdir(root, { recursive: true });
-      const tree = run(repo, ["git", "rev-parse", "HEAD^{tree}"]).stdout.toString().trim();
+      const fixture = await createMaterializationFixture(root);
+      const destination = resolve(fixture.repo, ".forbidden-release-tree");
       const result = run(repo, [
         "bun",
-        "scripts/release/materialize-planned-tree.mjs",
+        materializeScript,
         "--repo",
-        repo,
+        fixture.repo,
         "--tree",
-        tree,
+        fixture.tree,
         "--destination",
         destination,
         "--receipt",
@@ -145,6 +183,7 @@ describe("Exact tree materialization", () => {
       ]);
       expect(result.exitCode).not.toBe(0);
       await expect(access(destination)).rejects.toBeDefined();
+      expect(git(fixture.repo, ["status", "--porcelain=v1"])).toBe(fixture.status);
     } finally {
       await removeTemporaryDirectory(root);
     }
