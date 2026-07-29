@@ -9,8 +9,9 @@
   },
   "scripts": {
     "dev": "bun --bun vite",
-    "build": "bun --bun vite build && bun scripts/assert-precache-unique.mjs dist",
-    "build:harness": "bun --bun vite build --mode test-harness && bun scripts/assert-precache-unique.mjs dist-e2e",
+    "build": "bun --bun vite build && bun scripts/assert-precache-unique.mjs dist production",
+    "build:harness": "bun --bun vite build --config vite.harness.config.ts --mode test-harness && bun scripts/assert-precache-unique.mjs dist-e2e harness",
+    "build:field": "bun --bun vite build --config vite.field.config.ts && bun scripts/assert-build-boundaries.mjs",
     "preview": "bun --bun vite preview",
     "preview:harness": "bun --bun vite preview --outDir dist-e2e",
     "typecheck": "tsc --noEmit",

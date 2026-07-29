@@ -1,5 +1,8 @@
+import type { JourneyProjectionV1 } from "@somewhere/contracts";
 import type { JourneyState } from "../domain/journey";
 import type { Unsubscribe } from "./ports";
+
+export type PwaJourneyPhase = JourneyState["phase"] | JourneyProjectionV1["phase"];
 
 export interface PwaUpdateSource {
   listen(onUpdateReady: (applyUpdate: () => Promise<void>) => void): void;
@@ -12,14 +15,14 @@ export type PwaUpdateSnapshot =
 
 export interface PwaUpdateController {
   snapshot(): PwaUpdateSnapshot;
-  setJourneyPhase(phase: JourneyState["phase"]): void;
+  setJourneyPhase(phase: PwaJourneyPhase): void;
   accept(): Promise<void>;
   subscribe(listener: (snapshot: PwaUpdateSnapshot) => void): Unsubscribe;
 }
 
 export function createPwaUpdateController(
   source: PwaUpdateSource,
-  initialPhase: JourneyState["phase"],
+  initialPhase: PwaJourneyPhase,
 ): PwaUpdateController {
   let phase = initialPhase;
   let applyUpdate: (() => Promise<void>) | null = null;
