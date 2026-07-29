@@ -1,68 +1,62 @@
 import { createSensorController } from "./application/controller";
 import { createDiagnosticTrace } from "./application/diagnostics";
 import {
-  createJourneyApplication,
+  createV2JourneyApplication,
   type JourneyApplication,
 } from "./application/journey-application";
-import curatedDestinationInput from "./data/curated-destinations.json";
+import { createV2Store } from "./application/v2-store";
+import { createBrowserIdempotencyKeySource, createBrowserV2Api } from "./platform/browser-api";
 import { createBrowserSensorPorts } from "./platform/browser-composition";
-import { type DestinationBundle, parseDestinationBundle } from "./platform/curated-destinations";
-import { createE2eHarness, type SomewhereTestApi } from "./testkit/e2e-harness";
-import { createScriptedSensorRig } from "./testkit/fakes";
+import { createBrowserFeedbackCapabilityStore } from "./platform/feedback-capability-store";
+import type { SomewhereTestApi } from "./testkit/e2e-harness";
+import { createDeterministicTestComposition } from "./testkit/test-composition";
 
-export type SomewhereComposition = {
-  readonly application: JourneyApplication;
-  readonly testApi: SomewhereTestApi | null;
-};
-
-function parsedBundle(): DestinationBundle {
-  const result = parseDestinationBundle(curatedDestinationInput);
-  if (!result.ok) {
-    throw new Error(`Curated destinations are invalid: ${result.issues.join("; ")}`);
-  }
-  return result.value;
-}
-
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+export type SomewhereComposition = Readonly<{
+  application: JourneyApplication;
+  testApi: SomewhereTestApi | null;
+}>;
 
 export function createProductionComposition(): SomewhereComposition {
   const ports = createBrowserSensorPorts();
   const sensors = createSensorController(ports);
-  const application = createJourneyApplication({
+  const diagnostics = createDiagnosticTrace({
+    buildSha: import.meta.env.VITE_BUILD_SHA ?? "local",
+    policyVersion: "server-v1",
+  });
+  const store = createV2Store({
+    api: createBrowserV2Api(),
+    feedbackCapabilities: createBrowserFeedbackCapabilityStore(),
+    idempotencyKeys: createBrowserIdempotencyKeySource(),
+  });
+  const application = createV2JourneyApplication({
     sensors,
-    bundle: parsedBundle(),
-    clock: ports.clock,
-    scheduler: ports.scheduler,
-    random: { nextUnit: () => Math.random() },
-    todayIsoDate,
-    diagnostics: createDiagnosticTrace({
-      buildSha: import.meta.env.VITE_BUILD_SHA ?? "local",
-      policyVersion: "field-v1",
+    store,
+    diagnostics,
+    createBody: (location) => ({
+      contractVersion: 1,
+      constraints: {
+        accessibility: [],
+        budgetBand: "medium",
+        category: "cafe",
+        dietary: [],
+        maxWalkMinutes: 30,
+      },
+      disclosureLevel: "standard",
+      origin: {
+        accuracyM: location.accuracyM,
+        capturedAt: location.capturedAtMs,
+        latitude: location.latitude,
+        longitude: location.longitude,
+      },
+      recoveryCapability: null,
     }),
   });
   return { application, testApi: null };
 }
 
 export function createTestComposition(): SomewhereComposition {
-  const rig = createScriptedSensorRig();
-  const bundle = parsedBundle();
-  const sensors = createSensorController(rig.ports);
-  const application = createJourneyApplication({
-    sensors,
-    bundle,
-    clock: rig.ports.clock,
-    scheduler: rig.ports.scheduler,
-    random: { nextUnit: () => 0 },
-    todayIsoDate: () => "2026-07-28",
-    diagnostics: createDiagnosticTrace({
-      buildSha: "e2e",
-      policyVersion: "field-v1",
-    }),
-  });
-  return {
-    application,
-    testApi: createE2eHarness(application, rig, bundle),
-  };
+  if (import.meta.env.MODE !== "test-harness") {
+    throw new TypeError("The deterministic composition is available only in test-harness mode");
+  }
+  return createDeterministicTestComposition();
 }

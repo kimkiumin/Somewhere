@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import curatedDestinationInput from "../data/curated-destinations.json";
 import { parseDestinationBundle } from "../platform/curated-destinations";
+import { createJourneyApplication } from "../testkit/deterministic-journey-application";
 import { createScriptedSensorRig } from "../testkit/fakes";
 import { createSensorController } from "./controller";
 import { createDiagnosticTrace } from "./diagnostics";
-import { createJourneyApplication } from "./journey-application";
 
 function fixture(randomValues: readonly number[] = [0]) {
   const parsed = parseDestinationBundle(curatedDestinationInput);

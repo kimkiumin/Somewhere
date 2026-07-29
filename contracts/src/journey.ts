@@ -3,8 +3,17 @@ import { z } from "zod";
 function canonicalBase64Url(prefix: string, encodedLength: number, decodedLength: number): z.ZodType<string> {
   return z.string().regex(new RegExp(`^${prefix}\\.[A-Za-z0-9_-]{${encodedLength}}$`)).refine((value) => {
     const encoded = value.slice(prefix.length + 1);
-    const decoded = Buffer.from(encoded, "base64url");
-    return decoded.byteLength === decodedLength && decoded.toString("base64url") === encoded;
+    const remainder = encoded.length % 4;
+    const actualLength =
+      Math.floor(encoded.length / 4) * 3 + (remainder === 2 ? 1 : remainder === 3 ? 2 : 0);
+    const finalValue = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".indexOf(
+      encoded.at(-1) ?? "",
+    );
+    const canonicalTail =
+      remainder === 0 ||
+      (remainder === 2 && finalValue % 16 === 0) ||
+      (remainder === 3 && finalValue % 4 === 0);
+    return remainder !== 1 && actualLength === decodedLength && canonicalTail;
   }, "non-canonical base64url identifier");
 }
 

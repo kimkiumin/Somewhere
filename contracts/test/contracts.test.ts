@@ -108,6 +108,23 @@ describe("HTTP and primitive contracts", () => {
     expect(IdempotencyKeySchema.safeParse(`ik_v1.${"A".repeat(43)}=`).success).toBe(false);
   });
 
+  test("parses canonical branded tokens without the Node Buffer global", () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, "Buffer");
+    Object.defineProperty(globalThis, "Buffer", { configurable: true, value: undefined });
+    try {
+      expect(IdempotencyKeySchema.safeParse(`ik_v1.${"A".repeat(43)}`).success).toBe(true);
+      expect(JourneyProjectionV1Schema.safeParse(contractDocumentV1.projectionExamples[0]).success).toBe(
+        true,
+      );
+    } finally {
+      if (descriptor === undefined) {
+        Reflect.deleteProperty(globalThis, "Buffer");
+      } else {
+        Object.defineProperty(globalThis, "Buffer", descriptor);
+      }
+    }
+  });
+
   test("rejects raw arrival traces and forbidden error details", () => {
     expect(ArrivalBodyV1Schema.safeParse({
       contractVersion: 1,

@@ -1,3 +1,4 @@
+import type { JourneyProjectionV1 } from "@somewhere/contracts";
 import type { JourneyState } from "../domain/journey";
 import type { CuratedDestination } from "../platform/curated-destinations";
 
@@ -72,5 +73,37 @@ export function revealedDestinationView(
     category: selected.reveal.category,
     description: selected.reveal.description,
     curationNote: selected.curation.note,
+  };
+}
+
+export function hiddenProjectionView(
+  projection: JourneyProjectionV1 | null,
+): HiddenDestinationView | null {
+  if (projection === null || projection.phase === "finding" || projection.phase === "expired") {
+    return null;
+  }
+  return {
+    estimatedMinutes: Math.ceil(projection.disclosure.routeDurationMinutes),
+    hint: projection.disclosure.representativeCategories.join(" / "),
+  };
+}
+
+export function revealedProjectionView(
+  projection: JourneyProjectionV1 | null,
+): RevealedDestinationView | null {
+  if (
+    projection === null ||
+    projection.phase === "finding" ||
+    projection.phase === "expired" ||
+    !projection.revealed
+  ) {
+    return null;
+  }
+  return {
+    category: projection.disclosure.representativeCategories.join(" / "),
+    curationNote: projection.disclosure.policyVersion,
+    description: projection.reveal.address,
+    language: "ko",
+    name: projection.reveal.name,
   };
 }

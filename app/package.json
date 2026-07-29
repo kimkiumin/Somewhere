@@ -22,6 +22,7 @@
     "verify": "bun run test:prototype && bun run lint && bun run typecheck && bun run test:unit && bun run build && bun run test:e2e"
   },
   "dependencies": {
+    "@somewhere/contracts": "workspace:*",
     "workbox-window": "7.4.1",
     "zod": "4.4.3"
   },
