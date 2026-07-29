@@ -171,11 +171,13 @@ STARTUP_PHASE="preparation"
 
 STARTUP_PHASE="launch"
 readonly STARTUP_ACK="$RUN_DIR/startup-ready"
+readonly SUPERVISOR_STATUS="$RUN_DIR/supervisor-status"
 (
   cd "$ROOT_DIR"
   exec setsid bash -c '
     acknowledgement=$1
-    shift
+    status_file=$2
+    shift 2
     trap ":" HUP INT TERM
     "$@" &
     child=$!
@@ -184,11 +186,14 @@ readonly STARTUP_ACK="$RUN_DIR/startup-ready"
       wait "$child"
       child_status=$?
     done
+    printf "%s\n" "$child_status" > "$status_file"
     while [[ ! -e "$acknowledgement" ]]; do
       sleep 0.1
     done
-    exit "$child_status"
-  ' somewhere-startup-supervisor "$STARTUP_ACK" bunx wrangler dev \
+    while :; do
+      sleep 0.1
+    done
+  ' somewhere-startup-supervisor "$STARTUP_ACK" "$SUPERVISOR_STATUS" bunx wrangler dev \
     --config "$SERVER_DIR/wrangler.jsonc" \
     --ip "$HOST" \
     --port "$PORT" \
@@ -220,8 +225,9 @@ worker_group_identity || {
   exit 1
 }
 
-printf '{"pid":%s,"port":%s,"host":"%s","stateDir":"%s","root":"%s","startedAt":%s}\n' \
-  "$WORKER_PID" "$PORT" "$HOST" "$RUN_DIR/state" "$ROOT_DIR" "$(date +%s)" \
+printf '{"schemaVersion":1,"pid":%s,"processStartTime":"%s","processGroupId":%s,"port":%s,"host":"%s","stateDir":"%s","root":"%s","startedAt":%s}\n' \
+  "$WORKER_PID" "$WORKER_START_TIME" "$WORKER_PID" "$PORT" "$HOST" \
+  "$RUN_DIR/state" "$ROOT_DIR" "$(date +%s)" \
   >"$RUN_DIR/receipt.json"
 
 STARTUP_PHASE="readiness"
@@ -232,6 +238,9 @@ for _ in $(seq 1 100); do
     break
   fi
   if ! kill -0 "$WORKER_PID" 2>/dev/null; then
+    break
+  fi
+  if [[ -f "$SUPERVISOR_STATUS" ]]; then
     break
   fi
   sleep 0.1

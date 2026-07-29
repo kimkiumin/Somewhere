@@ -7,7 +7,7 @@ OWN_EVIDENCE_DIR=false
 cleanup() {
   if [[ -n "$LIVE_RUN_DIR" && -d "$LIVE_RUN_DIR" ]]; then
     server/scripts/stop-local-hidden-slice.sh "$LIVE_RUN_DIR" \
-      > "$EVIDENCE_DIR/live-cleanup-receipt.txt"
+      > "$EVIDENCE_DIR/live-cleanup-receipt.json"
   fi
   if [[ -n "$TASK_ROOT" && -d "$TASK_ROOT" ]]; then
     find "$TASK_ROOT" -depth -mindepth 1 -delete
@@ -50,6 +50,7 @@ SOMEWHERE_LOCAL_PORT="$OPS_PORT" \
   server/scripts/start-local-hidden-slice.sh | tee "$TASK_ROOT/live-start.txt"
 LIVE_RUN_DIR="$(sed -n 's/^RUN_DIR=//p' "$TASK_ROOT/live-start.txt")"
 [[ "$LIVE_RUN_DIR" == /tmp/somewhere-hidden-slice.* && -f "$LIVE_RUN_DIR/receipt.json" ]]
+cp "$LIVE_RUN_DIR/receipt.json" "$EVIDENCE_DIR/live-start-receipt.json"
 
 curl --silent --show-error --include \
   "$OPS_BASE_URL/api/v1/operations/schema?probe=SOMEWHERE_CANARY_SECRET" \
@@ -122,6 +123,31 @@ bun scripts/operations/canary-scan.ts \
 bash scripts/operations/export-restore.sh "$EVIDENCE_DIR"
 bash scripts/operations/rollback-dry-run.sh "$EVIDENCE_DIR" \
   | tee "$EVIDENCE_DIR/rollback-dry-run.txt"
+server/scripts/stop-local-hidden-slice.sh "$LIVE_RUN_DIR" \
+  | tee "$EVIDENCE_DIR/live-cleanup-receipt.json"
+LIVE_RUN_DIR=""
+bun -e '
+  const started = await Bun.file(process.argv[1]).json();
+  const stopped = await Bun.file(process.argv[2]).json();
+  if (
+    started.schemaVersion !== 1 ||
+    stopped.schemaVersion !== 1 ||
+    stopped.gate !== "PASS" ||
+    stopped.pid !== started.pid ||
+    stopped.processStartTime !== started.processStartTime ||
+    stopped.processGroupId !== started.processGroupId ||
+    stopped.port !== started.port ||
+    stopped.pidAbsent !== true ||
+    stopped.processGroupAbsent !== true ||
+    stopped.portClosed !== true ||
+    stopped.stateRemoved !== process.argv[3]
+  ) {
+    throw new TypeError("live cleanup identity or process-group proof mismatch");
+  }
+' \
+  "$EVIDENCE_DIR/live-start-receipt.json" \
+  "$EVIDENCE_DIR/live-cleanup-receipt.json" \
+  "$(sed -n 's/^RUN_DIR=//p' "$TASK_ROOT/live-start.txt")"
 printf '%s\n' \
   "verify_ops=PASS" \
   "live_http=PASS" \
