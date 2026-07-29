@@ -38,6 +38,13 @@
         "zod": "4.4.3",
       },
     },
+    "server": {
+      "name": "@somewhere/server",
+      "version": "2.0.0",
+      "devDependencies": {
+        "@types/node": "26.1.2",
+      },
+    },
   },
   "overrides": {
     "jake": "12.10.1",
@@ -552,6 +559,8 @@
     "@somewhere/contracts": ["@somewhere/contracts@workspace:contracts"],
 
     "@somewhere/field-app": ["@somewhere/field-app@workspace:app"],
+
+    "@somewhere/server": ["@somewhere/server@workspace:server"],
 
     "@speed-highlight/core": ["@speed-highlight/core@1.2.17", "", {}, "sha512-Z92FwKpCtfaW1V0jTU/fh3QzYEZN8wDwrzRIBoADCJfn4mJCNcJN/XegifX7BDrQ8/h9Xh/JnbyMchL0FqXrkg=="],
 
