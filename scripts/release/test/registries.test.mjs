@@ -24,8 +24,13 @@ const requiredScripts = [
   "verify-final-cleanup.mjs",
   "validate-final-verdict.mjs",
   "seal-final-manifest.mjs",
+  "validate-workflows.mjs",
+  "validate-ci-verdict.mjs",
+  "validate-todo20-evidence.mjs",
+  "build-production.mjs",
 ];
 const requiredSchemas = [
+  "exact-tree-receipt-v1.schema.json",
   "planned-tree-receipt-v1.schema.json",
   "command-receipt-v1.schema.json",
   "check-manifest-v1.schema.json",
@@ -38,6 +43,7 @@ const requiredSchemas = [
   "final-verdict-v1.schema.json",
 ];
 const requiredRegistries = [
+  "todo20-artifacts-v1.json",
   "final-lane-commands-v1.json",
   "final-lane-checks-v1.json",
   "plan-criteria-v1.json",
@@ -60,7 +66,17 @@ describe("Todo 22 release registry", () => {
     const checks = JSON.parse(
       await readFile(resolve(repo, "scripts/release/final-lane-checks-v1.json"), "utf8"),
     );
-    expect(checks.lanes.F1).toEqual(["plan-evidence", "reviewer-verdict", "manifest-check"]);
+    expect(checks.lanes.F1).toEqual([
+      "plan-evidence",
+      "todo20-evidence",
+      "reviewer-verdict",
+      "manifest-check",
+    ]);
+    expect(checks.lanes.F2.slice(0, 3)).toEqual([
+      "workflow-safety",
+      "ci-release-block",
+      "verify-v2",
+    ]);
     expect(checks.lanes.F3.external).toEqual(["device-verdict"]);
   });
 

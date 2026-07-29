@@ -20,7 +20,7 @@
     { "id": 17, "subject": "Create the complete Somewhere V2 phone journey", "evidenceAny": ["task-17/SCENARIOS.md"] },
     { "id": 18, "subject": "Keep private journey data out of PWA caches", "evidenceAny": ["task-18/EVIDENCE.md"] },
     { "id": 19, "subject": "Verify the real V2 mobile service end to end", "evidenceAny": ["task-19"] },
-    { "id": 20, "subject": "Gate the Somewhere V2 staging release", "evidenceAny": ["task-20"] },
+    { "id": 20, "subject": "Gate the Somewhere V2 staging release", "evidenceAny": ["task-20/exact-tree-receipt.json"] },
     { "id": 21, "subject": "Define the V2 iPhone release evidence gate", "evidenceAny": ["task-21"] },
     { "id": 22, "subject": "Document and streamline the complete V2 service", "evidenceAny": ["task-22"] }
   ]

@@ -30,7 +30,54 @@ materialization, signal cleanup, digest binding, and honest BLOCK behavior.
 Use `verify:v2` alone for a shorter development gate; `verify:release` already
 includes it.
 
-## 3. Prepare the exact commit
+## 3. CI and protected staging
+
+[`v2-ci.yml`](../../.github/workflows/v2-ci.yml) runs on pushes and pull
+requests with read-only repository permission and no secret references. It
+verifies V2, validates the synthetic field schema while requiring release
+`BLOCK`, audits pinned dependencies, creates a gitless production build and
+Worker dry-run in runner-temporary output, scans emitted artifacts, and uploads
+only sanitized repository evidence.
+
+[`v2-staging.yml`](../../.github/workflows/v2-staging.yml) is manual-only and
+declares the `somewhere-v2-staging` GitHub Environment. Repository validation
+can prove that declaration, but required reviewers, branch restrictions, and
+administrator bypass policy are control-plane facts; release remains `BLOCK`
+until an administrator verifies them in GitHub.
+
+The protected workflow requires an exact reviewed release SHA, an annotated
+`somewhere-v2-rc-*` tag on protected `main`, an approved prior release/config
+digest, the protected environment's external fence-receipt digest, and an
+approved HTTPS origin. The D1 target is derived from the checked-in staging
+binding; it is never accepted as workflow input. It then performs this fixed
+sequence:
+
+1. prove the prior Durable Object lifecycle/export and current binding are
+   identical;
+2. verify that the external operations authority has already closed admission;
+3. prove old-epoch reservations are drained;
+4. record D1 Time Travel state and export a portable backup, encrypt it to the
+   protected staging recipient certificate, hash the ciphertext, and keep the
+   plaintext outside the uploaded artifact directory;
+5. apply forward-only expand migrations;
+6. deploy one atomic Worker version while admission stays closed;
+7. smoke-test same-origin static/API routing and private no-store headers;
+8. wait for the operations authority's two-sample recovery policy to reopen
+   admission, then verify ready/OPEN health.
+
+Failure never opens the fence. A failure handler rechecks that admission is
+still closed. The workflow does not accept inline SQL, gradual deployment,
+Durable Object rollback, lifecycle rename/transfer, or secret-bearing pull
+requests. Restore uses the governed backup/Time Travel runbook and a raised
+epoch; schema contraction and lifecycle changes require a separately reviewed
+forward release.
+
+The historical [v0.2 Pages workflow](../../.github/workflows/app.yml) now
+verifies only. It contains no Pages write permission, artifact upload, or
+deployment action, so current V2 source cannot silently replace the historical
+origin.
+
+## 4. Prepare the exact commit
 
 ```bash
 export SOMEWHERE_SHARED_EVIDENCE_ROOT=/absolute/external/.somewhere-v2-evidence
@@ -53,7 +100,7 @@ build, copies only digest-bound artifacts, and emits default external BLOCK
 receipts. It selects a tracked, validated RC policy only when one exists;
 otherwise calibration remains explicit and the Study A/RC gate stays BLOCK.
 
-## 4. Run the four lanes
+## 5. Run the four lanes
 
 Each detached lane receives the same absolute evidence root and the derived
 `final/<sha>` root:
@@ -86,7 +133,7 @@ stdout, stderr, command, policy, SHA, tree, and digest is bound. Missing
 registered checks are BLOCK; extra, contradictory, foreign, or tampered
 receipts are FAIL.
 
-## 5. Cleanup and final verdict
+## 6. Cleanup and final verdict
 
 Run `verify-final-cleanup.mjs` for exact lanes F1–F4 and closed ports 8787/8788,
 then `validate-final-verdict.mjs`. Only after repository readiness is PASS may
@@ -98,7 +145,7 @@ terminate the owned process group, remove guarded temporary state, and write a
 probe receipt. Any open port, live PID, browser context, or temporary root
 prevents cleanup PASS.
 
-## 6. External public-release gates
+## 7. External public-release gates
 
 All of these must be supplied by their actual authority:
 
@@ -116,7 +163,7 @@ All of these must be supplied by their actual authority:
 Until every required receipt passes, `releaseReady` remains `BLOCK` even when
 `repositoryReady` is `PASS`.
 
-## 7. Cost and retention
+## 8. Cost and retention
 
 Cloudflare Free-first is a budget target, not a zero-cost guarantee. The
 versioned operations policy warns at 50% and closes new admission at 80%.
@@ -148,7 +195,7 @@ session 24h, CSRF 30m, prepared receipt 1h, sealed selection 180d, inbox/outbox
 audit 180d, Queue/DLQ 24h, Worker logs 3d, D1 Time Travel 7d, Durable Object
 PITR 30d, and tombstone 48h.
 
-## 8. Optimization disposition
+## 9. Optimization disposition
 
 Todo 22 extracted lane lifecycle/process cleanup from the runner after
 characterization tests, reducing the executable runner below 250 lines without

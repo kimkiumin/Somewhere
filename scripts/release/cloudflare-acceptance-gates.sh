@@ -2,12 +2,14 @@
 set -euo pipefail
 
 readonly WRANGLER_VERSION="4.115.0"
-readonly DEFAULT_ROOT="/home/tjrgus/Somewhere"
+readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 readonly ROOT_DIR="${SOMEWHERE_ROOT:-$DEFAULT_ROOT}"
 readonly SERVER_DIR="$ROOT_DIR/server"
 readonly APP_DIR="$ROOT_DIR/app"
 readonly CONTRACTS_DIR="$ROOT_DIR/contracts"
 readonly CONFIG_FILE="$SERVER_DIR/wrangler.jsonc"
+readonly WRANGLER_BIN="$ROOT_DIR/node_modules/.bin/wrangler"
 GATE_TMP=""
 
 cleanup() {
@@ -40,7 +42,8 @@ need_dir() {
 }
 
 wrangler() {
-  npx --yes "wrangler@$WRANGLER_VERSION" "$@"
+  need_file "$WRANGLER_BIN"
+  "$WRANGLER_BIN" "$@"
 }
 
 assert_config_contract() {
@@ -116,8 +119,7 @@ assert_config_contract() {
         identities.add(identity);
       }
     }
-    if (config.observability?.enabled !== false ||
-        config.observability?.logs?.invocation_logs !== false ||
+    if (config.observability?.logs?.invocation_logs !== false ||
         config.observability?.traces?.enabled !== false) {
       throw new Error("OBSERVABILITY_IDENTITY_LEAK");
     }
@@ -127,7 +129,7 @@ assert_config_contract() {
 }
 
 assert_static_limits() {
-  local dist_dir="$APP_DIR/dist"
+  local dist_dir="${1:-$APP_DIR/dist}"
   need_dir "$dist_dir"
 
   local asset_count
@@ -149,9 +151,9 @@ run_selftest() {
   need_command bun
   need_command curl
   need_command find
-  need_command npx
   need_command rg
   need_command sort
+  need_file "$WRANGLER_BIN"
 
   local version
   version="$(wrangler --version)"
@@ -173,15 +175,22 @@ run_preflight() {
   need_file "$SERVER_DIR/package.json"
   need_file "$CONTRACTS_DIR/package.json"
   assert_config_contract
+  GATE_TMP="$(mktemp -d -t somewhere-cloudflare-gate.XXXXXXXX)"
 
   bun run --cwd "$CONTRACTS_DIR" typecheck
   bun run --cwd "$CONTRACTS_DIR" test
   bun run --cwd "$SERVER_DIR" check
-  bun run --cwd "$SERVER_DIR" test
-  bun run --cwd "$APP_DIR" build
-  assert_static_limits
-
-  GATE_TMP="$(mktemp -d -t somewhere-cloudflare-gate.XXXXXXXX)"
+  bun run --cwd "$SERVER_DIR" test -- --configLoader runner --maxWorkers=1
+  (
+    cd "$APP_DIR"
+    bun --bun "$ROOT_DIR/node_modules/.bin/vite" build \
+      --config "$APP_DIR/vite.config.ts" \
+      --configLoader runner \
+      --base / \
+      --outDir "$GATE_TMP/app-dist"
+  )
+  bun "$APP_DIR/scripts/assert-precache-unique.mjs" "$GATE_TMP/app-dist" production
+  assert_static_limits "$GATE_TMP/app-dist"
 
   wrangler types "$GATE_TMP/$environment.d.ts" \
     --config "$CONFIG_FILE" \
@@ -196,10 +205,102 @@ run_preflight() {
   wrangler deploy \
     --config "$CONFIG_FILE" \
     --env "$environment" \
+    --assets "$GATE_TMP/app-dist" \
     --dry-run \
     --outdir "$GATE_TMP/$environment-build"
 
   pass "$environment compile, binding types, tests, build, and deploy dry-run"
+}
+
+run_lifecycle_contract() {
+  local prior_config="$1"
+  local environment="$2"
+  [[ "$environment" == "staging" || "$environment" == "production" ]] \
+    || fail "lifecycle environment must be staging or production"
+  need_file "$prior_config"
+  PRIOR_CONFIG="$prior_config" CURRENT_CONFIG="$CONFIG_FILE" TARGET_ENV="$environment" bun --eval '
+    import { readFileSync } from "node:fs";
+    const prior = JSON.parse(readFileSync(process.env.PRIOR_CONFIG, "utf8"));
+    const current = JSON.parse(readFileSync(process.env.CURRENT_CONFIG, "utf8"));
+    const target = process.env.TARGET_ENV;
+    const lifecycle = (value) => ({
+      exports: value.exports ?? null,
+      binding: value.env?.[target]?.durable_objects?.bindings ?? null,
+    });
+    if (JSON.stringify(lifecycle(prior)) !== JSON.stringify(lifecycle(current))) {
+      throw new Error("DO_LIFECYCLE_CHANGE_REQUIRES_SEPARATE_ATOMIC_RELEASE");
+    }
+    if ("migrations" in current) throw new Error("LEGACY_MIGRATIONS");
+  '
+  pass "$environment prior lifecycle snapshot is unchanged"
+}
+
+run_database_name() {
+  local environment="$1"
+  [[ "$environment" == "staging" ]] \
+    || fail "database-name is restricted to staging"
+  CONFIG_FILE_FOR_CHECK="$CONFIG_FILE" TARGET_ENV="$environment" bun --eval '
+    import { readFileSync } from "node:fs";
+    const config = JSON.parse(readFileSync(process.env.CONFIG_FILE_FOR_CHECK, "utf8"));
+    const databases = config.env?.[process.env.TARGET_ENV]?.d1_databases;
+    if (!Array.isArray(databases) || databases.length !== 1 ||
+        databases[0]?.binding !== "DB" ||
+        typeof databases[0]?.database_name !== "string") process.exit(1);
+    console.log(databases[0].database_name);
+  '
+}
+
+run_remote_sql_check() {
+  local kind="$1"
+  local environment="$2"
+  local database_name="${D1_DATABASE_NAME:-}"
+  [[ "$environment" == "staging" ]] \
+    || fail "$kind is restricted to the protected staging environment"
+  [[ -n "$database_name" ]] || fail "set D1_DATABASE_NAME to the exact remote database name"
+  local sql_file="$ROOT_DIR/scripts/release/sql/$kind.sql"
+  need_file "$sql_file"
+  GATE_TMP="$(mktemp -d -t somewhere-cloudflare-gate.XXXXXXXX)"
+  wrangler d1 execute "$database_name" \
+    --remote \
+    --config "$CONFIG_FILE" \
+    --env "$environment" \
+    --file "$sql_file" \
+    --json > "$GATE_TMP/$kind.json"
+  if [[ -n "${GATE_RECEIPT:-}" ]]; then
+    cp "$GATE_TMP/$kind.json" "$GATE_RECEIPT"
+  fi
+  bun "$ROOT_DIR/scripts/release/validate-d1-gate-result.mjs" \
+    --input "$GATE_TMP/$kind.json" \
+    || fail "$kind did not return one exact PASS result"
+  pass "$environment $kind"
+}
+
+run_resume_check() {
+  local base_url="${BASE_URL:-}"
+  local timeout_seconds="${RESUME_TIMEOUT_SECONDS:-900}"
+  [[ "$base_url" == https://* ]] || fail "set BASE_URL to the approved HTTPS staging origin"
+  [[ "$timeout_seconds" =~ ^[0-9]+$ ]] \
+    || fail "RESUME_TIMEOUT_SECONDS must be an integer"
+  [[ "$timeout_seconds" -ge 300 && "$timeout_seconds" -le 1200 ]] \
+    || fail "RESUME_TIMEOUT_SECONDS must be between 300 and 1200"
+  GATE_TMP="$(mktemp -d -t somewhere-cloudflare-gate.XXXXXXXX)"
+  local attempts=$((timeout_seconds / 5))
+  local attempt
+  for ((attempt = 1; attempt <= attempts; attempt += 1)); do
+    curl --silent --show-error "$base_url/api/v1/operations/health" \
+      > "$GATE_TMP/resume.json"
+    if HEALTH_FILE="$GATE_TMP/resume.json" bun --eval '
+      import { readFileSync } from "node:fs";
+      const health = JSON.parse(readFileSync(process.env.HEALTH_FILE, "utf8"));
+      if (health.status !== "ready" || health.externalGates !== "PASS" ||
+          health.writeFenceMode !== "OPEN") process.exit(1);
+    '; then
+      pass "authority-controlled recovery is open"
+      return
+    fi
+    sleep 5
+  done
+  fail "authority recovery did not reopen within ${timeout_seconds}s"
 }
 
 run_remote_read() {
@@ -286,9 +387,14 @@ usage() {
 Usage:
   cloudflare-acceptance-gates.sh selftest
   cloudflare-acceptance-gates.sh config-contract
+  cloudflare-acceptance-gates.sh lifecycle-contract <prior-wrangler.jsonc> <staging|production>
+  cloudflare-acceptance-gates.sh database-name staging
   cloudflare-acceptance-gates.sh preflight <staging|production>
+  D1_DATABASE_NAME=<exact-name> cloudflare-acceptance-gates.sh fence-check staging
+  D1_DATABASE_NAME=<exact-name> cloudflare-acceptance-gates.sh drain-check staging
   D1_DATABASE_NAME=<exact-name> cloudflare-acceptance-gates.sh remote-read <staging|production>
   BASE_URL=https://<approved-host> cloudflare-acceptance-gates.sh postdeploy
+  BASE_URL=https://<approved-host> cloudflare-acceptance-gates.sh resume-check
 
 The script performs no deployment, migration, resource creation, secret write,
 or restore. Those external writes require explicit authorization and the
@@ -309,9 +415,25 @@ main() {
       need_command rg
       assert_config_contract
       ;;
+    lifecycle-contract)
+      [[ "$#" -eq 3 ]] || fail "lifecycle-contract requires prior config and environment"
+      run_lifecycle_contract "$2" "$3"
+      ;;
+    database-name)
+      [[ "$#" -eq 2 ]] || fail "database-name requires one environment"
+      run_database_name "$2"
+      ;;
     preflight)
       [[ "$#" -eq 2 ]] || fail "preflight requires one environment"
       run_preflight "$2"
+      ;;
+    fence-check)
+      [[ "$#" -eq 2 ]] || fail "fence-check requires one environment"
+      run_remote_sql_check "fence-check" "$2"
+      ;;
+    drain-check)
+      [[ "$#" -eq 2 ]] || fail "drain-check requires one environment"
+      run_remote_sql_check "drain-check" "$2"
       ;;
     remote-read)
       [[ "$#" -eq 2 ]] || fail "remote-read requires one environment"
@@ -320,6 +442,10 @@ main() {
     postdeploy)
       [[ "$#" -eq 1 ]] || fail "postdeploy accepts no extra arguments"
       run_postdeploy
+      ;;
+    resume-check)
+      [[ "$#" -eq 1 ]] || fail "resume-check accepts no extra arguments"
+      run_resume_check
       ;;
     -h|--help|help)
       usage

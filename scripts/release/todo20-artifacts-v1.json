@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    "task-20/workflow-verdict.json",
+    "task-20/release-verdict.json",
+    "task-20/unsafe/false-pass-missing-credential.json",
+    "task-20/unsafe/shared-environment-binding.json",
+    "task-20/unsafe/lifecycle-gradual-rollback.json",
+    "task-20/unsafe/migration-without-backup.json",
+    "task-20/unsafe/private-cache-leak.json",
+    "task-20/unsafe/fork-secret-exposure.json",
+    "task-20/cleanup-HUP.json",
+    "task-20/cleanup-INT.json",
+    "task-20/cleanup-TERM.json",
+    "task-20-workflow-green.txt",
+    "task-20-verdict-green.txt",
+    "task-20-selftest-green.txt",
+    "task-20-staging-green.txt",
+    "task-20-production-green.txt",
+    "task-20-cleanup.txt"
+  ]
+}

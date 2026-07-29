@@ -3,7 +3,7 @@
   "$id": "https://somewhere.example/schemas/exact-tree-command-receipt.v1.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "tree", "inventoryDigest", "argv", "cwd", "exitCode", "exitClass", "expectedClass", "assertion", "artifacts", "cleanup", "startedAt", "endedAt"],
+  "required": ["schemaVersion", "tree", "inventoryDigest", "argv", "cwd", "exitCode", "exitClass", "expectedClass", "assertion", "artifacts", "dependencies", "environment", "network", "cleanup", "startedAt", "endedAt"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
@@ -18,24 +18,85 @@
     "endedAt": { "type": "string", "format": "date-time" },
     "artifacts": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["path", "sha256", "bytes"],
         "properties": {
-          "path": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$" },
           "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
           "bytes": { "type": "integer", "minimum": 0 }
         }
       }
     },
+    "dependencies": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["root", "lockfileSha256", "paths", "readOnly", "ephemeralCachePaths", "ephemeralWorkPaths"],
+          "properties": {
+            "root": { "type": "string", "minLength": 1 },
+            "lockfileSha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "paths": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^(?:node_modules|[a-z0-9][a-z0-9._-]*/node_modules)$" }
+            },
+            "readOnly": { "const": true },
+            "ephemeralCachePaths": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^(?:node_modules|[a-z0-9][a-z0-9._-]*/node_modules)/\\.vite-temp$" }
+            },
+            "ephemeralWorkPaths": {
+              "type": "array",
+              "maxItems": 1,
+              "uniqueItems": true,
+              "items": { "const": "server/.wrangler" }
+            }
+          }
+        }
+      ]
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["credentialsScrubbed", "cachesIsolated", "temporaryFilesystemIsolated", "hostCredentialRootsMasked", "hostProcessNamespaceMasked", "preexistingEvidenceIsolated", "temporaryRoot"],
+      "properties": {
+        "credentialsScrubbed": { "const": true },
+        "cachesIsolated": { "const": true },
+        "temporaryFilesystemIsolated": { "const": true },
+        "hostCredentialRootsMasked": { "const": true },
+        "hostProcessNamespaceMasked": { "const": true },
+        "preexistingEvidenceIsolated": { "const": true },
+        "temporaryRoot": { "type": "string", "minLength": 1 }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "namespaceIsolated", "externalConnectSucceeded", "traceSha256", "traceBytes"],
+      "properties": {
+        "policy": { "enum": ["inherit", "deny"] },
+        "namespaceIsolated": { "type": "boolean" },
+        "externalConnectSucceeded": { "const": false },
+        "traceSha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "traceBytes": { "type": "integer", "minimum": 0 }
+      }
+    },
     "cleanup": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceUnchanged", "temporaryRootRemovedByCaller"],
+      "required": ["sourceUnchanged", "temporaryRootRemovedByCaller", "runnerTemporaryRootRemoved"],
       "properties": {
         "sourceUnchanged": { "type": "boolean" },
-        "temporaryRootRemovedByCaller": { "const": true }
+        "temporaryRootRemovedByCaller": { "const": true },
+        "runnerTemporaryRootRemoved": { "const": true }
       }
     }
   }

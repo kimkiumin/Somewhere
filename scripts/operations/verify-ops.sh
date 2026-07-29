@@ -3,6 +3,7 @@ set -euo pipefail
 
 TASK_ROOT=""
 LIVE_RUN_DIR=""
+OWN_EVIDENCE_DIR=false
 cleanup() {
   if [[ -n "$LIVE_RUN_DIR" && -d "$LIVE_RUN_DIR" ]]; then
     server/scripts/stop-local-hidden-slice.sh "$LIVE_RUN_DIR" \
@@ -12,11 +13,22 @@ cleanup() {
     find "$TASK_ROOT" -depth -mindepth 1 -delete
     rmdir "$TASK_ROOT"
   fi
+  if [[ "$OWN_EVIDENCE_DIR" == true && -d "$EVIDENCE_DIR" ]]; then
+    find "$EVIDENCE_DIR" -depth -mindepth 1 -delete
+    rmdir "$EVIDENCE_DIR"
+  fi
 }
 trap cleanup EXIT
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-EVIDENCE_DIR="${SOMEWHERE_OPS_EVIDENCE_DIR:-/home/tjrgus/.somewhere-v2-evidence/task-14}"
+if [[ -n "${SOMEWHERE_OPS_EVIDENCE_DIR:-}" ]]; then
+  EVIDENCE_DIR="$SOMEWHERE_OPS_EVIDENCE_DIR"
+elif [[ -n "${SOMEWHERE_EVIDENCE_ROOT:-}" ]]; then
+  EVIDENCE_DIR="$SOMEWHERE_EVIDENCE_ROOT/verify-ops"
+else
+  EVIDENCE_DIR="$(mktemp -d -t somewhere-v2-ops-evidence.XXXXXXXX)"
+  OWN_EVIDENCE_DIR=true
+fi
 OPS_PORT="${SOMEWHERE_OPS_PORT:-18787}"
 OPS_BASE_URL="http://127.0.0.1:$OPS_PORT"
 mkdir -p "$EVIDENCE_DIR"
@@ -26,8 +38,12 @@ cd "$REPO_ROOT"
 bun scripts/operations/verify-legal.ts | tee "$EVIDENCE_DIR/legal-gates.json"
 bun run test:server -- task14 | tee "$EVIDENCE_DIR/task14-tests.txt"
 bun run --cwd server typecheck | tee "$EVIDENCE_DIR/typecheck.txt"
-bun run --cwd app build | tee "$EVIDENCE_DIR/app-build.txt"
-bunx wrangler deploy --dry-run --env="" --config server/wrangler.jsonc \
+bun run build:production -- \
+  --outdir "$TASK_ROOT/production" \
+  --receipt "$EVIDENCE_DIR/production-build.json" \
+  | tee "$EVIDENCE_DIR/app-build.txt"
+node_modules/.bin/wrangler deploy --dry-run --env="" --config server/wrangler.jsonc \
+  --assets "$TASK_ROOT/production/app/dist" \
   --outdir "$TASK_ROOT/dry-run" | tee "$EVIDENCE_DIR/wrangler-dry-run.txt"
 
 SOMEWHERE_LOCAL_PORT="$OPS_PORT" \

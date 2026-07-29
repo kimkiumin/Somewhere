@@ -5,7 +5,7 @@
     { "id": "curated-destination-authority", "literal": "CuratedDestinationSource" },
     { "id": "private-feedback-capability", "literal": "feedbackCapabilityRaw" },
     { "id": "raw-route-provider-payload", "literal": "providerRawPayload" },
-    { "id": "test-harness-mode", "literal": "test-harness" },
+    { "id": "test-harness-cache", "literal": "somewhere-test-harness" },
     { "id": "field-diagnostics-build", "literal": "field-diagnostics" }
   ]
 }

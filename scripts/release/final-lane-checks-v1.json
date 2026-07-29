@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "lanes": {
-    "F1": ["plan-evidence", "reviewer-verdict", "manifest-check"],
-    "F2": ["verify-v2", "bun-audit", "red-team", "production-scan", "review-work", "debugging", "security"],
+    "F1": ["plan-evidence", "todo20-evidence", "reviewer-verdict", "manifest-check"],
+    "F2": ["workflow-safety", "ci-release-block", "verify-v2", "bun-audit", "red-team", "production-scan", "review-work", "debugging", "security"],
     "F3": {
       "repository": ["prepare-health", "chromium", "webkit", "curl-contract", "lighthouse", "manual-browser-collect", "manual-browser-validate", "visual-review"],
       "external": ["device-verdict"]

@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 const repo = resolve(import.meta.dir, "../..");
 const release = resolve(repo, "scripts/release");
 const schemaNames = [
+  "exact-tree-receipt-v1.schema.json",
   "planned-tree-receipt-v1.schema.json",
   "command-receipt-v1.schema.json",
   "check-manifest-v1.schema.json",
