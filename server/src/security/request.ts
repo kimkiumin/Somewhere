@@ -1,0 +1,76 @@
+export type RequestPolicy = Readonly<{
+  canonicalHost: string;
+  canonicalOrigin: string;
+}>;
+
+export type RequestRejection =
+  | "request_forbidden"
+  | "payload_too_large"
+  | "unsupported_media_type"
+  | "invalid_request";
+
+export async function validateMutationRequest(
+  request: Request,
+  policy: RequestPolicy,
+  bodyLimitBytes: number,
+): Promise<Readonly<{ body: string }> | RequestRejection> {
+  if (
+    request.headers.get("host") !== policy.canonicalHost ||
+    request.headers.get("origin") !== policy.canonicalOrigin ||
+    (request.headers.has("sec-fetch-site") &&
+      request.headers.get("sec-fetch-site") !== "same-origin")
+  ) {
+    return "request_forbidden";
+  }
+  const contentLength = request.headers.get("content-length");
+  if (
+    contentLength !== null &&
+    (!/^(0|[1-9][0-9]*)$/.test(contentLength) || Number(contentLength) > bodyLimitBytes)
+  ) {
+    return "payload_too_large";
+  }
+  if (request.headers.get("content-type") !== "application/json") {
+    return "unsupported_media_type";
+  }
+  const reader = request.body?.getReader();
+  if (reader === undefined) {
+    return { body: "" };
+  }
+  const chunks: Uint8Array[] = [];
+  let bytesRead = 0;
+  while (true) {
+    const chunk = await reader.read();
+    if (chunk.done) {
+      break;
+    }
+    bytesRead += chunk.value.byteLength;
+    if (bytesRead > bodyLimitBytes) {
+      await reader.cancel();
+      return "payload_too_large";
+    }
+    chunks.push(chunk.value);
+  }
+  const bytes = new Uint8Array(bytesRead);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return { body: new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes) };
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return "invalid_request";
+    }
+    throw error;
+  }
+}
+
+export function validateSessionRequest(request: Request, policy: RequestPolicy): boolean {
+  return (
+    request.headers.get("host") === policy.canonicalHost &&
+    request.headers.get("origin") === policy.canonicalOrigin &&
+    (!request.headers.has("sec-fetch-site") ||
+      request.headers.get("sec-fetch-site") === "same-origin")
+  );
+}

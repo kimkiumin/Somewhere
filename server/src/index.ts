@@ -6,7 +6,7 @@ import { handleRequest } from "./http";
 export class JourneyDurableObject extends DurableObject<Env> {}
 
 const worker = {
-  fetch(request: Request, env: Env): Response {
+  fetch(request: Request, env: Env): Response | Promise<Response> {
     parseDeploymentEnvironment(env);
     return handleRequest(request);
   },
