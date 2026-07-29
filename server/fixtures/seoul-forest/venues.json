@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "fixtureVersion": "seoul-forest-closed-pilot-2026-07-29",
+  "canonicalizationVersion": "manual-canonical-v1",
+  "fieldAreaId": "seoul-forest",
+  "provider": {
+    "id": "somewhere-manual-pilot",
+    "capabilityVersion": "manual-place-v1",
+    "queryVersion": "seoul-forest-food-v1",
+    "paginationVersion": "single-page-manual-v1",
+    "coverageVersion": "closed-pilot-two-venues-v1",
+    "retrievedAt": "2026-07-28T06:00:00Z"
+  },
+  "restaurants": [
+    {
+      "candidateId": "manual:seongsu-gamjatang",
+      "providerPlaceId": "manual-seongsu-gamjatang",
+      "branchName": "소문난성수감자탕",
+      "normalizedBranchName": "소문난성수감자탕",
+      "address": "서울특별시 성동구 연무장길 45",
+      "coordinates": { "latitude": 37.542915, "longitude": 127.05467 },
+      "category": "restaurant",
+      "priceBand": 2,
+      "broadMenuCategory": "Korean stew",
+      "safetyStatus": "reviewed",
+      "sourceIds": ["source:manual-seongsu-gamjatang"],
+      "reviewedAt": "2026-07-28T06:00:00Z",
+      "expiresAt": "2026-08-27T06:00:00Z"
+    }
+  ],
+  "cafes": [
+    {
+      "candidateId": "manual:center-coffee-seoul-forest",
+      "providerPlaceId": "manual-center-coffee-seoul-forest",
+      "branchName": "센터커피 서울숲점",
+      "normalizedBranchName": "센터커피서울숲점",
+      "address": "서울특별시 성동구 서울숲2길 28-11",
+      "coordinates": { "latitude": 37.54645, "longitude": 127.04311 },
+      "category": "cafe",
+      "priceBand": 2,
+      "broadMenuCategory": "Coffee and baked goods",
+      "safetyStatus": "reviewed",
+      "sourceIds": ["source:manual-center-coffee"],
+      "reviewedAt": "2026-07-28T06:00:00Z",
+      "expiresAt": "2026-08-27T06:00:00Z"
+    }
+  ]
+}

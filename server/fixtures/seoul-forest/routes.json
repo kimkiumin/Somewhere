@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "fixtureVersion": "seoul-forest-closed-pilot-2026-07-29",
+  "providerId": "somewhere-manual-pilot",
+  "capabilityVersion": "manual-walking-route-v1",
+  "fieldAreaId": "seoul-forest",
+  "originZones": [
+    {
+      "zoneId": "seoul-forest-main-gate",
+      "polygon": [
+        { "latitude": 37.5435, "longitude": 127.0365 },
+        { "latitude": 37.5442, "longitude": 127.0365 },
+        { "latitude": 37.5442, "longitude": 127.0374 },
+        { "latitude": 37.5435, "longitude": 127.0374 }
+      ],
+      "startAnchor": { "latitude": 37.54385, "longitude": 127.03695 },
+      "maximumOriginOffsetM": 50
+    }
+  ],
+  "routes": [
+    {
+      "routeId": "route:main-gate:seongsu-gamjatang:v1",
+      "candidateId": "manual:seongsu-gamjatang",
+      "approvedOriginZoneIds": ["seoul-forest-main-gate"],
+      "capturedAt": "2026-07-27T06:00:00Z",
+      "independentlyReviewedAt": "2026-07-28T06:00:00Z",
+      "expiresAt": "2026-08-26T06:00:00Z",
+      "sourceRightNote": "Repository-authored reviewed walking geometry for the named closed pilot.",
+      "geometry": [
+        { "latitude": 37.54385, "longitude": 127.03695 },
+        { "latitude": 37.54292, "longitude": 127.046 },
+        { "latitude": 37.542915, "longitude": 127.05467 }
+      ],
+      "lengthM": 1670,
+      "expectedDurationSeconds": 1320,
+      "corridorWidthM": 25,
+      "endpointDigest": "sha256:7f77562199779d798d36591d429c8f50c28ebfe9ba04197c4ecf9d92bd7e8813",
+      "observedObstructions": "Signal-controlled crossings require normal pedestrian caution.",
+      "accessibilityNote": "No accessibility guarantee; supervised pilot review only.",
+      "fieldValidation": "reviewed",
+      "verifier": "Somewhere independent route reviewer",
+      "materialChangeReported": false
+    },
+    {
+      "routeId": "route:main-gate:center-coffee:v1",
+      "candidateId": "manual:center-coffee-seoul-forest",
+      "approvedOriginZoneIds": ["seoul-forest-main-gate"],
+      "capturedAt": "2026-07-27T06:00:00Z",
+      "independentlyReviewedAt": "2026-07-28T06:00:00Z",
+      "expiresAt": "2026-08-26T06:00:00Z",
+      "sourceRightNote": "Repository-authored reviewed walking geometry for the named closed pilot.",
+      "geometry": [
+        { "latitude": 37.54385, "longitude": 127.03695 },
+        { "latitude": 37.5452, "longitude": 127.0401 },
+        { "latitude": 37.54645, "longitude": 127.04311 }
+      ],
+      "lengthM": 650,
+      "expectedDurationSeconds": 540,
+      "corridorWidthM": 25,
+      "endpointDigest": "sha256:3f8bdec5ebe30c502284d67ead49fbf6bb1688e335b05895226298cd097694af",
+      "observedObstructions": "Use marked park paths and pedestrian crossings.",
+      "accessibilityNote": "No accessibility guarantee; supervised pilot review only.",
+      "fieldValidation": "reviewed",
+      "verifier": "Somewhere independent route reviewer",
+      "materialChangeReported": false
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "fixtureVersion": "seoul-forest-closed-pilot-2026-07-29",
+  "policyVersion": "manual-evidence-v1",
+  "entries": [
+    {
+      "candidateId": "manual:seongsu-gamjatang",
+      "snapshotVersion": "manual:seongsu-gamjatang:2026-07-28",
+      "sourceId": "source:manual-seongsu-gamjatang",
+      "sourceUrl": "https://data.seoul.go.kr/",
+      "sourceRightNote": "Repository-authored field observation; no provider response is copied.",
+      "reviewer": "Somewhere closed-pilot reviewer",
+      "observedAt": "2026-07-28T06:00:00Z",
+      "expiresAt": "2026-08-27T06:00:00Z",
+      "facts": {
+        "category": "supported",
+        "price": "supported",
+        "safety": "supported",
+        "route": "supported",
+        "merit": "supported"
+      },
+      "merit": {
+        "type": "menu",
+        "claim": "Broad Korean stew category",
+        "confidence": "high",
+        "evidenceIds": ["source:manual-seongsu-gamjatang"]
+      },
+      "criticalWeaknesses": []
+    },
+    {
+      "candidateId": "manual:center-coffee-seoul-forest",
+      "snapshotVersion": "manual:center-coffee-seoul-forest:2026-07-28",
+      "sourceId": "source:manual-center-coffee",
+      "sourceUrl": "https://data.seoul.go.kr/",
+      "sourceRightNote": "Repository-authored field observation; no provider response is copied.",
+      "reviewer": "Somewhere closed-pilot reviewer",
+      "observedAt": "2026-07-28T06:00:00Z",
+      "expiresAt": "2026-08-27T06:00:00Z",
+      "facts": {
+        "category": "supported",
+        "price": "supported",
+        "safety": "supported",
+        "route": "supported",
+        "merit": "supported"
+      },
+      "merit": {
+        "type": "atmosphere",
+        "claim": "Broad cafe atmosphere",
+        "confidence": "high",
+        "evidenceIds": ["source:manual-center-coffee"]
+      },
+      "criticalWeaknesses": []
+    }
+  ]
+}
