@@ -1,8 +1,12 @@
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import {
+  assertSameCleanSource,
+  captureCleanSource,
+} from "../../../../scripts/release/source-cleanliness.mjs";
+import { validatePreparedEvidence } from "./prepared-evidence-validator.mjs";
 
 const digest = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 const artifactSchema = z
@@ -69,15 +73,10 @@ function argumentsMap(values) {
     if (key === undefined || value === undefined || !key.startsWith("--")) {
       throw new TypeError("validator arguments must be --name value pairs");
     }
+    if (result.has(key)) throw new TypeError(`duplicate validator argument: ${key}`);
     result.set(key, value);
   }
   return result;
-}
-
-function git(repo, values) {
-  const result = spawnSync("git", ["-C", repo, ...values], { encoding: "utf8" });
-  if (result.status !== 0) throw new TypeError(result.stderr.trim());
-  return result.stdout.trim();
 }
 
 function sha256(bytes) {
@@ -108,15 +107,32 @@ async function buildDigest(repo) {
 
 async function main() {
   const options = argumentsMap(process.argv.slice(2));
+  const repo = path.resolve(options.get("--repo") ?? ".");
+  if (options.has("--sha") && options.has("--input")) {
+    const allowed = new Set(["--repo", "--sha", "--build-receipt", "--input", "--output"]);
+    if ([...options.keys()].some((key) => !allowed.has(key))) {
+      throw new TypeError("UNKNOWN_PREPARED_ARGUMENT");
+    }
+    const output = path.resolve(options.get("--output") ?? "");
+    await validatePreparedEvidence({
+      buildReceipt: path.resolve(options.get("--build-receipt") ?? ""),
+      input: path.resolve(options.get("--input") ?? ""),
+      output,
+      repo,
+      sha: options.get("--sha") ?? "",
+    });
+    process.stdout.write(`${output}\n`);
+    return;
+  }
   const manifestPath = path.resolve(options.get("--manifest") ?? "");
   const expectedSha = options.get("--expected-sha") ?? "";
   const expectedTree = options.get("--expected-tree") ?? "";
-  const repo = path.resolve(options.get("--repo") ?? ".");
+  const source = captureCleanSource(repo);
   const manifest = manifestSchema.parse(JSON.parse(await readFile(manifestPath, "utf8")));
-  if (manifest.sourceSha !== expectedSha || git(repo, ["rev-parse", "HEAD"]) !== expectedSha) {
+  if (manifest.sourceSha !== expectedSha || source.sha !== expectedSha) {
     throw new TypeError("FOREIGN_SHA");
   }
-  if (manifest.sourceTree !== expectedTree || git(repo, ["write-tree"]) !== expectedTree) {
+  if (manifest.sourceTree !== expectedTree || source.tree !== expectedTree) {
     throw new TypeError("FOREIGN_TREE");
   }
   const ageMs = Date.now() - Date.parse(manifest.collectedAt);
@@ -173,6 +189,7 @@ async function main() {
   ) {
     throw new TypeError("INCOMPLETE_ARTIFACT_SET");
   }
+  assertSameCleanSource(repo, source);
   process.stdout.write(
     `PASS sha=${manifest.sourceSha} tree=${manifest.sourceTree} build=${manifest.buildDigest} receipt=${manifest.buildReceiptDigest} artifacts=${manifest.artifacts.length}\n`,
   );

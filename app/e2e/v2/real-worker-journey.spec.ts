@@ -3,13 +3,16 @@ import { expect, test } from "@playwright/test";
 import {
   capture,
   control,
+  driveCredibleArrival,
   emitHeading,
   emitLocation,
+  installDeterministicClock,
   installDeterministicLocation,
   ready,
+  verifyOfflineShell,
 } from "../../qa/browser/v2/fixtures/real-worker";
 
-const BASE_URL = "https://127.0.0.1:8787/";
+const BASE_URL = process.env.SOMEWHERE_PREPARED_BASE_URL ?? "https://127.0.0.1:8787/";
 
 test("real browser session handshake reaches the Worker", async ({ page }, testInfo) => {
   // Given: an unmodified Chromium or WebKit same-origin browser request shape.
@@ -156,6 +159,7 @@ test("strong arrival retains one raw feedback capability across a context restar
     longitude: 127.03695,
   });
   let page = await context.newPage();
+  await installDeterministicClock(page);
   page.on("request", (request) => {
     if (request.url().endsWith("/arrival")) {
       console.log(`[ARRIVAL-REQUEST] ${request.method()} ${request.url()}`);
@@ -170,35 +174,7 @@ test("strong arrival retains one raw feedback capability across a context restar
   );
 
   // When: credible sub-100m route samples end with four strong samples over twelve seconds.
-  for (const point of [
-    [37.5442, 127.0377],
-    [37.5446, 127.0385],
-    [37.545, 127.0393],
-    [37.5452, 127.0401],
-    [37.54555, 127.04085],
-    [37.5459, 127.0416],
-    [37.54625, 127.04235],
-    [37.54645, 127.04306],
-  ]) {
-    await emitLocation(page, {
-      accuracy: 8,
-      latitude: point[0] ?? 0,
-      longitude: point[1] ?? 0,
-    });
-    await emitHeading(page, 0);
-    await page.waitForTimeout(150);
-  }
-  for (let sample = 0; sample < 5; sample += 1) {
-    await emitLocation(page, {
-      accuracy: 8,
-      latitude: 37.54645,
-      longitude: 127.04307 + sample * 0.00001,
-    });
-    await emitHeading(page, 0);
-    if (sample < 4) {
-      await page.waitForTimeout(4_100);
-    }
-  }
+  await driveCredibleArrival(page);
   await expect(page.getByRole("heading", { name: "도착했어요." })).toBeVisible();
   const arrivalStatus = (await arrivalResponse).status();
   console.log(`[ARRIVAL-RESPONSE] ${arrivalStatus}`);
@@ -262,21 +238,15 @@ test("production mobile surface is private, offline-safe, accessible, and contai
   // When: the installed service worker reloads offline and storage is inspected.
   await page.setViewportSize({ height: 844, width: 390 });
   await page.goto(".");
-  await page.evaluate(() => navigator.serviceWorker.ready);
-  await page.context().setOffline(true);
-  await page.reload();
-  await expect(page.getByRole("heading", { name: "어딘가로 떠나볼까요?" })).toBeVisible();
-  const cacheUrls = await page.evaluate(async () => {
-    const urls: string[] = [];
-    for (const name of await caches.keys()) {
-      for (const request of await (await caches.open(name)).keys()) {
-        urls.push(request.url);
-      }
-    }
-    return urls;
-  });
+  const cacheUrls = await verifyOfflineShell(page);
 
   // Then: no API/private identity is cached and no fake or direct-bearing fallback exists.
+  const cachePathnames = cacheUrls.map((url) => new URL(url).pathname);
+  expect(cachePathnames.some((value) => value.endsWith("/") || value.endsWith("/index.html"))).toBe(
+    true,
+  );
+  expect(cachePathnames.some((value) => value.endsWith(".js"))).toBe(true);
+  expect(cachePathnames.some((value) => value.endsWith(".css"))).toBe(true);
   expect(cacheUrls.some((url) => url.includes("/api/"))).toBe(false);
   expect(cacheUrls.join("\n")).not.toContain("센터커피 서울숲점");
   expect(await page.evaluate(() => Reflect.has(window, "somewhereTest"))).toBe(false);

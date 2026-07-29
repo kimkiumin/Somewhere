@@ -3,6 +3,8 @@ set -euo pipefail
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
+bun "$ROOT_DIR/scripts/release/write-v2-build-receipt.mjs" "$ROOT_DIR" --check-only
+
 (
   cd "$ROOT_DIR/app"
   bun --bun vite build --base /

@@ -2,7 +2,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { type BrowserContext, expect, type Page } from "@playwright/test";
 
-const CONTROL_URL = "https://127.0.0.1:8787/api/test/v2-control";
+const BASE_URL = process.env.SOMEWHERE_PREPARED_BASE_URL ?? "https://127.0.0.1:8787/";
+const CONTROL_URL = new URL("/api/test/v2-control", BASE_URL).href;
 const CONTROL_KEY = "somewhere-v2-local-qa";
 const EVIDENCE_DIR = process.env.V2_EVIDENCE_DIR ?? "../.omo/evidence/task-19";
 const LOCAL_SENSOR_CONTROL = "__somewhereV2LocalSensorControl";
@@ -14,6 +15,14 @@ type LocationCoordinates = {
 };
 
 export async function capture(page: Page, name: string): Promise<void> {
+  const project =
+    page.context().browser()?.browserType().name() === "webkit"
+      ? "webkit-mobile"
+      : "chromium-mobile";
+  const evidenceName =
+    process.env.SOMEWHERE_PREPARED_BASE_URL === undefined
+      ? name
+      : `${project}-${name.replace(/^real-(chromium-mobile|webkit-mobile)-/, "real-")}`;
   await mkdir(path.join(EVIDENCE_DIR, "visual"), { recursive: true });
   await page.evaluate(() => scrollTo({ behavior: "instant", left: 0, top: 0 }));
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
@@ -24,7 +33,7 @@ export async function capture(page: Page, name: string): Promise<void> {
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
   }
-  metadata[name] = await page.evaluate(() => ({
+  metadata[evidenceName] = await page.evaluate(() => ({
     devicePixelRatio,
     headerPresent: document.querySelector(".instrument-header") !== null,
     horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -35,7 +44,7 @@ export async function capture(page: Page, name: string): Promise<void> {
   await page.screenshot({
     animations: "disabled",
     fullPage: true,
-    path: path.join(EVIDENCE_DIR, "visual", `${name}.png`),
+    path: path.join(EVIDENCE_DIR, "visual", `${evidenceName}.png`),
   });
 }
 
@@ -118,12 +127,66 @@ export async function emitLocation(page: Page, coordinates: LocationCoordinates)
   );
 }
 
+export async function installDeterministicClock(page: Page): Promise<void> {
+  await page.clock.install({ time: new Date("2026-07-29T12:00:00.000Z") });
+}
+
+export async function driveCredibleArrival(page: Page): Promise<void> {
+  const routePoints = [
+    [37.5442, 127.0377],
+    [37.5446, 127.0385],
+    [37.545, 127.0393],
+    [37.5452, 127.0401],
+    [37.54555, 127.04085],
+    [37.5459, 127.0416],
+    [37.54625, 127.04235],
+    [37.54645, 127.04306],
+  ] as const;
+  for (const [latitude, longitude] of routePoints) {
+    await emitLocation(page, { accuracy: 8, latitude, longitude });
+    await emitHeading(page, 0);
+    await page.clock.fastForward(150);
+  }
+  for (let sample = 0; sample < 5; sample += 1) {
+    await emitLocation(page, {
+      accuracy: 8,
+      latitude: 37.54645,
+      longitude: 127.04307 + sample * 0.00001,
+    });
+    await emitHeading(page, 0);
+    if (sample < 4) {
+      await page.clock.fastForward(4_100);
+    }
+  }
+}
+
 export async function ready(page: Page): Promise<void> {
   await page.goto(".");
   await expect(page.getByRole("heading", { name: "어딘가로 떠나볼까요?" })).toBeVisible();
   await page.getByRole("button", { name: "시작하기" }).click();
   await page.getByRole("button", { name: "한 곳 찾기" }).click();
   await expect(page.getByRole("heading", { name: "목적지는 아직 비밀이에요." })).toBeVisible();
+}
+
+export async function verifyOfflineShell(page: Page): Promise<readonly string[]> {
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.context().setOffline(true);
+  if (page.context().browser()?.browserType().name() === "webkit") {
+    // Playwright WebKit aborts offline navigations internally, so its offline proof inspects the exact precache.
+    await expect(page.getByRole("heading", { name: "어딘가로 떠나볼까요?" })).toBeVisible();
+  } else {
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "어딘가로 떠나볼까요?" })).toBeVisible();
+  }
+  return page.evaluate(async () => {
+    const urls: string[] = [];
+    for (const name of await caches.keys()) {
+      for (const request of await (await caches.open(name)).keys()) {
+        urls.push(request.url);
+      }
+    }
+    return urls;
+  });
 }
 
 export function control(page: Page, clockOffsetMs: number, grantFeedbackConsent: boolean) {

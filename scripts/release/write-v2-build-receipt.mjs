@@ -1,19 +1,11 @@
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-
-const repo = path.resolve(process.argv[2] ?? ".");
-const output = path.resolve(
-  process.argv[3] ?? process.env.V2_EVIDENCE_DIR ?? path.join(repo, ".omo/evidence/task-19"),
-  "build-receipt.json",
-);
-
-function git(values) {
-  const result = spawnSync("git", ["-C", repo, ...values], { encoding: "utf8" });
-  if (result.status !== 0) throw new TypeError(result.stderr.trim());
-  return result.stdout.trim();
-}
+import {
+  assertCleanSource,
+  assertSameCleanSource,
+  captureCleanSource,
+} from "./source-cleanliness.mjs";
 
 async function files(directory, prefix = "") {
   const found = [];
@@ -25,7 +17,7 @@ async function files(directory, prefix = "") {
   return found.sort();
 }
 
-async function buildDigest() {
+async function buildDigest(repo) {
   const dist = path.join(repo, "app", "dist");
   const hash = createHash("sha256");
   for (const relative of await files(dist)) {
@@ -37,20 +29,48 @@ async function buildDigest() {
   return `sha256:${hash.digest("hex")}`;
 }
 
-await mkdir(path.dirname(output), { recursive: true });
-await writeFile(
-  output,
-  `${JSON.stringify(
-    {
-      schemaVersion: 1,
-      sourceSha: git(["rev-parse", "HEAD"]),
-      sourceTree: git(["write-tree"]),
-      buildDigest: await buildDigest(),
-      builtAt: new Date().toISOString(),
-      command: "bun run local:v2:prepare",
-    },
-    null,
-    2,
-  )}\n`,
-);
-process.stdout.write(`${output}\n`);
+export async function writeBuildReceipt({ beforeEmit = async () => {}, output, repo }) {
+  const source = captureCleanSource(repo);
+  await rm(output, { force: true });
+  const receipt = {
+    schemaVersion: 1,
+    sourceSha: source.sha,
+    sourceTree: source.tree,
+    buildDigest: await buildDigest(repo),
+    builtAt: new Date().toISOString(),
+    command: "bun run local:v2:prepare",
+  };
+  await beforeEmit();
+  await mkdir(path.dirname(output), { recursive: true });
+  const temporary = `${output}.tmp-${process.pid}`;
+  await writeFile(temporary, `${JSON.stringify(receipt, null, 2)}\n`);
+  try {
+    assertSameCleanSource(repo, source);
+    await rename(temporary, output);
+    assertSameCleanSource(repo, source);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    await rm(output, { force: true });
+    throw error;
+  }
+}
+
+async function main() {
+  const repo = path.resolve(process.argv[2] ?? ".");
+  const checkOnly = process.argv[3] === "--check-only";
+  const output = path.resolve(
+    (checkOnly ? undefined : process.argv[3]) ??
+      process.env.V2_EVIDENCE_DIR ??
+      path.join(repo, ".omo/evidence/task-19"),
+    "build-receipt.json",
+  );
+  assertCleanSource(repo);
+  if (checkOnly) {
+    process.stdout.write("PASS clean source\n");
+    return;
+  }
+  await writeBuildReceipt({ output, repo });
+  process.stdout.write(`${output}\n`);
+}
+
+if (import.meta.main) await main();

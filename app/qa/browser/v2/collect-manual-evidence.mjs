@@ -1,7 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  assertSameCleanSource,
+  captureCleanSource,
+} from "../../../../scripts/release/source-cleanliness.mjs";
+import { collectPreparedEvidence } from "./prepared-evidence.mjs";
 
 function argumentsMap(values) {
   const result = new Map();
@@ -11,15 +16,10 @@ function argumentsMap(values) {
     if (key === undefined || value === undefined || !key.startsWith("--")) {
       throw new TypeError("collector arguments must be --name value pairs");
     }
+    if (result.has(key)) throw new TypeError(`duplicate collector argument: ${key}`);
     result.set(key, value);
   }
   return result;
-}
-
-function git(repo, values) {
-  const result = spawnSync("git", ["-C", repo, ...values], { encoding: "utf8" });
-  if (result.status !== 0) throw new TypeError(result.stderr.trim());
-  return result.stdout.trim();
 }
 
 function sha256(bytes) {
@@ -63,9 +63,38 @@ async function artifact(evidence, relative) {
 async function main() {
   const options = argumentsMap(process.argv.slice(2));
   const repo = path.resolve(options.get("--repo") ?? ".");
+  if (options.has("--sha")) {
+    const allowed = new Set([
+      "--repo",
+      "--sha",
+      "--source-tree",
+      "--base-url",
+      "--build-receipt",
+      "--viewports",
+      "--output-dir",
+      "--output",
+    ]);
+    if ([...options.keys()].some((key) => !allowed.has(key))) {
+      throw new TypeError("UNKNOWN_PREPARED_ARGUMENT");
+    }
+    const output = path.resolve(options.get("--output") ?? "");
+    await collectPreparedEvidence({
+      baseUrl: options.get("--base-url") ?? "",
+      buildReceipt: path.resolve(options.get("--build-receipt") ?? ""),
+      output,
+      outputDir: path.resolve(options.get("--output-dir") ?? ""),
+      repo,
+      sha: options.get("--sha") ?? "",
+      sourceTree: options.get("--source-tree") ?? "",
+      viewports: options.get("--viewports") ?? "",
+    });
+    process.stdout.write(`${output}\n`);
+    return;
+  }
   const evidence = path.resolve(options.get("--evidence") ?? "");
   const expectedSha = options.get("--expected-sha") ?? "";
-  if (!/^[a-f0-9]{40}$/.test(expectedSha) || git(repo, ["rev-parse", "HEAD"]) !== expectedSha) {
+  const source = captureCleanSource(repo);
+  if (!/^[a-f0-9]{40}$/.test(expectedSha) || source.sha !== expectedSha) {
     throw new TypeError("FOREIGN_SHA");
   }
   await mkdir(evidence, { recursive: true });
@@ -77,6 +106,7 @@ async function main() {
     "process-cleanup.json",
     "process-start.json",
     "visual-metadata.json",
+    "manual-evidence.json",
   ]) {
     await rm(path.join(evidence, name), { force: true });
   }
@@ -90,7 +120,7 @@ async function main() {
   await writeFile(path.join(evidence, "browser-run.log"), browserLog);
   if (run.status !== 0) throw new TypeError(`BROWSER_RUN_FAILED:${run.status}\n${browserLog}`);
 
-  const sourceTree = git(repo, ["write-tree"]);
+  const sourceTree = source.tree;
   const buildReceiptBytes = await readFile(path.join(evidence, "build-receipt.json"));
   const buildReceipt = JSON.parse(buildReceiptBytes.toString("utf8"));
   const digest = await buildDigest(repo);
@@ -155,7 +185,17 @@ async function main() {
     verdict: "PASS",
   };
   const output = path.join(evidence, "manual-evidence.json");
-  await writeFile(output, `${JSON.stringify(manifest, null, 2)}\n`);
+  const temporary = `${output}.tmp-${process.pid}`;
+  await writeFile(temporary, `${JSON.stringify(manifest, null, 2)}\n`);
+  try {
+    assertSameCleanSource(repo, source);
+    await rename(temporary, output);
+    assertSameCleanSource(repo, source);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    await rm(output, { force: true });
+    throw error;
+  }
   process.stdout.write(`${output}\n`);
 }
 

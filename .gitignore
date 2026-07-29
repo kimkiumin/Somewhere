@@ -27,6 +27,7 @@ build/
 .cache/
 .vite/
 .vitest/
+.wrangler/
 
 # Environment files
 .env
