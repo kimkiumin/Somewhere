@@ -1,0 +1,52 @@
+{
+  "contractVersion": 1,
+  "identifierFormats": {
+    "journeyId": "^j_v1\\.[A-Za-z0-9_-]{22}$",
+    "requestId": "^req_v1\\.[A-Za-z0-9_-]{22}$",
+    "idempotencyKey": "^ik_v1\\.[A-Za-z0-9_-]{43}$",
+    "csrfToken": "^csrf_v1\\.[A-Za-z0-9_-]{43}$",
+    "recoveryCapability": "^rc_v1\\.[A-Za-z0-9_-]{43}$",
+    "feedbackCapability": "^fb_v1\\.[A-Za-z0-9_-]{43}$"
+  },
+  "bodyLimits": {
+    "journeyCreate": 4096,
+    "routeRecoveryAndArrival": 2048,
+    "otherPost": 1024,
+    "delete": 0
+  },
+  "projectionActions": {
+    "finding": ["poll", "cancel"],
+    "readyR0": ["commit", "reveal", "stop"],
+    "readyR1": ["commit", "stop"],
+    "committedR0": ["poll", "reveal", "stop"],
+    "committedR1": ["poll", "stop"],
+    "followingR0": ["reveal", "stop", "route-recover", "arrival"],
+    "followingR1": ["stop", "route-recover", "arrival"],
+    "routeRecoveryR0": ["reveal", "stop", "route-recover"],
+    "routeRecoveryR1": ["stop", "route-recover"],
+    "nearR0": ["reveal", "stop", "route-recover", "arrival"],
+    "nearR1": ["stop", "route-recover", "arrival"],
+    "pausedR0": ["continue", "route-recover", "confirm-stop", "reveal"],
+    "pausedR1": ["continue", "route-recover", "confirm-stop"],
+    "stoppedR0": ["record-reason", "skip-reason", "reveal"],
+    "stoppedR1": ["record-reason", "skip-reason"],
+    "completedRecoveryR0": ["reveal", "recovery"],
+    "completedRecoveryR1": ["recovery"],
+    "completedNoRecoveryR0": ["reveal"],
+    "completedNoRecoveryR1": [],
+    "arrivedR0": ["reveal"],
+    "arrivedR1": [],
+    "expired": []
+  },
+  "idempotency": {
+    "ttlHours": 24,
+    "exactByteReplay": true,
+    "replayBeforeSequence": true
+  },
+  "sequence": {
+    "initial": 1,
+    "header": "Expected-Journey-Sequence",
+    "acceptedMutationIncrement": 1
+  },
+  "racePrecedence": ["DELETE", "EXPIRE", "CONFIRM_STOP", "STOP_REQUEST", "ARRIVAL", "REVEAL", "ROUTE_REPAIR_OR_UPDATE", "COMMIT", "CONTINUE", "REACTION"]
+}

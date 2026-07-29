@@ -639,84 +639,26 @@ All endpoints are under `/api/v1`. JSON uses explicit versioned schemas. Success
 
 ### 11.2 Wire projections and mutation envelopes
 
-Every response validates as one shared contract type. Optional fields are forbidden when their phase does not permit them.
+Every response validates against the versioned runtime schemas in `contracts/src/journey.ts`. Optional fields are forbidden when their phase does not permit them. `revealed:false` forbids identity and `revealed:true` requires it.
+
+| Phase/variant | Exact actions |
+| --- | --- |
+| `finding` | `["poll","cancel"]` |
+| `ready/R0`, `ready/R1` | `["commit","reveal","stop"]`, `["commit","stop"]` |
+| `committed/R0`, `committed/R1` | `["poll","reveal","stop"]`, `["poll","stop"]` |
+| `following/R0`, `following/R1` | `["reveal","stop","route-recover","arrival"]`, `["stop","route-recover","arrival"]` |
+| `route-recovery/R0`, `route-recovery/R1` | `["reveal","stop","route-recover"]`, `["stop","route-recover"]` |
+| `near/R0`, `near/R1` | `["reveal","stop","route-recover","arrival"]`, `["stop","route-recover","arrival"]` |
+| `paused/R0`, `paused/R1` | `["continue","route-recover","confirm-stop","reveal"]`, `["continue","route-recover","confirm-stop"]` |
+| `stopped/R0`, `stopped/R1` | `["record-reason","skip-reason","reveal"]`, `["record-reason","skip-reason"]` |
+| `completed/recovery/R0`, `completed/recovery/R1` | `["reveal","recovery"]`, `["recovery"]` |
+| `completed/no-recovery/R0`, `completed/no-recovery/R1` | `["reveal"]`, `[]` |
+| `arrived/R0`, `arrived/R1` | `["reveal"]`, `[]` |
+| `expired` | `[]` |
+
+Finding `cancel` invokes authenticated `DELETE /journeys/:journeyId`; it is not the paused journey's Continue action. Arrived exposes only the server Reveal action. Done is a client-local dismissal and never appears in a projection or endpoint.
 
 ```ts
-type JourneyProjection =
-  | {
-      contractVersion: 1;
-      journeyId: string;
-      sequence: number;
-      phase: "finding";
-      pollAfterSeconds: number;
-      actions: ["poll", "cancel"];
-    }
-  | {
-      contractVersion: 1;
-      journeyId: string;
-      sequence: number;
-      phase: "ready";
-      revealed: boolean;
-      disclosure: SafeDisclosure;
-      reveal?: RevealedIdentity;
-      actions: Array<"commit" | "reveal" | "stop">;
-    }
-  | {
-      contractVersion: 1;
-      journeyId: string;
-      sequence: number;
-      phase: "committed" | "following" | "route-recovery" | "near";
-      revealed: boolean;
-      disclosure: SafeDisclosure;
-      reveal?: RevealedIdentity;
-      guidance: RouteGuidance | GuidanceUnavailable;
-      actions: Array<"reveal" | "stop" | "route-recover" | "arrival">;
-    }
-  | {
-      contractVersion: 1;
-      journeyId: string;
-      sequence: number;
-      phase: "paused";
-      revealed: boolean;
-      disclosure: SafeDisclosure;
-      reveal?: RevealedIdentity;
-      stopConfirmation: { copyVersion: string };
-      routeRepair:
-        | { status: "idle" }
-        | { status: "repairing"; choice: "recalibrate" | "reroute" | "cached-route" }
-        | { status: "ready"; routeVersion: string }
-        | { status: "external-map-handed-off" }
-        | { status: "failed"; reason: "route-stale" | "location-poor" | "heading-poor" | "provider" };
-      actions: Array<"continue" | "route-recover" | "confirm-stop" | "reveal">;
-    }
-  | {
-      contractVersion: 1;
-      journeyId: string;
-      sequence: number;
-      phase: "stopped" | "completed";
-      revealed: boolean;
-      disclosure: SafeDisclosure;
-      reveal?: RevealedIdentity;
-      stopReasonState: "required-or-skip" | "recorded" | "skipped";
-      actions: Array<"record-reason" | "skip-reason" | "reveal" | "recovery">;
-    }
-  | {
-      contractVersion: 1;
-      journeyId: string;
-      sequence: number;
-      phase: "arrived";
-      revealed: boolean;
-      disclosure: SafeDisclosure;
-      reveal?: RevealedIdentity;
-      actions: Array<"reveal" | "finish">;
-    }
-  | {
-      contractVersion: 1;
-      journeyId: string;
-      sequence: number;
-      phase: "expired";
-      actions: [];
-    };
 
 type SafeDisclosure = {
   routeDistanceM: number;
@@ -842,8 +784,8 @@ A replay with the same idempotency key and body digest returns the original stat
 | `POST /journeys/:id/commit` | `{ contractVersion: 1 }` | `200` committed/following projection |
 | `POST /journeys/:id/reveal` | `{ contractVersion: 1 }` | `200` same-phase projection with `reveal` |
 | `POST /journeys/:id/stop/request` | `{ contractVersion: 1 }` | `200` paused projection |
-| `POST /journeys/:id/stop/cancel` | `{ contractVersion: 1 }` | `200` previous-phase projection |
-| `POST /journeys/:id/stop/confirm` | `{ contractVersion: 1 }` | `200` stopped projection |
+| `POST /journeys/:id/stop/cancel` | `{ contractVersion: 1, stopConfirmationId }` | `200` previous-phase projection |
+| `POST /journeys/:id/stop/confirm` | `{ contractVersion: 1, stopConfirmationId }` | `200` stopped projection |
 | `POST /journeys/:id/stop/reason` | `StopReasonBody` | `200` stopped/completed projection |
 | `POST /journeys/:id/route/recover` | `RouteRecoveryBody` | `200` active, paused, or unavailable projection |
 | `POST /journeys/:id/arrival` | `ArrivalBody` | `200` near projection or `ArrivalMutationResponse` |
@@ -851,7 +793,7 @@ A replay with the same idempotency key and body digest returns the original stat
 | `POST /journeys/:id/recovery/confirm` | `RecoveryConfirmationBody` | `201 RecoveryCapability` |
 | `GET /feedback/eligible` | Feedback authorization header | `200` safe prompt or `204` |
 | `POST /feedback/:id/reaction` | Feedback authorization header and `ReactionBody` | `200` recorded outcome |
-| `DELETE /journeys/:id` | None | `204` |
+| `DELETE /journeys/:id` | exactly zero bytes | `204` finding Cancel or explicit deletion |
 
 Paths in the table are relative to `/api/v1`. All journey mutations require the common CSRF, idempotency, expected-sequence, cookie-binding, and content-type controls from [Section 11.1](#111-session-and-request-controls). Recovery and feedback add their stated single-purpose capabilities. DELETE has no JSON body but still requires the mutation headers.
 
@@ -917,11 +859,11 @@ Atomically changes `ready` or any active guidance phase to `paused` and returns 
 
 #### `POST /api/v1/journeys/:journeyId/stop/cancel`
 
-Moves `paused` back to `phaseBeforePause` if no stop was confirmed.
+Carries the current `stopConfirmationId` and moves `paused` back to `phaseBeforePause` if no stop was confirmed.
 
 #### `POST /api/v1/journeys/:journeyId/stop/confirm`
 
-Moves `paused` to `stopped`, records confirmation time, and permanently disables guidance for that journey.
+Carries the current `stopConfirmationId`, moves `paused` to `stopped`, records confirmation time, and permanently disables guidance for that journey.
 
 #### `POST /api/v1/journeys/:journeyId/stop/reason`
 
@@ -937,6 +879,7 @@ Accepts locally reduced evidence:
 
 ```json
 {
+  "contractVersion": 1,
   "endpointDistanceBand": "within-arrival-threshold",
   "accuracyBand": "good",
   "consecutiveSamples": 4,

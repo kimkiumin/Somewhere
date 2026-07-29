@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "policyDate": "2026-07-29",
+  "warnFraction": 0.5,
+  "closeFraction": 0.8,
+  "firstSevenWindowUncertaintyFraction": 0.2,
+  "steadyUncertaintyMinimumFraction": 0.1,
+  "platformSampleIntervalSeconds": 300,
+  "dailySampleStaleAfterSeconds": 900,
+  "storageSampleStaleAfterSeconds": 21600,
+  "reopenFreshSampleCount": 2,
+  "reopenFreshSampleSpacingSeconds": 300,
+  "states": ["BOOT_BLOCKED", "OPEN", "WARN", "METER_BLOCK", "EXTERNAL_BLOCK", "WRITE_FENCED", "DEGRADED", "EMERGENCY_FROZEN", "RECOVERY_VERIFY"],
+  "racePrecedence": ["DELETE", "EXPIRE", "CONFIRM_STOP", "STOP_REQUEST", "ARRIVAL", "REVEAL", "ROUTE_REPAIR_OR_UPDATE", "COMMIT", "CONTINUE", "REACTION"],
+  "meterIds": ["worker.dynamic_requests", "worker.http_cpu", "worker.logs_written", "d1.rows_read", "d1.rows_written", "d1.account_storage", "d1.database_storage", "do.requests", "do.duration", "do.rows_read", "do.rows_written", "do.account_storage", "do.object_storage", "queue.operations", "queue.retention"],
+  "retention": {
+    "sessionHours": 24,
+    "csrfMinutes": 30,
+    "preparedReceiptHours": 1,
+    "sealedSelectionDays": 180,
+    "inboxOutboxHours": 48,
+    "feedbackCapabilityDays": 7,
+    "coarseOperationsDays": 7,
+    "securityMigrationDeletionAuditDays": 180,
+    "queueDlqHours": 24,
+    "workerLogsDays": 3,
+    "d1TimeTravelDays": 7,
+    "durableObjectPitrDays": 30,
+    "tombstoneHours": 48
+  },
+  "releaseOrder": ["ADMISSION_CLOSE", "RESERVATION_DRAIN", "PRODUCER_FENCE", "QUEUE_OUTBOX_INBOX_DRAIN", "QUEUE_PAUSE", "BACKUP_BOOKMARK", "EXPAND_MIGRATION", "COMPATIBLE_CODE", "TERMINAL_SMOKE", "QUEUE_CONSUMER_PRODUCERS_ADMISSION_RESUME"]
+}
