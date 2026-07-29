@@ -5,9 +5,13 @@
   "type": "module",
   "scripts": {
     "check": "bun run lint && bun run typecheck",
-    "lint": "biome check src/index.ts src/http.ts src/environment.ts test vitest.config.ts",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local --config wrangler.jsonc",
+    "lint": "biome check src/index.ts src/http.ts src/environment.ts src/db test vitest.config.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "26.1.2"
