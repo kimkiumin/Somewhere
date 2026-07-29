@@ -26,6 +26,9 @@
   --radius-sm: 10px;
   --radius-md: 18px;
   --radius-lg: 28px;
+  --size-touch: 48px;
+  --size-phone: 480px;
+  --size-compass: 300px;
   color: var(--color-text);
   background: var(--color-canvas);
   font-family: "SF Pro Text", Aptos, "Helvetica Neue", Arial, sans-serif;
@@ -50,6 +53,10 @@ body {
   background: var(--color-canvas);
 }
 
+#app {
+  min-height: 100dvh;
+}
+
 button,
 select,
 input {
@@ -57,7 +64,7 @@ input {
 }
 
 button {
-  min-height: 48px;
+  min-height: var(--size-touch);
 }
 
 button:focus-visible,
@@ -71,38 +78,39 @@ a:focus-visible {
 .app-shell {
   display: grid;
   min-height: 100dvh;
-  align-content: center;
-  gap: var(--space-6);
-  width: min(100%, 480px);
+  align-content: start;
+  gap: var(--space-5);
+  width: min(100%, var(--size-phone));
   margin-inline: auto;
   padding: max(var(--space-6), env(safe-area-inset-top))
     max(var(--space-5), env(safe-area-inset-right)) max(var(--space-6), env(safe-area-inset-bottom))
     max(var(--space-5), env(safe-area-inset-left));
 }
 
-.app-shell--journey {
-  align-content: start;
-}
-
 .instrument-header,
 .section-heading,
 .status-row,
-.button-row,
 .safety-row,
-.diagnostic-row {
+.info-row {
   display: flex;
   align-items: center;
 }
 
 .instrument-header,
 .section-heading,
-.status-row,
-.diagnostic-row {
+.status-row {
   justify-content: space-between;
 }
 
 .instrument-header {
+  flex-wrap: wrap;
   gap: var(--space-4);
+  min-height: var(--size-touch);
+}
+
+.header-note {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
 }
 
 .wordmark,
@@ -135,13 +143,18 @@ h2,
 h3,
 p {
   margin-block: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 h1,
 .display {
-  font-size: clamp(2.45rem, 12vw, 4.5rem);
+  font-size: clamp(1.9rem, 8vw, 2.65rem);
   font-weight: 650;
-  line-height: 1.02;
+  line-height: 1.16;
+  text-wrap: balance;
+  word-break: keep-all;
 }
 
 h2 {
@@ -165,9 +178,40 @@ h3 {
 .body-copy {
   font-size: 1rem;
   line-height: 1.55;
+  text-wrap: pretty;
 }
 
 .small-copy {
   font-size: 0.875rem;
   line-height: 1.45;
+}
+
+.app-shell *,
+.showcase * {
+  min-width: 0;
+}
+
+span,
+legend,
+label,
+button,
+select,
+dt,
+dd,
+li {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+@media (min-width: 520px) {
+  body {
+    background: color-mix(in srgb, var(--color-deep), var(--color-canvas) 94%);
+  }
+
+  .app-shell {
+    border-inline: 1px solid var(--color-border);
+    background: var(--color-canvas);
+    box-shadow: 0 16px 48px rgb(23 35 28 / 8%);
+  }
 }

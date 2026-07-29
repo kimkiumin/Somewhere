@@ -3,24 +3,31 @@ import { expect, type Page, test } from "@playwright/test";
 import { harnessCommand } from "./harness";
 
 async function expectAccessible(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-  expect(results.violations).toEqual([]);
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
 }
 
-test("has no automated WCAG A/AA violations across core journey states", async ({ page }) => {
+async function ready(page: Page): Promise<void> {
+  await page.goto(".");
+  await page.getByRole("button", { name: "시작하기" }).click();
+  await page.getByRole("button", { name: "한 곳 찾기" }).click();
+  await harnessCommand(page, "emitOrigin");
+}
+
+test("has no automated WCAG A/AA violations across core V2 states", async ({ page }) => {
   await page.goto(".");
   await expectAccessible(page);
-
-  await page.getByRole("button", { name: "Start adventure" }).click();
+  await ready(page);
   await expectAccessible(page);
-  await page.getByRole("button", { name: "Begin walk" }).click();
+  await page.getByRole("button", { name: "이곳으로 출발" }).click();
   await harnessCommand(page, "emitDistance", 250, 10);
   await expectAccessible(page);
-  await harnessCommand(page, "emitDistance", 240, 90);
-  await expectAccessible(page);
-  await page.getByRole("button", { name: "Reveal", exact: true }).click();
+  await page.getByRole("button", { name: "중단", exact: true }).click();
   await expectAccessible(page);
 });
 
@@ -28,64 +35,42 @@ test("keeps keyboard focus visible and respects reduced motion", async ({ page }
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(".");
   await page.keyboard.press("Tab");
-
-  await expect(page.getByRole("button", { name: "Open field diagnostics" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "시작하기" })).toBeFocused();
   await expect(page.locator(":focus-visible")).toHaveCount(1);
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Start adventure" })).toBeFocused();
 });
 
 test("moves focus through user-triggered phases without replacing the live region", async ({
   page,
 }) => {
   await page.goto(".");
-  const liveRegion = await page.locator('[aria-live="polite"]').elementHandle();
-  expect(liveRegion).not.toBeNull();
-
-  await page.getByRole("button", { name: "Start adventure" }).click();
-  await expect(page.getByRole("heading", { name: "Your destination is hidden." })).toBeFocused();
-  expect(await liveRegion?.evaluate((node) => node.isConnected)).toBe(true);
-  await page.getByRole("button", { name: "Begin walk" }).click();
-  await expect(page.getByRole("heading", { name: "Finding your direction…" })).toBeFocused();
-  expect(await liveRegion?.evaluate((node) => node.isConnected)).toBe(true);
-
-  await harnessCommand(page, "emitDistance", 250, 10);
-  await page.getByRole("button", { name: "Reveal", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "가족마당" })).toBeFocused();
-  expect(await liveRegion?.evaluate((node) => node.isConnected)).toBe(true);
-  await expect(page.locator('[aria-live="polite"]')).toHaveCount(1);
+  const live = await page.locator('[aria-live="polite"]').elementHandle();
+  await page.getByRole("button", { name: "시작하기" }).click();
+  await expect(page.getByRole("heading", { name: "포기할 수 없는 것만 정해요." })).toBeFocused();
+  expect(await live?.evaluate((node) => node.isConnected)).toBe(true);
+  await page.getByRole("button", { name: "한 곳 찾기" }).click();
+  await expect(
+    page.getByRole("heading", { name: "조건에 맞는 곳을 살펴보고 있어요." }),
+  ).toBeFocused();
+  expect(await live?.evaluate((node) => node.isConnected)).toBe(true);
 });
 
-test("focuses diagnostics and restores its opener on close", async ({ page }) => {
-  await page.goto(".");
-  await page.getByRole("button", { name: "Open field diagnostics" }).click();
-  await expect(page.getByRole("heading", { name: "Field diagnostics" })).toBeFocused();
-  const undersizedControls = await page.locator("button, select").evaluateAll((controls) =>
-    controls
-      .map((control) => ({
-        name: control.textContent?.trim() ?? control.getAttribute("aria-label") ?? control.tagName,
-        height: control.getBoundingClientRect().height,
-      }))
-      .filter((control) => control.height < 48),
+test("keeps diagnostics absent from the consumer and touch controls large", async ({ page }) => {
+  await ready(page);
+  await expect(page.getByText(/field diagnostics|trace events/i)).toHaveCount(0);
+  const undersized = await page.locator("button, select, label.choice").evaluateAll(
+    (nodes) =>
+      nodes.filter((node) => {
+        const box = node.getBoundingClientRect();
+        return box.width < 44 || box.height < 44;
+      }).length,
   );
-  expect(undersizedControls).toEqual([]);
-
-  await page.getByRole("button", { name: "Close" }).click();
-  await expect(page.getByRole("button", { name: "Open field diagnostics" })).toBeFocused();
+  expect(undersized).toBe(0);
 });
 
 test("does not steal focus for automatic proximity or arrival", async ({ page }) => {
-  await page.goto(".");
-  await page.getByRole("button", { name: "Start adventure" }).click();
-  await page.getByRole("button", { name: "Begin walk" }).click();
-  await page.getByRole("button", { name: "Give up", exact: true }).focus();
-
+  await ready(page);
+  await page.getByRole("button", { name: "이곳으로 출발" }).click();
+  await page.getByRole("button", { name: "중단", exact: true }).focus();
   await harnessCommand(page, "emitDistance", 100, 10);
-  await expect(page.getByRole("button", { name: "Give up", exact: true })).toBeFocused();
-  await harnessCommand(page, "emitDistance", 20, 10);
-  await harnessCommand(page, "emitDistance", 20, 10);
-  await harnessCommand(page, "emitDistance", 20, 10);
-  await harnessCommand(page, "advanceMs", 3_000);
-  await harnessCommand(page, "emitDistance", 20, 10);
-  await expect(page.getByRole("button", { name: "Give up", exact: true })).toBeFocused();
+  await expect(page.getByRole("button", { name: "중단", exact: true })).toBeFocused();
 });

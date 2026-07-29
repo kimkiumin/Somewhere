@@ -25,26 +25,37 @@ import {
   revealedProjectionView,
 } from "./journey-view";
 import type { Clock, DeadlineScheduler, Unsubscribe } from "./ports";
-import type { JourneyCreateBody } from "./v2-api";
-import type { V2Store } from "./v2-store";
+import type { FeedbackPrompt, JourneyCreateBody, ReactionBody, RecoveryIntent } from "./v2-api";
+import type { V2Store, V2StoreFailure } from "./v2-store";
 
 export type { JourneyGuidance } from "./journey-guidance";
 export type { HiddenDestinationView, RevealedDestinationView } from "./journey-view";
 
 export type JourneyApplicationSnapshot = Readonly<{
   journey: JourneyState;
+  projection: JourneyProjectionV1 | null;
   sensors: SensorSnapshot;
   guidance: JourneyGuidance;
   hiddenDestination: HiddenDestinationView | null;
   revealedDestination: RevealedDestinationView | null;
   diagnosticEventCount: number;
+  failure: V2StoreFailure | null;
 }>;
 
 export interface JourneyApplication {
-  startAdventure(): Promise<void>;
+  startAdventure(preferences?: JourneyPreferences): Promise<void>;
   retrySignals(): Promise<void>;
   beginWalk(): void;
   reveal(): void;
+  stop(): Promise<void>;
+  cancelStop(): Promise<void>;
+  confirmStop(): Promise<void>;
+  recordStopReason(reason: ReactionStopReason): Promise<void>;
+  recoverRoute(choice: RouteRecoveryChoice): Promise<void>;
+  requestRecovery(): Promise<RecoveryIntent>;
+  confirmRecovery(intent: RecoveryIntent, reviewedFields: readonly string[]): Promise<void>;
+  eligibleFeedback(): Promise<FeedbackPrompt | null>;
+  recordReaction(feedbackId: string, reaction: ReactionBody["reaction"]): Promise<void>;
   giveUp(): void;
   reroll(): void;
   subscribe(listener: (snapshot: JourneyApplicationSnapshot) => void): Unsubscribe;
@@ -53,6 +64,24 @@ export interface JourneyApplication {
   discardDiagnostics(): void;
   destroy(): Promise<void>;
 }
+
+export type JourneyPreferences = Readonly<{
+  category: JourneyCreateBody["constraints"]["category"];
+  budgetBand: JourneyCreateBody["constraints"]["budgetBand"];
+  maxWalkMinutes: number;
+  disclosureLevel: JourneyCreateBody["disclosureLevel"];
+}>;
+
+export type ReactionStopReason =
+  | "safety-concern"
+  | "route-or-sensor"
+  | "hard-condition"
+  | "venue-situation"
+  | "changed-mind"
+  | "schedule-changed"
+  | "skip";
+
+export type RouteRecoveryChoice = "recalibrate" | "reroute" | "cached-route" | "external-map";
 
 export type V2JourneyApplicationOptions = Readonly<{
   sensors: SensorController;
@@ -98,6 +127,10 @@ export function createV2JourneyApplication(
   let arrivalSubmitted = false;
   let validationGeneration = 0;
   let creating = false;
+  let directionSuppressed = false;
+  let resumeAfterMs: number | null = null;
+  let recoveryLocationReady: (() => void) | null = null;
+  let preferences: JourneyPreferences | null = null;
 
   function projection(): JourneyProjectionV1 | null {
     return options.store.snapshot().projection;
@@ -107,11 +140,13 @@ export function createV2JourneyApplication(
     const serverProjection = projection();
     return {
       journey: journeyWithLocalProximity(serverProjection, proximity),
+      projection: serverProjection,
       sensors,
       guidance,
       hiddenDestination: hiddenProjectionView(serverProjection),
       revealedDestination: revealedProjectionView(serverProjection),
       diagnosticEventCount: options.diagnostics.eventCount(),
+      failure: options.store.snapshot().failure,
     };
   }
 
@@ -128,13 +163,25 @@ export function createV2JourneyApplication(
     }
     creating = true;
     const sample = sensors.location.sample;
+    const defaultBody = options.createBody({
+      accuracyM: sample.accuracyM,
+      capturedAtMs: sample.capturedAtMs,
+      latitude: sample.coordinates.latitude,
+      longitude: sample.coordinates.longitude,
+    });
     await options.store.create(
-      options.createBody({
-        accuracyM: sample.accuracyM,
-        capturedAtMs: sample.capturedAtMs,
-        latitude: sample.coordinates.latitude,
-        longitude: sample.coordinates.longitude,
-      }),
+      preferences === null
+        ? defaultBody
+        : {
+            ...defaultBody,
+            constraints: {
+              ...defaultBody.constraints,
+              budgetBand: preferences.budgetBand,
+              category: preferences.category,
+              maxWalkMinutes: preferences.maxWalkMinutes,
+            },
+            disclosureLevel: preferences.disclosureLevel,
+          },
     );
     creating = false;
   }
@@ -238,6 +285,9 @@ export function createV2JourneyApplication(
       visibleSinceMs,
       nowMs: options.clock.nowMs(),
     });
+    if (directionSuppressed) {
+      guidance = { status: "inactive" };
+    }
     if (guidance.routeProgressState !== undefined) {
       routeProgress = guidance.routeProgressState;
     }
@@ -325,6 +375,22 @@ export function createV2JourneyApplication(
     }
     previousVisibility = next.visibility;
     sensors = next;
+    if (recoveryLocationReady !== null && sensors.location.status === "live") {
+      const resolve = recoveryLocationReady;
+      recoveryLocationReady = null;
+      resolve();
+    }
+    if (
+      directionSuppressed &&
+      resumeAfterMs !== null &&
+      sensors.location.status === "live" &&
+      sensors.heading.status === "live" &&
+      sensors.location.sample.capturedAtMs > resumeAfterMs &&
+      sensors.heading.sample.capturedAtMs > resumeAfterMs
+    ) {
+      directionSuppressed = false;
+      resumeAfterMs = null;
+    }
     recorder.recordSensorSamples(next);
     void createFromLiveLocation();
     deriveGuidance();
@@ -349,7 +415,8 @@ export function createV2JourneyApplication(
   });
 
   return {
-    async startAdventure() {
+    async startAdventure(nextPreferences) {
+      preferences = nextPreferences ?? null;
       options.diagnostics.beginSession();
       await options.sensors.startFromUserGesture();
       sensors = options.sensors.snapshot();
@@ -369,6 +436,86 @@ export function createV2JourneyApplication(
     },
     reveal() {
       void options.store.mutate({ action: "reveal", body: { contractVersion: 1 } });
+    },
+    async stop() {
+      directionSuppressed = true;
+      resumeAfterMs = null;
+      guidance = { status: "inactive" };
+      notify();
+      await options.store.mutate({ action: "stop-request", body: { contractVersion: 1 } });
+    },
+    async cancelStop() {
+      const serverProjection = projection();
+      if (serverProjection?.phase !== "paused") {
+        return;
+      }
+      const locationAt =
+        sensors.location.status === "live" ? sensors.location.sample.capturedAtMs : 0;
+      const headingAt = sensors.heading.status === "live" ? sensors.heading.sample.capturedAtMs : 0;
+      resumeAfterMs = Math.max(locationAt, headingAt);
+      await options.store.mutate({
+        action: "continue",
+        body: {
+          contractVersion: 1,
+          stopConfirmationId: serverProjection.stopConfirmationId,
+        },
+      });
+    },
+    async confirmStop() {
+      const serverProjection = projection();
+      if (serverProjection?.phase !== "paused") {
+        return;
+      }
+      await options.store.mutate({
+        action: "confirm-stop",
+        body: {
+          contractVersion: 1,
+          stopConfirmationId: serverProjection.stopConfirmationId,
+        },
+      });
+    },
+    async recordStopReason(reason) {
+      await options.store.mutate({
+        action: "stop-reason",
+        body: { contractVersion: 1, reason, reasonPolicyVersion: "stop-reasons-v1" },
+      });
+    },
+    async recoverRoute(choice) {
+      await options.store.mutate({
+        action: "route-recover",
+        body: { choice, contractVersion: 1 },
+      });
+    },
+    requestRecovery() {
+      return options.store.requestRecovery();
+    },
+    async confirmRecovery(intent, reviewedFields) {
+      await options.sensors.startFromUserGesture();
+      sensors = options.sensors.snapshot();
+      if (sensors.location.status !== "live") {
+        await new Promise<void>((resolve) => {
+          recoveryLocationReady = resolve;
+        });
+      }
+      if (sensors.location.status !== "live") {
+        throw new TypeError("Fresh location is required for recovery");
+      }
+      const body = options.createBody({
+        accuracyM: sensors.location.sample.accuracyM,
+        capturedAtMs: sensors.location.sample.capturedAtMs,
+        latitude: sensors.location.sample.coordinates.latitude,
+        longitude: sensors.location.sample.coordinates.longitude,
+      });
+      const grant = await options.store.confirmRecovery(intent, body.constraints, reviewedFields);
+      await options.store.reset();
+      await options.store.create({ ...body, recoveryCapability: grant.recoveryCapability });
+    },
+    eligibleFeedback: () => options.store.eligibleFeedback(),
+    recordReaction(feedbackId, reaction) {
+      return options.store.recordReaction(feedbackId, {
+        contractVersion: 1,
+        reaction,
+      });
     },
     giveUp() {
       notify();

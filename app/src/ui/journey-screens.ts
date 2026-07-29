@@ -1,195 +1,182 @@
 import type { JourneyApplicationSnapshot } from "../application/journey-application";
-import { actionButton, compass, element, safetyControls } from "./dom-primitives";
-import type { UiState } from "./render";
+import { actionButton, compass, element, infoRows, safetyControls } from "./dom-primitives";
 
-function hiddenPanel(snapshot: JourneyApplicationSnapshot): HTMLElement {
-  const panel = element("article", "panel hidden-panel");
-  panel.append(
-    element("span", "hidden-mark", "?"),
-    element("p", "eyebrow", "Destination hidden"),
-    element("h2", undefined, snapshot.hiddenDestination?.hint ?? "A quiet place is waiting."),
-  );
-  const meta = element("div", "meta-grid");
-  const time = element("div", "meta-item");
-  time.append(
-    element("span", "label muted", "Walking estimate"),
-    element(
-      "strong",
-      undefined,
-      snapshot.hiddenDestination === null
-        ? "Unknown"
-        : `About ${snapshot.hiddenDestination.estimatedMinutes} min`,
-    ),
-  );
-  const trust = element("div", "meta-item");
-  trust.append(
-    element("span", "label muted", "Field area"),
-    element("strong", undefined, "Seoul Forest"),
-  );
-  meta.append(time, trust);
-  panel.append(
-    meta,
-    element(
-      "p",
-      "small-copy muted",
-      "Direction is not a route. Stay on public paths and follow crossings.",
-    ),
-  );
-  return panel;
+function heading(eyebrow: string, title: string, copy?: string): HTMLElement {
+  const section = element("section", "state-heading");
+  section.append(element("p", "eyebrow", eyebrow), element("h1", undefined, title));
+  if (copy !== undefined) {
+    section.append(element("p", "body-copy muted", copy));
+  }
+  return section;
 }
 
-export function idleScreen(main: HTMLElement, uiState: UiState): void {
-  const hero = element("section", "hero");
-  hero.append(
-    element("p", "eyebrow", "A quiet field instrument"),
-    element("h1", undefined, "Follow the unknown."),
-    element(
-      "p",
-      "lead muted",
-      "Choose a hidden place, then walk with only direction and distance.",
+export function startScreen(main: HTMLElement): void {
+  main.append(
+    heading(
+      "숨겨진 목적지",
+      "어딘가로 떠나볼까요?",
+      "꼭 필요한 조건만 정하면 비교 목록 없이 한 곳을 골라드려요.",
     ),
+    compass("idle", "?", "목적지는 출발 뒤에도 숨겨져요"),
+    actionButton("시작하기", "open-constraints", "button--primary button--wide"),
+    element("p", "small-copy muted centered", "직접 확인하기 전에는 이름과 정확한 주소를 숨겨요."),
+  );
+}
+
+export function constraintsScreen(main: HTMLElement): void {
+  const form = element("form", "constraints");
+  form.id = "constraints-form";
+  const category = element("fieldset", "choice-group");
+  category.append(element("legend", undefined, "어디로 갈까요?"));
+  for (const [value, label] of [
+    ["restaurant", "식당"],
+    ["cafe", "카페"],
+  ] as const) {
+    const item = element("label", "choice");
+    const input = element("input");
+    input.type = "radio";
+    input.name = "category";
+    input.value = value;
+    input.checked = value === "cafe";
+    item.append(input, element("span", undefined, label));
+    category.append(item);
+  }
+  const walk = element("label", "stack");
+  walk.append(element("span", "label", "최대 걷는 시간"));
+  const walkSelect = element("select", "select");
+  walkSelect.name = "maxWalkMinutes";
+  for (const minutes of [15, 30, 45]) {
+    const option = element("option", undefined, `${minutes}분`);
+    option.value = String(minutes);
+    option.selected = minutes === 30;
+    walkSelect.append(option);
+  }
+  walk.append(walkSelect);
+  const budget = element("label", "stack");
+  budget.append(element("span", "label", "예산"));
+  const budgetSelect = element("select", "select");
+  budgetSelect.name = "budgetBand";
+  for (const [value, label] of [
+    ["low", "가볍게"],
+    ["medium", "보통"],
+    ["high", "넉넉하게"],
+  ] as const) {
+    const option = element("option", undefined, label);
+    option.value = value;
+    option.selected = value === "medium";
+    budgetSelect.append(option);
+  }
+  budget.append(budgetSelect);
+  form.append(
+    category,
+    walk,
+    budget,
+    actionButton("한 곳 찾기", "find", "button--primary button--wide"),
   );
   main.append(
-    hero,
-    compass("idle", "?", "Destination stays hidden"),
-    actionButton("Start adventure", "start", "button--primary button--wide"),
-    element(
-      "p",
-      "small-copy muted centered",
-      "Screen-on field test · Seoul Forest · No background navigation",
+    heading(
+      "최소 조건",
+      "포기할 수 없는 것만 정해요.",
+      "장소 이름, 사진, 평점은 보여드리지 않아요.",
     ),
+    form,
   );
-  if (uiState.updateAvailable) {
-    const update = element("aside", "update-notice");
-    update.append(
-      element("p", "small-copy", "A verified Somewhere update is ready."),
-      actionButton("Update Somewhere", "accept-update", "button--secondary"),
-    );
-    main.append(update);
-  }
 }
 
-export function hiddenScreen(main: HTMLElement, snapshot: JourneyApplicationSnapshot): void {
-  const heading = element("section", "state-heading");
-  heading.append(
-    element("span", "status-pill", "Ready when you are"),
-    element("h1", undefined, "Your destination is hidden."),
-    element("p", "body-copy muted", "You can reveal or leave at any time."),
-  );
+export function findingScreen(main: HTMLElement): void {
+  const indicator = element("div", "finding-mark");
+  indicator.setAttribute("aria-hidden", "true");
   main.append(
-    heading,
-    hiddenPanel(snapshot),
-    actionButton("Begin walk", "begin", "button--primary button--wide"),
-    safetyControls(),
+    heading(
+      "한 곳을 찾는 중",
+      "조건에 맞는 곳을 살펴보고 있어요.",
+      "후보를 나열하지 않고 한 곳만 준비할게요.",
+    ),
+    indicator,
   );
 }
 
-function pauseCopy(snapshot: JourneyApplicationSnapshot): string {
-  if (snapshot.sensors.heading.status === "denied") {
-    return "Compass access was not allowed.";
+function disclosure(snapshot: JourneyApplicationSnapshot): readonly [string, string, string] {
+  const projection = snapshot.projection;
+  if (projection !== null && projection.phase !== "finding" && projection.phase !== "expired") {
+    const price = { high: "₩₩₩", low: "₩", medium: "₩₩", unknown: "확인 필요" }[
+      projection.disclosure.priceBand
+    ];
+    return [
+      `${Math.round(projection.disclosure.routeDistanceM)}m · 약 ${Math.ceil(projection.disclosure.routeDurationMinutes)}분`,
+      projection.disclosure.representativeCategories.join(" · "),
+      price,
+    ];
   }
-  const reasons = snapshot.guidance.status === "paused" ? snapshot.guidance.reasons : [];
-  if (reasons.includes("location-inaccurate")) {
-    return "Location is too uncertain right now.";
-  }
-  if (reasons.includes("location-stale")) {
-    return "Location has not refreshed yet.";
-  }
-  if (reasons.includes("heading-stale")) {
-    return "Compass has not refreshed yet.";
-  }
-  if (reasons.includes("visibility-hidden")) {
-    return "Return to this screen to refresh direction.";
-  }
-  if (reasons.includes("heading-uncalibrated")) {
-    return "Move the phone gently to help the compass calibrate.";
-  }
-  return "The direction signal needs a moment.";
+  return [
+    `약 ${snapshot.hiddenDestination?.estimatedMinutes ?? 0}분`,
+    snapshot.hiddenDestination?.hint ?? "카페",
+    "₩₩",
+  ];
 }
 
-export function activeJourneyScreen(main: HTMLElement, snapshot: JourneyApplicationSnapshot): void {
-  if (snapshot.journey.phase === "arrived") {
-    const heading = element("section", "state-heading");
-    heading.append(
-      element("span", "status-pill status-pill--arrived", "Journey complete"),
-      element("h1", undefined, "Arrived."),
-      element("p", "body-copy muted", "Ready to discover where the signal brought you?"),
-    );
-    main.append(
-      heading,
-      compass("arrived", "Arrived", "Take in your surroundings"),
-      actionButton("Reveal destination", "reveal", "button--primary button--wide button--warm"),
-      safetyControls(false),
-    );
-    return;
-  }
+export function readyScreen(main: HTMLElement, snapshot: JourneyApplicationSnapshot): void {
+  const values = disclosure(snapshot);
+  const panel = element("section", "hidden-place");
+  panel.append(element("span", "hidden-mark", "?"), infoRows(...values));
+  main.append(
+    heading(
+      "한 곳이 준비됐어요",
+      "목적지는 아직 비밀이에요.",
+      "조건에 맞는 한 곳을 골랐어요. 출발하면 바로 확정돼요.",
+    ),
+    panel,
+    actionButton("이곳으로 출발", "commit", "button--primary button--wide"),
+    safetyControls(snapshot.revealedDestination !== null),
+  );
+}
 
+export function guidanceScreen(main: HTMLElement, snapshot: JourneyApplicationSnapshot): void {
+  const phase = snapshot.projection?.phase;
+  const arrived = phase === "arrived" || snapshot.journey.phase === "arrived";
+  const near = phase === "near" || snapshot.journey.phase === "near";
   const live = snapshot.guidance.status === "live";
-  const acquiring = snapshot.guidance.status === "acquiring";
-  const near = snapshot.journey.phase === "near";
-  const heading = element("section", "state-heading state-heading--compact");
-  heading.append(
-    element(
-      "span",
-      `status-pill${live ? "" : acquiring ? " status-pill--acquiring" : " status-pill--paused"}`,
-      live ? (near ? "Very close" : "Signals ready") : acquiring ? "Finding direction" : "Paused",
-    ),
-    element(
-      "h1",
-      "journey-title",
-      live
-        ? near
-          ? "You are getting closer."
-          : "Keep following the quiet signal."
-        : acquiring
-          ? "Finding your direction…"
-          : "Direction paused.",
-    ),
-  );
-  main.append(heading);
-
-  if (live) {
+  const title = arrived
+    ? "도착했어요."
+    : near
+      ? "거의 다 왔어요."
+      : live
+        ? "화살표를 따라가세요."
+        : "방향을 다시 확인하고 있어요.";
+  main.append(heading(arrived ? "도착" : near ? "가까워지는 중" : "길 안내", title));
+  if (arrived) {
+    main.append(compass("arrived", "도착", "주변을 천천히 살펴보세요"));
+  } else if (live) {
     main.append(
       compass(
         "live",
-        `${Math.max(0, Math.round(snapshot.guidance.distanceM))} m`,
-        near ? "Move carefully" : "Keep to public paths",
+        `${Math.max(0, Math.round(snapshot.guidance.distanceM))}m`,
+        near ? "천천히 이동하세요" : "공공 보행로를 이용하세요",
       ),
     );
   } else {
-    main.append(
-      compass(
-        "paused",
-        acquiring ? "…" : "Paused",
-        acquiring ? "Waiting for fresh signals" : pauseCopy(snapshot),
-      ),
+    main.append(compass("paused", "잠시 멈춤", "신뢰할 수 있는 방향이 돌아오면 안내할게요"));
+  }
+  if (snapshot.revealedDestination !== null) {
+    const reveal = element("aside", "reveal-inline");
+    const name = element("h2", undefined, snapshot.revealedDestination.name);
+    name.lang = snapshot.revealedDestination.language;
+    reveal.append(
+      element("p", "eyebrow", "확인한 목적지"),
+      name,
+      element("p", "body-copy", snapshot.revealedDestination.description),
     );
-    if (!acquiring) {
-      main.append(actionButton("Retry signals", "retry", "button--secondary button--wide"));
-    }
+    main.append(reveal);
   }
-  main.append(safetyControls());
-}
-
-export function revealedScreen(main: HTMLElement, snapshot: JourneyApplicationSnapshot): void {
-  const revealed = snapshot.revealedDestination;
-  const gaveUp = snapshot.journey.phase === "give-up";
-  const article = element("article", `reveal-panel${gaveUp ? " reveal-panel--neutral" : ""}`);
-  const name = element("h1", undefined, revealed?.name ?? "Destination unavailable");
-  if (revealed !== null) {
-    name.lang = revealed.language;
+  if (!arrived && !live) {
+    main.append(
+      actionButton("안내 복구 살펴보기", "open-route-recovery", "button--secondary button--wide"),
+    );
   }
-  article.append(
-    element("p", "eyebrow", gaveUp ? "Walk ended safely" : "Somewhere, revealed"),
-    name,
-    element("p", "label reveal-category", revealed?.category ?? "Unknown place"),
-    element("p", "lead", revealed?.description ?? "No description is available."),
-    element(
-      "p",
-      "small-copy muted",
-      revealed?.curationNote ?? "Check current access before approaching.",
-    ),
-    actionButton("Start again", "restart", "button--primary button--wide"),
-  );
-  main.append(article);
+  main.append(safetyControls(snapshot.revealedDestination !== null));
+  if (arrived) {
+    main.append(
+      element("p", "small-copy muted centered", "장소 평가는 60분 뒤 한 번만 여쭤볼게요."),
+    );
+  }
 }

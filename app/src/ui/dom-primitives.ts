@@ -1,5 +1,3 @@
-import type { JourneyApplicationSnapshot } from "../application/journey-application";
-
 export function element<K extends keyof HTMLElementTagNameMap>(
   tagName: K,
   className?: string,
@@ -15,35 +13,38 @@ export function element<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-export function actionButton(label: string, action: string, variant: string): HTMLButtonElement {
+export function actionButton(
+  label: string,
+  action: string,
+  variant = "button--secondary",
+): HTMLButtonElement {
   const button = element("button", `button ${variant}`, label);
   button.type = "button";
   button.dataset.action = action;
   return button;
 }
 
-export function instrumentHeader(snapshot: JourneyApplicationSnapshot): HTMLElement {
+export function instrumentHeader(): HTMLElement {
   const header = element("header", "instrument-header");
-  const brand = element("p", "wordmark", "Somewhere");
-  const diagnostics = actionButton(
-    `Field data · ${snapshot.diagnosticEventCount}`,
-    "open-diagnostics",
-    "button--quiet button--compact",
+  header.append(
+    element("p", "wordmark", "Somewhere"),
+    element("p", "header-note", "한 곳만, 조용히"),
   );
-  diagnostics.setAttribute("aria-label", "Open field diagnostics");
-  header.append(brand, diagnostics);
   return header;
 }
 
-export function safetyControls(includeReveal = true): HTMLElement {
-  const wrapper = element("div", "safety-controls");
-  const row = element("div", "safety-row");
-  if (includeReveal) {
-    row.append(actionButton("Reveal", "reveal", "button--secondary"));
+export function infoRows(distance: string, category: string, price: string): HTMLElement {
+  const list = element("dl", "info-rows");
+  for (const [label, value] of [
+    ["거리", distance],
+    ["메뉴", category],
+    ["가격", price],
+  ] as const) {
+    const row = element("div", "info-row");
+    row.append(element("dt", undefined, label), element("dd", undefined, value));
+    list.append(row);
   }
-  row.append(actionButton("Give up", "give-up", "button--caution"));
-  wrapper.append(row, actionButton("Reroll", "reroll", "button--quiet button--wide"));
-  return wrapper;
+  return list;
 }
 
 export function compass(
@@ -51,8 +52,8 @@ export function compass(
   distanceText: string,
   statusText: string,
 ): HTMLElement {
-  const variantClass = variant === "live" || variant === "idle" ? "" : ` compass-stage--${variant}`;
-  const stage = element("section", `compass-stage${variantClass}`);
+  const suffix = variant === "live" || variant === "idle" ? "" : ` compass-stage--${variant}`;
+  const stage = element("section", `compass-stage${suffix}`);
   stage.setAttribute("aria-label", `${statusText} ${distanceText}`.trim());
   stage.append(element("span", "compass-cardinal", "N"));
   if (variant === "live") {
@@ -69,4 +70,13 @@ export function compass(
   );
   stage.append(readout);
   return stage;
+}
+
+export function safetyControls(revealed: boolean): HTMLElement {
+  const row = element("div", "safety-row");
+  if (!revealed) {
+    row.append(actionButton("목적지 확인", "reveal"));
+  }
+  row.append(actionButton("중단", "stop", "button--caution"));
+  return row;
 }

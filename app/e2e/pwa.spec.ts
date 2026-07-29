@@ -42,22 +42,22 @@ test("registers an installable manifest and restores the app shell offline", asy
 
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Follow the unknown." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "어딘가로 떠나볼까요?" })).toBeVisible();
   await context.setOffline(false);
 });
 
 test("never exposes an update reload during an active journey", async ({ page }) => {
   await page.goto(".");
-  await page.getByRole("button", { name: "Start adventure" }).click();
-  await page.getByRole("button", { name: "Begin walk" }).click();
+  await page.getByRole("button", { name: "시작하기" }).click();
+  await page.getByRole("button", { name: "한 곳 찾기" }).click();
+  await harnessCommand(page, "emitOrigin");
+  await page.getByRole("button", { name: "이곳으로 출발" }).click();
   await harnessCommand(page, "emitDistance", 240, 10);
 
   await harnessCommand(page, "triggerUpdate");
 
-  await expect(page.getByRole("button", { name: "Update Somewhere" })).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", { name: "Keep following the quiet signal." }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Somewhere 업데이트" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "화살표를 따라가세요." })).toBeVisible();
 });
 
 test("offers a user-controlled update while idle", async ({ page }) => {
@@ -65,5 +65,5 @@ test("offers a user-controlled update while idle", async ({ page }) => {
 
   await harnessCommand(page, "triggerUpdate");
 
-  await expect(page.getByRole("button", { name: "Update Somewhere" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Somewhere 업데이트" })).toBeVisible();
 });

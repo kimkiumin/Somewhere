@@ -2,7 +2,9 @@ import { expect, type Page, type TestInfo, test } from "@playwright/test";
 import { harnessCommand } from "./harness";
 
 const viewports = [
+  { width: 320, height: 780 },
   { width: 375, height: 812 },
+  { width: 390, height: 844 },
   { width: 430, height: 932 },
   { width: 768, height: 1024 },
   { width: 1280, height: 900 },
@@ -16,49 +18,52 @@ async function capture(
 ): Promise<void> {
   await page.screenshot({
     path: testInfo.outputPath(`${viewport.width}x${viewport.height}-${state}.png`),
-    fullPage: false,
+    fullPage: true,
     animations: "disabled",
   });
 }
 
-test("captures every product state and target viewport", async ({ page }, testInfo) => {
+async function findReady(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "한 곳 찾기" }).click();
+  await harnessCommand(page, "emitOrigin");
+  await expect(page.getByRole("heading", { name: "목적지는 아직 비밀이에요." })).toBeVisible();
+}
+
+test("captures every V2 product state and target viewport", async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await page.goto(".");
-    await expect(page.getByRole("heading", { name: "Follow the unknown." })).toBeVisible();
-    await capture(page, testInfo, viewport, "idle");
-
-    await page.getByRole("button", { name: "Start adventure" }).click();
-    await capture(page, testInfo, viewport, "hidden");
-    await page.getByRole("button", { name: "Begin walk" }).click();
-    await capture(page, testInfo, viewport, "acquiring");
-
+    await capture(page, testInfo, viewport, "start");
+    await page.getByRole("button", { name: "시작하기" }).click();
+    await capture(page, testInfo, viewport, "constraints");
+    await findReady(page);
+    await capture(page, testInfo, viewport, "ready");
+    await page.getByRole("button", { name: "이곳으로 출발" }).click();
     await harnessCommand(page, "emitDistance", 300, 10);
     await capture(page, testInfo, viewport, "following");
+    await page.getByRole("button", { name: "목적지 확인" }).click();
+    await capture(page, testInfo, viewport, "revealed-following");
     await harnessCommand(page, "emitDistance", 290, 90);
-    await capture(page, testInfo, viewport, "paused");
-    await harnessCommand(page, "emitDistance", 100, 10);
+    await capture(page, testInfo, viewport, "degraded");
+    await page.getByRole("button", { name: "안내 복구 살펴보기" }).click();
+    await capture(page, testInfo, viewport, "route-recovery");
+    await page.getByRole("button", { name: "나침반 다시 맞추기" }).click();
+    for (const distance of [210, 120, 100]) {
+      await harnessCommand(page, "emitDistance", distance, 10);
+    }
     await capture(page, testInfo, viewport, "near");
-    await harnessCommand(page, "emitDistance", 20, 10);
-    await harnessCommand(page, "emitDistance", 22, 10);
-    await harnessCommand(page, "emitDistance", 18, 10);
-    await harnessCommand(page, "advanceMs", 3_000);
-    await harnessCommand(page, "emitDistance", 19, 10);
-    await capture(page, testInfo, viewport, "arrived");
-    await page.getByRole("button", { name: "Reveal destination" }).click();
-    await capture(page, testInfo, viewport, "revealed");
 
     await page.goto(".");
-    await page.getByRole("button", { name: "Start adventure" }).click();
-    await page.getByRole("button", { name: "Give up", exact: true }).click();
-    await capture(page, testInfo, viewport, "give-up");
-
-    await page.goto(".");
-    await page.getByRole("button", { name: "Open field diagnostics" }).click();
-    await capture(page, testInfo, viewport, "diagnostics");
-
-    await page.goto("showcase.html");
-    await expect(page.getByRole("heading", { name: "Primitive showcase" })).toBeVisible();
-    await capture(page, testInfo, viewport, "showcase");
+    await page.getByRole("button", { name: "시작하기" }).click();
+    await findReady(page);
+    await page.getByRole("button", { name: "중단", exact: true }).click();
+    await capture(page, testInfo, viewport, "stop-confirm");
+    await page.getByRole("button", { name: "중단 확정" }).click();
+    await capture(page, testInfo, viewport, "stop-reason");
+    await page.getByRole("button", { name: "건너뛰기" }).click();
+    await capture(page, testInfo, viewport, "completed");
+    await page.getByRole("button", { name: "새 장소 찾기" }).click();
+    await capture(page, testInfo, viewport, "recovery-review");
   }
 });

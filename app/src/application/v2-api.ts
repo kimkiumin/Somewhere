@@ -94,7 +94,7 @@ export type RecoveryGrant = Readonly<{
   contractVersion: 1;
   expiresAt: number;
   previousDestinationExcluded: true;
-  recoveryCapability: string;
+  recoveryCapability: NonNullable<JourneyCreateBody["recoveryCapability"]>;
 }>;
 
 export interface V2Api {

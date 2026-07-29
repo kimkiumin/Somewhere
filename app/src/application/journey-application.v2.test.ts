@@ -2,10 +2,14 @@ import { type JourneyProjectionV1, PROJECTION_EXAMPLES_V1 } from "@somewhere/con
 import { describe, expect, test, vi } from "vitest";
 import { routeEndpointDigest } from "../domain/polyline";
 import { createScriptedSensorRig } from "../testkit/fakes";
-import { DeterministicV2Api, MemoryFeedbackCapabilityStore } from "../testkit/v2-fakes";
+import {
+  DeterministicV2Api,
+  feedbackRecord,
+  MemoryFeedbackCapabilityStore,
+} from "../testkit/v2-fakes";
 import { createSensorController } from "./controller";
 import { createDiagnosticTrace } from "./diagnostics";
-import { createV2JourneyApplication } from "./journey-application";
+import { createV2JourneyApplication, type JourneyApplication } from "./journey-application";
 import { createV2Store } from "./v2-store";
 
 function projection(phase: string, revealed: boolean): JourneyProjectionV1 {
@@ -22,13 +26,14 @@ function projection(phase: string, revealed: boolean): JourneyProjectionV1 {
   return found;
 }
 
-function fixture() {
+function fixture(autoTransition = false) {
   const rig = createScriptedSensorRig();
   const sensors = createSensorController(rig.ports);
-  const api = new DeterministicV2Api(projection("ready", false));
+  const api = new DeterministicV2Api(projection("ready", false), autoTransition);
+  const feedbackCapabilities = new MemoryFeedbackCapabilityStore();
   const store = createV2Store({
     api,
-    feedbackCapabilities: new MemoryFeedbackCapabilityStore(),
+    feedbackCapabilities,
     idempotencyKeys: { next: () => `ik_v1.${"A".repeat(43)}` },
   });
   const application = createV2JourneyApplication({
@@ -56,7 +61,7 @@ function fixture() {
       recoveryCapability: null,
     }),
   });
-  return { api, application, rig, store };
+  return { api, application, feedbackCapabilities, rig, store };
 }
 
 async function followingProjection(): Promise<JourneyProjectionV1> {
@@ -232,5 +237,114 @@ describe("V2 journey application facade", () => {
         reasons: ["route-unavailable"],
       }),
     );
+  });
+
+  test("TASK17_V2_STOP removes direction before dispatching stop-request", async () => {
+    const context = fixture();
+    await context.application.startAdventure();
+    context.rig.advanceMs(1_000);
+    context.rig.emitLocation({
+      accuracyM: 7,
+      capturedAtMs: context.rig.nowMs(),
+      coordinates: { latitude: 37.544_6, longitude: 127.037_4 },
+    });
+    await vi.waitFor(() => expect(context.store.snapshot().status).toBe("ready"));
+
+    context.api.projection = await followingProjection();
+    context.application.beginWalk();
+    await vi.waitFor(() => expect(context.store.snapshot().projection?.phase).toBe("following"));
+    context.rig.emitHeading({
+      degrees: 0,
+      reference: "true",
+      accuracyDeg: 8,
+      capturedAtMs: context.rig.nowMs(),
+    });
+    await vi.waitFor(() => expect(context.application.snapshot().guidance.status).toBe("live"));
+
+    const applicationWithStop = context.application as JourneyApplication & {
+      readonly stop: () => void;
+    };
+    const stopRequest = applicationWithStop.stop();
+
+    expect(context.application.snapshot().guidance.status).toBe("inactive");
+    expect(context.api.calls.at(-1)).toMatchObject({
+      kind: "mutate",
+      mutation: { action: "stop-request", body: { contractVersion: 1 } },
+    });
+    await stopRequest;
+  });
+
+  test("TASK17_V2_LIFECYCLE dispatches typed stop, recovery, and replacement commands", async () => {
+    const context = fixture(true);
+    await context.application.startAdventure();
+    context.rig.emitLocation({
+      accuracyM: 8,
+      capturedAtMs: context.rig.nowMs(),
+      coordinates: { latitude: 37.554, longitude: 127.039_6 },
+    });
+    await vi.waitFor(() => expect(context.store.snapshot().projection?.phase).toBe("ready"));
+    context.application.beginWalk();
+    await vi.waitFor(() => expect(context.store.snapshot().projection?.phase).toBe("following"));
+
+    await context.application.stop();
+    expect(context.store.snapshot().projection?.phase).toBe("paused");
+    await context.application.cancelStop();
+    expect(context.store.snapshot().projection?.phase).toBe("following");
+    await context.application.stop();
+    await context.application.confirmStop();
+    expect(context.store.snapshot().projection?.phase).toBe("stopped");
+    await context.application.recordStopReason("route-or-sensor");
+    expect(context.store.snapshot().projection?.phase).toBe("completed");
+
+    const intent = await context.application.requestRecovery();
+    const replacement = context.application.confirmRecovery(intent, intent.requiredReviewFields);
+    await Promise.resolve();
+    context.rig.emitLocation({
+      accuracyM: 8,
+      capturedAtMs: context.rig.nowMs() + 1,
+      coordinates: { latitude: 37.554, longitude: 127.039_6 },
+    });
+    await replacement;
+
+    expect(
+      context.api.calls
+        .filter((call) => call.kind === "mutate")
+        .map((call) => call.mutation.action),
+    ).toEqual([
+      "commit",
+      "stop-request",
+      "continue",
+      "stop-request",
+      "confirm-stop",
+      "stop-reason",
+    ]);
+    expect(context.api.calls).toContainEqual(
+      expect.objectContaining({
+        kind: "confirm-recovery",
+        reviewedFields: ["constraints"],
+      }),
+    );
+    expect(context.api.calls.at(-1)).toMatchObject({
+      kind: "create",
+      body: { recoveryCapability: `rc_v1.${"A".repeat(43)}` },
+    });
+  });
+
+  test("TASK17_V2_REACTION reads and records an identity-free delayed reaction", async () => {
+    const context = fixture();
+    context.feedbackCapabilities.record = feedbackRecord(0, 10_000);
+
+    const prompt = await context.application.eligibleFeedback();
+    expect(prompt?.actions).toEqual(["dislike", "like", "love", "did_not_visit"]);
+    if (prompt === null) {
+      throw new TypeError("Expected an eligible feedback prompt");
+    }
+    await context.application.recordReaction(prompt.feedbackId, "love");
+
+    expect(context.api.calls.at(-1)).toMatchObject({
+      kind: "reaction",
+      feedbackId: prompt.feedbackId,
+    });
+    expect(context.feedbackCapabilities.record).toBeNull();
   });
 });

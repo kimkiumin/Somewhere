@@ -51,7 +51,7 @@
   }
 
   .compass-stage {
-    width: min(70dvh, 290px);
+    width: min(52dvh, 270px);
   }
 }
 
@@ -63,5 +63,43 @@
     transition-duration: 0.01ms;
     animation-duration: 0.01ms;
     animation-iteration-count: 1;
+  }
+
+  .finding-mark {
+    animation: none;
+    border-color: var(--color-accent);
+  }
+}
+
+@media (max-width: 350px) {
+  .app-shell {
+    padding-inline: max(var(--space-4), env(safe-area-inset-left));
+  }
+
+  .safety-row {
+    display: grid;
+  }
+
+  .compass-stage {
+    width: min(76vw, 250px);
+  }
+
+  h1,
+  .display {
+    font-size: clamp(1.25rem, 8vw, 2rem);
+  }
+
+  .lead,
+  .body-copy {
+    font-size: clamp(0.8rem, 4.5vw, 1rem);
+  }
+
+  .compass-readout {
+    width: 74%;
+  }
+
+  .compass-readout .small-copy {
+    font-size: clamp(0.5rem, 4vw, 0.875rem);
+    word-break: keep-all;
   }
 }

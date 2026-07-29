@@ -1,38 +1,79 @@
+import { PROJECTION_EXAMPLES_V1 } from "@somewhere/contracts";
 import { createSensorController } from "../application/controller";
 import { createDiagnosticTrace } from "../application/diagnostics";
+import { createV2JourneyApplication } from "../application/journey-application";
+import { createV2Store } from "../application/v2-store";
 import type { SomewhereComposition } from "../composition";
-import curatedDestinationInput from "../data/curated-destinations.json";
-import { type DestinationBundle, parseDestinationBundle } from "../platform/curated-destinations";
-import { createJourneyApplication } from "./deterministic-journey-application";
 import { createE2eHarness } from "./e2e-harness";
 import { createScriptedSensorRig } from "./fakes";
+import { DeterministicV2Api, MemoryFeedbackCapabilityStore } from "./v2-fakes";
 
-function parsedBundle(): DestinationBundle {
-  const result = parseDestinationBundle(curatedDestinationInput);
-  if (!result.ok) {
-    throw new Error(`Curated destinations are invalid: ${result.issues.join("; ")}`);
+const ENDPOINT = { latitude: 37.545_033_8, longitude: 127.039_617_2 } as const;
+
+function readyProjection() {
+  const ready = PROJECTION_EXAMPLES_V1.find(
+    (candidate) => candidate.phase === "ready" && !candidate.revealed,
+  );
+  if (ready === undefined) {
+    throw new TypeError("Ready projection fixture is missing");
   }
-  return result.value;
+  return ready;
 }
 
 export function createDeterministicTestComposition(): SomewhereComposition {
   const rig = createScriptedSensorRig();
-  const bundle = parsedBundle();
   const sensors = createSensorController(rig.ports);
-  const application = createJourneyApplication({
+  const api = new DeterministicV2Api(readyProjection(), true);
+  const store = createV2Store({
+    api,
+    feedbackCapabilities: new MemoryFeedbackCapabilityStore(),
+    idempotencyKeys: { next: () => `ik_v1.${"A".repeat(43)}` },
+    now: rig.nowMs,
+  });
+  const application = createV2JourneyApplication({
     sensors,
-    bundle,
+    store,
+    diagnostics: createDiagnosticTrace({ buildSha: "e2e", policyVersion: "server-v1" }),
     clock: rig.ports.clock,
     scheduler: rig.ports.scheduler,
-    random: { nextUnit: () => 0 },
-    todayIsoDate: () => "2026-07-28",
-    diagnostics: createDiagnosticTrace({
-      buildSha: "e2e",
-      policyVersion: "field-v1",
+    createBody: (location) => ({
+      contractVersion: 1,
+      constraints: {
+        accessibility: [],
+        budgetBand: "medium",
+        category: "cafe",
+        dietary: [],
+        maxWalkMinutes: 30,
+      },
+      disclosureLevel: "standard",
+      origin: {
+        accuracyM: location.accuracyM,
+        capturedAt: location.capturedAtMs,
+        latitude: location.latitude,
+        longitude: location.longitude,
+      },
+      recoveryCapability: null,
     }),
   });
   return {
     application,
-    testApi: createE2eHarness(application, rig, bundle),
+    testApi: createE2eHarness(
+      application,
+      rig,
+      ENDPOINT,
+      () => api.calls,
+      async () => {
+        if (api.projection.phase !== "finding" && api.projection.phase !== "expired") {
+          api.projection = {
+            ...api.projection,
+            disclosure: {
+              ...api.projection.disclosure,
+              representativeCategories: ["<img src=x onerror=alert(1)>"],
+            },
+          };
+          await store.refresh();
+        }
+      },
+    ),
   };
 }

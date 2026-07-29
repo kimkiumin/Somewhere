@@ -1,7 +1,7 @@
 .compass-stage {
   position: relative;
   display: grid;
-  width: min(100%, 320px);
+  width: min(100%, var(--size-compass));
   aspect-ratio: 1;
   place-items: center;
   justify-self: center;
@@ -74,8 +74,10 @@
   bottom: 16%;
   z-index: 4;
   display: grid;
+  width: 74%;
   justify-items: center;
   gap: var(--space-1);
+  text-align: center;
 }
 
 .distance {

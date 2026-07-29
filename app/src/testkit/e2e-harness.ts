@@ -1,10 +1,11 @@
 import type { JourneyApplication } from "../application/journey-application";
 import type { PermissionOutcome } from "../application/ports";
-import type { DestinationBundle } from "../platform/curated-destinations";
 import type { ScriptedSensorRig } from "./fakes";
+import type { V2ApiCall } from "./v2-fakes";
 
 export type SomewhereTestApi = {
   readonly emitDistance: (distanceM: number, accuracyM: number) => void;
+  readonly emitOrigin: () => void;
   readonly emitLocationOnly: (distanceM: number, accuracyM: number) => void;
   readonly emitHeadingOnly: (trueDegrees: number, accuracyDeg: number) => void;
   readonly setVisibility: (state: string) => void;
@@ -12,6 +13,8 @@ export type SomewhereTestApi = {
   readonly releaseWakeLock: () => void;
   readonly advanceMs: (milliseconds: number) => void;
   readonly snapshot: () => ReturnType<JourneyApplication["snapshot"]>;
+  readonly calls: () => readonly V2ApiCall[];
+  readonly injectMaliciousDisclosure: () => Promise<void>;
 };
 
 function coordinatesNorthOf(
@@ -28,7 +31,9 @@ function coordinatesNorthOf(
 export function createE2eHarness(
   application: JourneyApplication,
   sensors: ScriptedSensorRig,
-  bundle: DestinationBundle,
+  endpoint: Readonly<{ latitude: number; longitude: number }>,
+  calls: () => readonly V2ApiCall[],
+  injectMaliciousDisclosure: () => Promise<void>,
 ): SomewhereTestApi {
   function selectedCoordinates(): { readonly latitude: number; readonly longitude: number } {
     const snapshot = application.snapshot();
@@ -36,13 +41,7 @@ export function createE2eHarness(
     if (journey.phase === "idle" || journey.phase === "selecting") {
       throw new Error("A destination must be selected before emitting a scripted walk.");
     }
-    const selected = bundle.destinations.find(
-      (destination) => destination.id === journey.destinationId,
-    );
-    if (selected === undefined) {
-      throw new Error("Selected scripted destination is missing.");
-    }
-    return selected.coordinates;
+    return endpoint;
   }
 
   function locationAtDistance(distanceM: number, accuracyM: number): void {
@@ -58,6 +57,13 @@ export function createE2eHarness(
   }
 
   return {
+    emitOrigin() {
+      sensors.emitLocation({
+        coordinates: coordinatesNorthOf(endpoint.latitude, endpoint.longitude, 1_000),
+        accuracyM: 8,
+        capturedAtMs: sensors.nowMs(),
+      });
+    },
     emitDistance(distanceM, accuracyM) {
       locationAtDistance(distanceM, accuracyM);
       sensors.emitHeading({
@@ -94,5 +100,7 @@ export function createE2eHarness(
     releaseWakeLock: () => sensors.releaseWakeLockFromSystem(),
     advanceMs: (milliseconds) => sensors.advanceMs(milliseconds),
     snapshot: () => application.snapshot(),
+    calls,
+    injectMaliciousDisclosure,
   };
 }

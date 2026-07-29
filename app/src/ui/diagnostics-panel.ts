@@ -1,42 +1,42 @@
 import type { JourneyApplicationSnapshot } from "../application/journey-application";
 import { actionButton, element } from "./dom-primitives";
-import type { UiState } from "./render";
 
-export function diagnosticsPanel(
-  snapshot: JourneyApplicationSnapshot,
-  uiState: UiState,
-): HTMLElement {
-  const panel = element("section", "panel diagnostics diagnostics-panel");
+export function diagnosticsPanel(snapshot: JourneyApplicationSnapshot): HTMLElement {
+  const panel = element("section", "panel diagnostics");
   panel.setAttribute("aria-labelledby", "diagnostics-title");
-  const heading = element("div", "section-heading");
-  const title = element("h2", undefined, "Field diagnostics");
+  const title = element("h1", undefined, "Field diagnostics");
   title.id = "diagnostics-title";
-  heading.append(
-    title,
-    actionButton("Close", "close-diagnostics", "button--quiet button--compact"),
-  );
   panel.append(
-    heading,
+    element("p", "eyebrow", "Somewhere field surface"),
+    title,
     element(
       "p",
       "small-copy privacy-warning",
-      "Sensitive: downloaded traces contain exact coordinates. Nothing is uploaded or saved automatically.",
+      "Sensitive: a local export may contain exact coordinates. Nothing uploads automatically.",
     ),
   );
-
+  const location =
+    snapshot.sensors.location.status === "live"
+      ? `live · ±${Math.round(snapshot.sensors.location.sample.accuracyM)} m`
+      : snapshot.sensors.location.status;
+  const heading =
+    snapshot.sensors.heading.status === "live"
+      ? `live · ${snapshot.sensors.heading.sample.reference} · ${
+          snapshot.sensors.heading.sample.accuracyDeg === null
+            ? "accuracy unknown"
+            : `±${Math.round(snapshot.sensors.heading.sample.accuracyDeg)}°`
+        }`
+      : snapshot.sensors.heading.status;
+  const guidance =
+    snapshot.guidance.status === "live" && snapshot.guidance.distanceM !== null
+      ? `live · ${Math.round(snapshot.guidance.distanceM)} m`
+      : snapshot.guidance.status;
   for (const [label, value] of [
-    [
-      "Location",
-      snapshot.sensors.location.status === "live"
-        ? `Live · ±${Math.round(snapshot.sensors.location.sample.accuracyM)} m`
-        : snapshot.sensors.location.status,
-    ],
-    [
-      "Heading",
-      snapshot.sensors.heading.status === "live"
-        ? `Live · ${snapshot.sensors.heading.sample.reference}`
-        : snapshot.sensors.heading.status,
-    ],
+    ["Safe phase", snapshot.projection?.phase ?? snapshot.journey.phase],
+    ["Location", location],
+    ["Heading", heading],
+    ["Guidance", guidance],
+    ["Visibility", snapshot.sensors.visibility],
     ["Wake Lock", snapshot.sensors.wakeLock.status],
     [
       "Subscriptions",
@@ -48,30 +48,12 @@ export function diagnosticsPanel(
     row.append(element("span", "muted", label), element("strong", undefined, value));
     panel.append(row);
   }
-
-  const label = element("label", "stack small-copy");
-  label.htmlFor = "environment-label";
-  label.append(element("span", "label muted", "Test environment"));
-  const select = element("select", "select");
-  select.id = "environment-label";
-  select.dataset.action = "environment";
-  for (const [value, text] of [
-    ["other", "Not labelled"],
-    ["open-sky", "Open sky"],
-    ["urban-canyon", "Urban / building canyon"],
-    ["indoor", "Indoor diagnostics"],
-  ] as const) {
-    const option = element("option", undefined, text);
-    option.value = value;
-    option.selected = uiState.environmentLabel === value;
-    select.append(option);
-  }
-  label.append(select);
-  panel.append(label);
   const actions = element("div", "button-row");
   actions.append(
-    actionButton("Download trace", "download-diagnostics", "button--secondary"),
-    actionButton("Discard", "discard-diagnostics", "button--caution"),
+    actionButton("Start sensors", "field-start", "button--primary"),
+    actionButton("Retry", "field-retry"),
+    actionButton("Export local JSON", "field-export"),
+    actionButton("Discard trace", "field-discard", "button--caution"),
   );
   panel.append(actions);
   return panel;

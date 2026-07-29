@@ -1,6 +1,11 @@
-import type { DiagnosticSessionMetadata } from "./application/diagnostics";
-import type { JourneyApplication } from "./application/journey-application";
+import type {
+  JourneyApplication,
+  JourneyPreferences,
+  ReactionStopReason,
+  RouteRecoveryChoice,
+} from "./application/journey-application";
 import { createPwaUpdateController, type PwaUpdateController } from "./application/pwa-update";
+import type { ReactionBody } from "./application/v2-api";
 import { createProductionComposition, createTestComposition } from "./composition";
 import { createBrowserPwaUpdateSource } from "./platform/browser-pwa";
 import { createScriptedPwaUpdateSource } from "./testkit/pwa-update-source";
@@ -16,63 +21,100 @@ function requireAppRoot(): HTMLElement {
   return node;
 }
 
-const root = requireAppRoot();
-
 function normalizedError(error: unknown): Error {
-  return error instanceof Error ? error : new Error("An unexpected startup error occurred.");
+  return error instanceof Error ? error : new Error("잠시 뒤 다시 시도해 주세요.");
 }
 
-function renderFatal(error: Error): void {
+function renderFatal(root: HTMLElement, error: Error): void {
   const main = document.createElement("main");
   main.className = "app-shell";
   const heading = document.createElement("h1");
-  heading.textContent = "Somewhere needs a reset.";
+  heading.textContent = "연결을 다시 확인해 주세요.";
   const copy = document.createElement("p");
-  copy.className = "lead muted";
+  copy.className = "body-copy muted";
   copy.textContent = error.message;
   const reload = document.createElement("button");
   reload.className = "button button--primary";
   reload.type = "button";
-  reload.textContent = "Reload";
+  reload.textContent = "다시 불러오기";
   reload.addEventListener("click", () => window.location.reload());
   main.append(heading, copy, reload);
   root.replaceChildren(main);
 }
 
-function browserMode(): DiagnosticSessionMetadata["browserMode"] {
-  return window.matchMedia("(display-mode: standalone)").matches ? "home-screen" : "other";
+function preferences(root: HTMLElement): JourneyPreferences {
+  const form = root.querySelector<HTMLFormElement>("#constraints-form");
+  const values = form === null ? new FormData() : new FormData(form);
+  const category = values.get("category") === "restaurant" ? "restaurant" : "cafe";
+  const budgetValue = values.get("budgetBand");
+  const budgetBand = budgetValue === "low" || budgetValue === "high" ? budgetValue : "medium";
+  const walkValue = Number(values.get("maxWalkMinutes"));
+  const maxWalkMinutes = Number.isInteger(walkValue) && walkValue > 0 ? walkValue : 30;
+  return { budgetBand, category, disclosureLevel: "standard", maxWalkMinutes };
 }
 
-function downloadTrace(application: JourneyApplication, uiState: UiState): void {
-  const json = application.exportDiagnostics({
-    browserMode: browserMode(),
-    environmentLabel: uiState.environmentLabel,
-    userAgent: navigator.userAgent,
-  });
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `somewhere-field-trace-${new Date().toISOString()}.json`;
-  anchor.click();
-  queueMicrotask(() => URL.revokeObjectURL(url));
+function stopReason(value: string | undefined): ReactionStopReason | null {
+  switch (value) {
+    case "safety-concern":
+    case "route-or-sensor":
+    case "hard-condition":
+    case "venue-situation":
+    case "changed-mind":
+    case "schedule-changed":
+      return value;
+    default:
+      return null;
+  }
 }
 
-function mount(application: JourneyApplication, pwaUpdates: PwaUpdateController): void {
+function recoveryChoice(value: string | undefined): RouteRecoveryChoice | null {
+  switch (value) {
+    case "recalibrate":
+    case "reroute":
+    case "cached-route":
+    case "external-map":
+      return value;
+    default:
+      return null;
+  }
+}
+
+function reaction(value: string | undefined): ReactionBody["reaction"] | null {
+  switch (value) {
+    case "dislike":
+    case "like":
+    case "love":
+    case "did_not_visit":
+      return value;
+    default:
+      return null;
+  }
+}
+
+function mount(
+  root: HTMLElement,
+  application: JourneyApplication,
+  pwaUpdates: PwaUpdateController,
+): void {
   let uiState: UiState = {
-    diagnosticsOpen: false,
-    environmentLabel: "other",
+    setup: "start",
+    stopPending: false,
+    recoveryIntent: null,
+    feedbackPrompt: null,
+    routeRecoveryOpen: false,
     updateAvailable: pwaUpdates.snapshot().status === "available",
   };
   let lastRenderKey = "";
-  let lastJourneyPhase = application.snapshot().journey.phase;
-  let focusIntent: "phase-heading" | "diagnostics-heading" | "diagnostics-opener" | null = null;
+  let feedbackTimer: number | null = null;
+  let focusHeading = false;
   const animator = createCompassAnimator(root);
 
   function render(force = false): void {
     const snapshot = application.snapshot();
     animator.update(
-      snapshot.guidance.status === "live" ? snapshot.guidance.relativeAngleDeg : null,
+      snapshot.guidance.status === "live" && !uiState.stopPending
+        ? snapshot.guidance.relativeAngleDeg
+        : null,
     );
     const nextKey = renderKey(snapshot, uiState);
     if (!force && nextKey === lastRenderKey) {
@@ -82,53 +124,56 @@ function mount(application: JourneyApplication, pwaUpdates: PwaUpdateController)
       document.activeElement instanceof HTMLElement
         ? document.activeElement.dataset.action
         : undefined;
-    const focusedHeading =
-      document.activeElement instanceof HTMLHeadingElement
-        ? document.activeElement.textContent
-        : null;
-    const phaseChanged = snapshot.journey.phase !== lastJourneyPhase;
     renderSomewhere(root, snapshot, uiState);
     animator.applyCurrent();
-    lastRenderKey = nextKey;
-    lastJourneyPhase = snapshot.journey.phase;
-    let focusTarget: HTMLElement | null = null;
-    if (focusIntent === "phase-heading" && phaseChanged) {
-      focusTarget = root.querySelector("h1");
-    } else if (focusIntent === "diagnostics-heading") {
-      focusTarget = root.querySelector("#diagnostics-title");
-    } else if (focusIntent === "diagnostics-opener") {
-      focusTarget = root.querySelector('[data-action="open-diagnostics"]');
-    }
-    if (focusTarget !== null) {
-      focusTarget.tabIndex = -1;
-      focusTarget.focus({ preventScroll: true });
-      focusIntent = null;
+    if (focusHeading) {
+      const heading = root.querySelector<HTMLElement>("h1");
+      if (heading !== null) {
+        heading.tabIndex = -1;
+        heading.focus({ preventScroll: true });
+      }
+      focusHeading = false;
     } else if (focusedAction !== undefined) {
       root
         .querySelector<HTMLElement>(`[data-action="${focusedAction}"]`)
         ?.focus({ preventScroll: true });
-    } else if (focusedHeading !== null) {
-      const replacement = [...root.querySelectorAll<HTMLElement>("h1, h2")].find(
-        (heading) => heading.textContent === focusedHeading,
-      );
-      if (replacement !== undefined) {
-        replacement.tabIndex = -1;
-        replacement.focus({ preventScroll: true });
-      }
     }
+    lastRenderKey = nextKey;
   }
 
+  const fail = (error: unknown) => renderFatal(root, normalizedError(error));
   const stopApplication = application.subscribe((snapshot) => {
+    if (snapshot.projection?.phase === "paused") {
+      uiState = { ...uiState, stopPending: false };
+    }
     pwaUpdates.setJourneyPhase(snapshot.journey.phase);
     render();
+    if (
+      feedbackTimer === null &&
+      snapshot.projection?.phase === "arrived" &&
+      uiState.feedbackPrompt === null
+    ) {
+      feedbackTimer = window.setTimeout(
+        () => {
+          application
+            .eligibleFeedback()
+            .then((prompt) => {
+              if (prompt !== null) {
+                uiState = { ...uiState, feedbackPrompt: prompt };
+                render(true);
+              }
+            })
+            .catch(() => undefined);
+        },
+        Math.max(0, snapshot.projection.feedbackDueAt - Date.now()),
+      );
+    }
   });
   const stopPwaUpdates = pwaUpdates.subscribe((snapshot) => {
-    uiState = {
-      ...uiState,
-      updateAvailable: snapshot.status === "available",
-    };
+    uiState = { ...uiState, updateAvailable: snapshot.status === "available" };
     render(true);
   });
+
   root.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) {
       return;
@@ -137,69 +182,102 @@ function mount(application: JourneyApplication, pwaUpdates: PwaUpdateController)
     if (button === null) {
       return;
     }
+    focusHeading = true;
     switch (button.dataset.action) {
-      case "start":
-        focusIntent = "phase-heading";
-        application.startAdventure().catch((error: unknown) => renderFatal(normalizedError(error)));
+      case "open-constraints":
+        uiState = { ...uiState, setup: "constraints" };
+        render(true);
         break;
-      case "begin":
-        focusIntent = "phase-heading";
+      case "find": {
+        const selectedPreferences = preferences(root);
+        uiState = { ...uiState, setup: "finding" };
+        render(true);
+        application.startAdventure(selectedPreferences).catch(fail);
+        break;
+      }
+      case "commit":
         application.beginWalk();
         break;
-      case "retry":
-        application.retrySignals().catch((error: unknown) => renderFatal(normalizedError(error)));
-        break;
       case "reveal":
-        focusIntent = "phase-heading";
         application.reveal();
         break;
-      case "give-up":
-        focusIntent = "phase-heading";
-        application.giveUp();
+      case "stop":
+        uiState = { ...uiState, stopPending: true };
+        render(true);
+        application.stop().catch(fail);
         break;
-      case "reroll":
-        application.reroll();
+      case "cancel-stop":
+        application.cancelStop().catch(fail);
         break;
+      case "confirm-stop":
+        application.confirmStop().catch(fail);
+        break;
+      case "stop-reason": {
+        const reason = stopReason(button.dataset.value);
+        if (reason !== null) {
+          application.recordStopReason(reason).catch(fail);
+        }
+        break;
+      }
+      case "skip-reason":
+        application.recordStopReason("skip").catch(fail);
+        break;
+      case "open-route-recovery":
+        uiState = { ...uiState, routeRecoveryOpen: true };
+        render(true);
+        break;
+      case "close-route-recovery":
+        uiState = { ...uiState, routeRecoveryOpen: false };
+        render(true);
+        break;
+      case "route-recover": {
+        const choice = recoveryChoice(button.dataset.value);
+        if (choice !== null) {
+          uiState = { ...uiState, routeRecoveryOpen: false };
+          application.recoverRoute(choice).catch(fail);
+        }
+        break;
+      }
+      case "request-recovery":
+        application
+          .requestRecovery()
+          .then((intent) => {
+            uiState = { ...uiState, recoveryIntent: intent };
+            render(true);
+          })
+          .catch(fail);
+        break;
+      case "confirm-recovery":
+        if (uiState.recoveryIntent !== null) {
+          application
+            .confirmRecovery(uiState.recoveryIntent, uiState.recoveryIntent.requiredReviewFields)
+            .then(() => {
+              uiState = { ...uiState, recoveryIntent: null };
+              render(true);
+            })
+            .catch(fail);
+        }
+        break;
+      case "reaction": {
+        const selectedReaction = reaction(button.dataset.value);
+        const feedbackId = button.dataset.feedbackId;
+        if (selectedReaction !== null && feedbackId !== undefined) {
+          application
+            .recordReaction(feedbackId, selectedReaction)
+            .then(() => {
+              uiState = { ...uiState, feedbackPrompt: null };
+              render(true);
+            })
+            .catch(fail);
+        }
+        break;
+      }
       case "restart":
         window.location.reload();
         break;
-      case "open-diagnostics":
-        focusIntent = "diagnostics-heading";
-        uiState = { ...uiState, diagnosticsOpen: true };
-        render(true);
-        break;
-      case "close-diagnostics":
-        focusIntent = "diagnostics-opener";
-        uiState = { ...uiState, diagnosticsOpen: false };
-        render(true);
-        break;
-      case "download-diagnostics":
-        downloadTrace(application, uiState);
-        break;
-      case "discard-diagnostics":
-        application.discardDiagnostics();
-        break;
       case "accept-update":
-        pwaUpdates.accept().catch((error: unknown) => renderFatal(normalizedError(error)));
+        pwaUpdates.accept().catch(fail);
         break;
-    }
-  });
-  root.addEventListener("change", (event) => {
-    if (!(event.target instanceof HTMLSelectElement)) {
-      return;
-    }
-    if (event.target.dataset.action !== "environment") {
-      return;
-    }
-    const value = event.target.value;
-    if (
-      value === "open-sky" ||
-      value === "urban-canyon" ||
-      value === "indoor" ||
-      value === "other"
-    ) {
-      uiState = { ...uiState, environmentLabel: value };
-      render(true);
     }
   });
   window.addEventListener(
@@ -208,46 +286,48 @@ function mount(application: JourneyApplication, pwaUpdates: PwaUpdateController)
       stopApplication();
       stopPwaUpdates();
       animator.destroy();
+      if (feedbackTimer !== null) {
+        window.clearTimeout(feedbackTimer);
+      }
       application.destroy().catch(() => undefined);
     },
     { once: true },
   );
   render(true);
+  application
+    .eligibleFeedback()
+    .then((prompt) => {
+      if (prompt !== null) {
+        uiState = { ...uiState, feedbackPrompt: prompt };
+        render(true);
+      }
+    })
+    .catch(() => undefined);
 }
 
 function bootstrap(): void {
+  const root = requireAppRoot();
   if (import.meta.env.MODE === "test-harness") {
     const composition = createTestComposition();
     if (composition.testApi === null) {
       throw new Error("Test harness composition is missing its control API.");
     }
-    const scriptedUpdates = createScriptedPwaUpdateSource();
-    createBrowserPwaUpdateSource().listen(() => undefined);
-    Reflect.set(composition.testApi, "triggerUpdate", () => scriptedUpdates.emitReady());
+    const updates = createScriptedPwaUpdateSource();
+    Reflect.set(composition.testApi, "triggerUpdate", () => updates.emitReady());
     Reflect.set(window, "somewhereTest", composition.testApi);
-    mount(
-      composition.application,
-      createPwaUpdateController(scriptedUpdates, composition.application.snapshot().journey.phase),
-    );
+    mount(root, composition.application, createPwaUpdateController(updates, "idle"));
     return;
   }
-
   const composition = createProductionComposition();
   mount(
+    root,
     composition.application,
-    createPwaUpdateController(
-      createBrowserPwaUpdateSource(),
-      composition.application.snapshot().journey.phase,
-    ),
+    createPwaUpdateController(createBrowserPwaUpdateSource(), "idle"),
   );
 }
 
 try {
   bootstrap();
 } catch (error) {
-  if (error instanceof Error) {
-    renderFatal(error);
-  } else {
-    renderFatal(new Error("An unexpected startup error occurred."));
-  }
+  renderFatal(requireAppRoot(), normalizedError(error));
 }
