@@ -1,9 +1,7 @@
-import { DurableObject } from "cloudflare:workers";
-
 import { parseDeploymentEnvironment } from "./environment";
 import { handleRequest } from "./http";
 
-export class JourneyDurableObject extends DurableObject<Env> {}
+export { JourneyDurableObject } from "./journey/durable-object";
 
 const worker = {
   fetch(request: Request, env: Env): Response | Promise<Response> {
