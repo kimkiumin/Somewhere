@@ -53,10 +53,15 @@ export interface Clock {
   nowMs(): number;
 }
 
+export interface DeadlineScheduler {
+  schedule(delayMs: number, callback: () => void): Unsubscribe;
+}
+
 export type SensorControllerPorts = {
   readonly location: LocationSource;
   readonly heading: HeadingSource;
   readonly visibility: VisibilitySource;
   readonly wakeLock: WakeLockSource;
   readonly clock: Clock;
+  readonly scheduler: DeadlineScheduler;
 };

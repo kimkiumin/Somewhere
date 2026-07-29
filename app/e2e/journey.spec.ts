@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { harnessCommand } from "./harness";
+import { harnessCommand, harnessSnapshot } from "./harness";
 
 test("completes a hidden destination journey without leaking identity", async ({ page }) => {
   await page.goto(".");
@@ -26,12 +26,21 @@ test("completes a hidden destination journey without leaking identity", async ({
   await expect(page.getByRole("button", { name: "Reveal destination" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Reveal", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Give up", exact: true })).toBeVisible();
+  const arrived = await harnessSnapshot(page);
+  expect(arrived.guidance.status).toBe("inactive");
+  expect(arrived.sensors.subscriptionCounts).toMatchObject({ location: 0, heading: 0 });
+  const terminalEventCount = arrived.diagnosticEventCount;
+  await harnessCommand(page, "emitDistance", 5, 5);
+  expect((await harnessSnapshot(page)).diagnosticEventCount).toBe(terminalEventCount);
   await page.getByRole("button", { name: "Reveal destination" }).click();
-  await expect(page.getByRole("heading", { name: "가족마당" })).toBeVisible();
+  const revealedName = page.getByRole("heading", { name: "가족마당" });
+  await expect(revealedName).toBeVisible();
+  await expect(revealedName).toHaveAttribute("lang", "ko");
 });
 
 test("keeps Reveal and Give Up in the first viewport on target phones", async ({ page }) => {
   for (const viewport of [
+    { width: 375, height: 812 },
     { width: 430, height: 932 },
     { width: 390, height: 844 },
   ]) {

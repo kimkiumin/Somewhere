@@ -7,6 +7,7 @@ import {
 
 export type NavigationPolicy = {
   readonly locationMaxAgeMs: number;
+  readonly headingMaxAgeMs: number;
   readonly maxGuidanceAccuracyM: number;
   readonly nearEnterM: number;
   readonly nearExitM: number;
@@ -19,6 +20,7 @@ export type NavigationPolicy = {
 
 export const INITIAL_NAVIGATION_POLICY = {
   locationMaxAgeMs: 10_000,
+  headingMaxAgeMs: 10_000,
   maxGuidanceAccuracyM: 50,
   nearEnterM: 120,
   nearExitM: 150,
@@ -48,6 +50,7 @@ export type LocationProblem = "location-invalid" | "location-stale" | "location-
 
 export type HeadingProblem =
   | "heading-invalid"
+  | "heading-stale"
   | "heading-uncalibrated"
   | "heading-inaccurate"
   | "declination-unavailable";
@@ -87,15 +90,21 @@ export function evaluateLocation(
 
 export function evaluateHeading(
   sample: HeadingSample,
+  nowMs: number,
   declinationDegreesEast: number | null,
   policy: NavigationPolicy,
 ): HeadingEvaluation {
   if (
     !Number.isFinite(sample.degrees) ||
     !Number.isFinite(sample.capturedAtMs) ||
+    !Number.isFinite(nowMs) ||
+    sample.capturedAtMs > nowMs ||
     (sample.accuracyDeg !== null && !Number.isFinite(sample.accuracyDeg))
   ) {
     return { status: "invalid", reason: "heading-invalid" };
+  }
+  if (nowMs - sample.capturedAtMs > policy.headingMaxAgeMs) {
+    return { status: "invalid", reason: "heading-stale" };
   }
   if (sample.accuracyDeg === -1) {
     return { status: "invalid", reason: "heading-uncalibrated" };

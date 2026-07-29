@@ -36,6 +36,7 @@ describe("signal quality", () => {
         accuracyDeg: 8,
         capturedAtMs: 1_000,
       },
+      1_000,
       -9.011_45,
       INITIAL_NAVIGATION_POLICY,
     );
@@ -51,6 +52,7 @@ describe("signal quality", () => {
           accuracyDeg: -1,
           capturedAtMs: 1_000,
         },
+        1_000,
         -9.011_45,
         INITIAL_NAVIGATION_POLICY,
       ),
@@ -63,10 +65,33 @@ describe("signal quality", () => {
           accuracyDeg: null,
           capturedAtMs: 1_000,
         },
+        1_000,
         null,
         INITIAL_NAVIGATION_POLICY,
       ),
     ).toEqual({ status: "valid", trueDegrees: 275 });
+  });
+
+  test("keeps heading fresh at the boundary and expires it one millisecond later", () => {
+    const sample = {
+      degrees: 275,
+      reference: "true" as const,
+      accuracyDeg: 8,
+      capturedAtMs: 1_000,
+    };
+
+    expect(evaluateHeading(sample, 11_000, null, INITIAL_NAVIGATION_POLICY)).toEqual({
+      status: "valid",
+      trueDegrees: 275,
+    });
+    expect(evaluateHeading(sample, 11_001, null, INITIAL_NAVIGATION_POLICY)).toEqual({
+      status: "invalid",
+      reason: "heading-stale",
+    });
+    expect(evaluateHeading(sample, 999, null, INITIAL_NAVIGATION_POLICY)).toEqual({
+      status: "invalid",
+      reason: "heading-invalid",
+    });
   });
 });
 

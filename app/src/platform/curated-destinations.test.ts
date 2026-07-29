@@ -30,6 +30,7 @@ function validBundleInput() {
         estimatedMinutes: 5,
         reveal: {
           name: "가족마당",
+          language: "ko",
           category: "Open lawn",
           description: "A broad lawn inside Seoul Forest.",
         },
@@ -46,6 +47,7 @@ function validBundleInput() {
         estimatedMinutes: 7,
         reveal: {
           name: "거울연못",
+          language: "ko",
           category: "Pond",
           description: "A reflective pond in Seoul Forest.",
         },
@@ -115,6 +117,24 @@ describe("curated destination boundary", () => {
     };
 
     expect(parseDestinationBundle(outside).ok).toBe(false);
+  });
+
+  test("rejects missing or unsupported revealed-name language metadata", () => {
+    const missing = validBundleInput();
+    const missingReveal = missing.destinations[0]?.reveal;
+    if (missingReveal === undefined) {
+      throw new Error("Fixture requires a revealed destination.");
+    }
+    Reflect.deleteProperty(missingReveal, "language");
+    expect(parseDestinationBundle(missing).ok).toBe(false);
+
+    const unsupported = validBundleInput();
+    const unsupportedReveal = unsupported.destinations[0]?.reveal;
+    if (unsupportedReveal === undefined) {
+      throw new Error("Fixture requires a revealed destination.");
+    }
+    Reflect.set(unsupportedReveal, "language", "fr");
+    expect(parseDestinationBundle(unsupported).ok).toBe(false);
   });
 
   test("reroll excludes the current destination deterministically", () => {

@@ -65,6 +65,8 @@ function mount(application: JourneyApplication, pwaUpdates: PwaUpdateController)
     updateAvailable: pwaUpdates.snapshot().status === "available",
   };
   let lastRenderKey = "";
+  let lastJourneyPhase = application.snapshot().journey.phase;
+  let focusIntent: "phase-heading" | "diagnostics-heading" | "diagnostics-opener" | null = null;
   const animator = createCompassAnimator(root);
 
   function render(force = false): void {
@@ -80,13 +82,39 @@ function mount(application: JourneyApplication, pwaUpdates: PwaUpdateController)
       document.activeElement instanceof HTMLElement
         ? document.activeElement.dataset.action
         : undefined;
+    const focusedHeading =
+      document.activeElement instanceof HTMLHeadingElement
+        ? document.activeElement.textContent
+        : null;
+    const phaseChanged = snapshot.journey.phase !== lastJourneyPhase;
     renderSomewhere(root, snapshot, uiState);
     animator.applyCurrent();
     lastRenderKey = nextKey;
-    if (focusedAction !== undefined) {
+    lastJourneyPhase = snapshot.journey.phase;
+    let focusTarget: HTMLElement | null = null;
+    if (focusIntent === "phase-heading" && phaseChanged) {
+      focusTarget = root.querySelector("h1");
+    } else if (focusIntent === "diagnostics-heading") {
+      focusTarget = root.querySelector("#diagnostics-title");
+    } else if (focusIntent === "diagnostics-opener") {
+      focusTarget = root.querySelector('[data-action="open-diagnostics"]');
+    }
+    if (focusTarget !== null) {
+      focusTarget.tabIndex = -1;
+      focusTarget.focus({ preventScroll: true });
+      focusIntent = null;
+    } else if (focusedAction !== undefined) {
       root
         .querySelector<HTMLElement>(`[data-action="${focusedAction}"]`)
         ?.focus({ preventScroll: true });
+    } else if (focusedHeading !== null) {
+      const replacement = [...root.querySelectorAll<HTMLElement>("h1, h2")].find(
+        (heading) => heading.textContent === focusedHeading,
+      );
+      if (replacement !== undefined) {
+        replacement.tabIndex = -1;
+        replacement.focus({ preventScroll: true });
+      }
     }
   }
 
@@ -111,18 +139,22 @@ function mount(application: JourneyApplication, pwaUpdates: PwaUpdateController)
     }
     switch (button.dataset.action) {
       case "start":
+        focusIntent = "phase-heading";
         application.startAdventure().catch((error: unknown) => renderFatal(normalizedError(error)));
         break;
       case "begin":
+        focusIntent = "phase-heading";
         application.beginWalk();
         break;
       case "retry":
         application.retrySignals().catch((error: unknown) => renderFatal(normalizedError(error)));
         break;
       case "reveal":
+        focusIntent = "phase-heading";
         application.reveal();
         break;
       case "give-up":
+        focusIntent = "phase-heading";
         application.giveUp();
         break;
       case "reroll":
@@ -132,10 +164,12 @@ function mount(application: JourneyApplication, pwaUpdates: PwaUpdateController)
         window.location.reload();
         break;
       case "open-diagnostics":
+        focusIntent = "diagnostics-heading";
         uiState = { ...uiState, diagnosticsOpen: true };
         render(true);
         break;
       case "close-diagnostics":
+        focusIntent = "diagnostics-opener";
         uiState = { ...uiState, diagnosticsOpen: false };
         render(true);
         break;

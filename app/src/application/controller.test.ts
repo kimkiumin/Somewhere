@@ -21,6 +21,7 @@ type FakeSensors = {
   readonly wakeReleaseCalls: () => number;
   readonly setPermission: (outcome: PermissionOutcome) => void;
   readonly emitVisibility: (state: VisibilityState) => void;
+  readonly emitWakeRelease: () => void;
   readonly emitLocation: LocationSource["subscribe"] extends (
     onSample: infer Listener,
     onFailure: (failure: LocationFailure) => void,
@@ -46,11 +47,13 @@ function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value
 function fakeSensors(
   permission: PermissionOutcome = { status: "granted" },
   acquireWakeLock: () => Promise<WakeLockOutcome> = () => Promise.resolve({ status: "acquired" }),
+  releaseWakeLock: () => Promise<void> = () => Promise.resolve(),
 ): FakeSensors {
   let permissionOutcome = permission;
   let locationListener: Parameters<LocationSource["subscribe"]>[0] | null = null;
   let headingListener: Parameters<HeadingSource["subscribe"]>[0] | null = null;
   let visibilityListener: ((state: VisibilityState) => void) | null = null;
+  let wakeReleaseListener: (() => void) | null = null;
   let activeLocation = 0;
   let activeHeading = 0;
   let permissionCallCount = 0;
@@ -103,9 +106,14 @@ function fakeSensors(
     },
     release() {
       wakeReleaseCallCount += 1;
-      return Promise.resolve();
+      return releaseWakeLock();
     },
-    subscribeToRelease: () => () => undefined,
+    subscribeToRelease(listener) {
+      wakeReleaseListener = listener;
+      return () => {
+        wakeReleaseListener = null;
+      };
+    },
   };
 
   return {
@@ -115,6 +123,9 @@ function fakeSensors(
       visibility,
       wakeLock,
       clock: { nowMs: () => 10_000 },
+      scheduler: {
+        schedule: () => () => undefined,
+      },
     },
     activeCounts: () => ({ location: activeLocation, heading: activeHeading }),
     permissionCalls: () => permissionCallCount,
@@ -127,6 +138,9 @@ function fakeSensors(
       if (visibilityListener !== null) {
         visibilityListener(state);
       }
+    },
+    emitWakeRelease() {
+      wakeReleaseListener?.();
     },
     emitLocation(sample) {
       if (locationListener !== null) {
@@ -248,5 +262,59 @@ describe("sensor controller lifecycle", () => {
     expect(fake.permissionCalls()).toBe(2);
     expect(fake.activeCounts()).toEqual({ location: 1, heading: 1 });
     expect(controller.snapshot().heading.status).toBe("acquiring");
+  });
+
+  test("suspends live collection immediately and ignores repeated suspension", async () => {
+    const fake = fakeSensors();
+    const controller = createSensorController(fake.ports);
+    await controller.startFromUserGesture();
+    fake.emitLocation({
+      coordinates: { latitude: 37.544_6, longitude: 127.037_4 },
+      accuracyM: 10,
+      capturedAtMs: 10_000,
+    });
+    fake.emitHeading({
+      degrees: 350,
+      reference: "magnetic",
+      accuracyDeg: 8,
+      capturedAtMs: 10_000,
+    });
+
+    controller.suspend();
+    controller.suspend();
+    const suspended = controller.snapshot();
+    fake.emitWakeRelease();
+    await controller.settle();
+
+    expect(suspended.started).toBe(false);
+    expect(suspended.location.status).toBe("idle");
+    expect(suspended.heading.status).toBe("idle");
+    expect(suspended.guidance.status).toBe("inactive");
+    expect(suspended.subscriptionCounts.location).toBe(0);
+    expect(suspended.subscriptionCounts.heading).toBe(0);
+    expect(fake.wakeReleaseCalls()).toBe(1);
+    expect(fake.wakeAcquireCalls()).toBe(1);
+  });
+
+  test("keeps a pending acquisition suspended and captures release failure", async () => {
+    const wake = deferred<WakeLockOutcome>();
+    const fake = fakeSensors(
+      { status: "granted" },
+      () => wake.promise,
+      () => Promise.reject(new Error("release blocked")),
+    );
+    const controller = createSensorController(fake.ports);
+
+    void controller.startFromUserGesture();
+    controller.suspend();
+    wake.resolve({ status: "acquired" });
+    await controller.settle();
+
+    expect(fake.activeCounts()).toEqual({ location: 0, heading: 0 });
+    expect(controller.snapshot().started).toBe(false);
+    expect(controller.snapshot().wakeLock).toEqual({
+      status: "error",
+      message: "release blocked",
+    });
   });
 });

@@ -24,6 +24,9 @@ The user does not know the destination. The app gives only minimal direction and
   a live or paid place API.
 - No background or locked-screen navigation promise. If it becomes required,
   apply the native-pivot gate in `/app/qa/field/README.md`.
+- Read `/docs/README.md` before using older product or implementation documents.
+  Current `/app` behavior is governed by this file, the root README and DESIGN,
+  current code/tests, and the field runbook.
 
 ## Core Flow
 
@@ -39,7 +42,15 @@ This is an off-screen discovery experience.
 
 The core value is not recommendation accuracy. The core value is hidden destination discovery, safe uncertainty, and screen-reduced exploration.
 
-## Source Documents to Read Before Working
+## Frozen v0.1 Guidance
+
+The remaining source list, simulation rules, file structure, and prototype
+documentation requirements in this file apply only to `/prototype`. They are
+historical product context for `/app`, not current implementation constraints.
+In particular, do not apply the v0.1 “no real GPS” or “simulate movement first”
+rules to the v0.2 sensor application.
+
+## Source Documents for v0.1 Work
 
 Before implementation, read these files if they exist:
 

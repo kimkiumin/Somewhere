@@ -34,6 +34,7 @@ export function createProductionComposition(): SomewhereComposition {
     sensors,
     bundle: parsedBundle(),
     clock: ports.clock,
+    scheduler: ports.scheduler,
     random: { nextUnit: () => Math.random() },
     todayIsoDate,
     diagnostics: createDiagnosticTrace({
@@ -52,6 +53,7 @@ export function createTestComposition(): SomewhereComposition {
     sensors,
     bundle,
     clock: rig.ports.clock,
+    scheduler: rig.ports.scheduler,
     random: { nextUnit: () => 0 },
     todayIsoDate: () => "2026-07-28",
     diagnostics: createDiagnosticTrace({

@@ -1,45 +1,30 @@
-import { distanceMeters, shortestAngularDelta, trueBearingDegrees } from "../domain/geo";
 import { type JourneyState, transitionJourney } from "../domain/journey";
 import {
   type ArrivalGate,
   advanceArrivalGate,
-  evaluateHeading,
-  evaluateLocation,
   INITIAL_NAVIGATION_POLICY,
   initialArrivalGate,
   nextProximity,
 } from "../domain/signals";
 import type { CuratedDestination, DestinationBundle } from "../platform/curated-destinations";
-import { resolveDeclination, selectDestination } from "../platform/curated-destinations";
+import { selectDestination } from "../platform/curated-destinations";
 import type { SensorController, SensorSnapshot } from "./controller";
 import type { DiagnosticSessionMetadata, DiagnosticTrace } from "./diagnostics";
-import type { Clock, Unsubscribe } from "./ports";
+import { createJourneyDiagnosticRecorder } from "./journey-diagnostics";
+import { createJourneyFreshnessWatchdog } from "./journey-freshness";
+import { deriveJourneyGuidance, type JourneyGuidance } from "./journey-guidance";
+import {
+  activeDestination,
+  activeDestinationId,
+  type HiddenDestinationView,
+  hiddenDestinationView,
+  type RevealedDestinationView,
+  revealedDestinationView,
+} from "./journey-view";
+import type { Clock, DeadlineScheduler, Unsubscribe } from "./ports";
 
-export type JourneyGuidance =
-  | { readonly status: "inactive" }
-  | { readonly status: "acquiring" }
-  | { readonly status: "paused"; readonly reasons: readonly string[] }
-  | {
-      readonly status: "live";
-      readonly distanceM: number;
-      readonly targetBearingTrueDeg: number;
-      readonly deviceHeadingTrueDeg: number;
-      readonly relativeAngleDeg: number;
-      readonly locationAccuracyM: number;
-      readonly headingAccuracyDeg: number | null;
-    };
-
-export type HiddenDestinationView = {
-  readonly hint: string;
-  readonly estimatedMinutes: number;
-};
-
-export type RevealedDestinationView = {
-  readonly name: string;
-  readonly category: string;
-  readonly description: string;
-  readonly curationNote: string;
-};
+export type { JourneyGuidance } from "./journey-guidance";
+export type { HiddenDestinationView, RevealedDestinationView } from "./journey-view";
 
 export type JourneyApplicationSnapshot = {
   readonly journey: JourneyState;
@@ -58,6 +43,7 @@ export type JourneyApplicationOptions = {
   readonly sensors: SensorController;
   readonly bundle: DestinationBundle;
   readonly clock: Clock;
+  readonly scheduler: DeadlineScheduler;
   readonly random: RandomSource;
   readonly todayIsoDate: () => string;
   readonly diagnostics: DiagnosticTrace;
@@ -77,89 +63,25 @@ export interface JourneyApplication {
   destroy(): Promise<void>;
 }
 
-function activeDestinationId(journey: JourneyState): string | null {
-  switch (journey.phase) {
-    case "hidden":
-    case "following":
-    case "near":
-    case "arrived":
-    case "revealed":
-    case "give-up":
-      return journey.destinationId;
-    case "idle":
-    case "selecting":
-      return null;
-  }
-}
-
-function activeDestination(
-  journey: JourneyState,
-  destinations: readonly CuratedDestination[],
-): CuratedDestination | null {
-  const id = activeDestinationId(journey);
-  if (id === null) {
-    return null;
-  }
-  return destinations.find((destination) => destination.id === id) ?? null;
-}
-
-function isGuidedPhase(journey: JourneyState): boolean {
-  return journey.phase === "following" || journey.phase === "near";
-}
-
-function pauseReasonsFromSensors(sensors: SensorSnapshot): readonly string[] {
-  switch (sensors.guidance.status) {
-    case "paused":
-      return sensors.guidance.reasons;
-    case "inactive":
-    case "acquiring":
-    case "live":
-      return [];
-  }
-}
-
 export function createJourneyApplication(options: JourneyApplicationOptions): JourneyApplication {
   let journey: JourneyState = { phase: "idle" };
   let sensorSnapshot = options.sensors.snapshot();
   let guidance: JourneyGuidance = { status: "inactive" };
   let arrivalGate: ArrivalGate = initialArrivalGate();
   let lastProcessedLocationAtMs: number | null = null;
-  let lastRecordedLocationAtMs: number | null = null;
-  let lastRecordedHeadingAtMs: number | null = null;
+  const diagnosticRecorder = createJourneyDiagnosticRecorder(options.diagnostics);
+  const freshness = createJourneyFreshnessWatchdog(options.clock, options.scheduler);
   const listeners = new Set<(snapshot: JourneyApplicationSnapshot) => void>();
 
-  function destination(): CuratedDestination | null {
-    return activeDestination(journey, options.bundle.destinations);
-  }
+  const destination = (): CuratedDestination | null =>
+    activeDestination(journey, options.bundle.destinations);
 
   function hiddenDestination(): HiddenDestinationView | null {
-    const selected = destination();
-    if (
-      selected === null ||
-      journey.phase === "idle" ||
-      journey.phase === "selecting" ||
-      journey.phase === "revealed" ||
-      journey.phase === "give-up"
-    ) {
-      return null;
-    }
-    return {
-      hint: selected.hint,
-      estimatedMinutes: selected.estimatedMinutes,
-    };
+    return hiddenDestinationView(journey, destination());
   }
 
   function revealedDestination(): RevealedDestinationView | null {
-    const selected = destination();
-    if (selected === null || (journey.phase !== "revealed" && journey.phase !== "give-up")) {
-      return null;
-    }
-    return {
-      name: selected.reveal.name,
-      category: selected.reveal.category,
-      description: selected.reveal.description,
-      curationNote: selected.curation.note,
-    };
+    return revealedDestinationView(journey, destination());
   }
 
   function snapshot(): JourneyApplicationSnapshot {
@@ -169,7 +91,7 @@ export function createJourneyApplication(options: JourneyApplicationOptions): Jo
       guidance,
       hiddenDestination: hiddenDestination(),
       revealedDestination: revealedDestination(),
-      diagnosticEventCount: options.diagnostics.snapshot().length,
+      diagnosticEventCount: options.diagnostics.eventCount(),
     };
   }
 
@@ -180,41 +102,12 @@ export function createJourneyApplication(options: JourneyApplicationOptions): Jo
     }
   }
 
-  function recordSensorSamples(): void {
-    if (
-      sensorSnapshot.location.status === "live" &&
-      sensorSnapshot.location.sample.capturedAtMs !== lastRecordedLocationAtMs
-    ) {
-      const sample = sensorSnapshot.location.sample;
-      lastRecordedLocationAtMs = sample.capturedAtMs;
-      options.diagnostics.record({
-        type: "location",
-        capturedAtMs: sample.capturedAtMs,
-        values: {
-          latitude: sample.coordinates.latitude,
-          longitude: sample.coordinates.longitude,
-          accuracyM: sample.accuracyM,
-          movementHeadingTrueDeg: sample.movementHeadingTrueDeg ?? null,
-          speedMps: sample.speedMps ?? null,
-        },
-      });
-    }
-    if (
-      sensorSnapshot.heading.status === "live" &&
-      sensorSnapshot.heading.sample.capturedAtMs !== lastRecordedHeadingAtMs
-    ) {
-      const sample = sensorSnapshot.heading.sample;
-      lastRecordedHeadingAtMs = sample.capturedAtMs;
-      options.diagnostics.record({
-        type: "heading",
-        capturedAtMs: sample.capturedAtMs,
-        values: {
-          degrees: sample.degrees,
-          reference: sample.reference,
-          accuracyDeg: sample.accuracyDeg,
-        },
-      });
-    }
+  function finishCollection(): void {
+    freshness.cancel();
+    guidance = { status: "inactive" };
+    options.sensors.suspend();
+    sensorSnapshot = options.sensors.snapshot();
+    options.diagnostics.stopRecording();
   }
 
   function updateJourneyFromLocation(
@@ -238,6 +131,7 @@ export function createJourneyApplication(options: JourneyApplicationOptions): Jo
         capturedAtMs,
         values: { phase: "arrived" },
       });
+      finishCollection();
       return;
     }
 
@@ -252,89 +146,40 @@ export function createJourneyApplication(options: JourneyApplicationOptions): Jo
   }
 
   function deriveGuidance(): void {
-    if (!isGuidedPhase(journey)) {
-      guidance = { status: "inactive" };
-      return;
+    guidance = deriveJourneyGuidance({
+      journey,
+      sensors: sensorSnapshot,
+      destination: destination(),
+      fieldArea: options.bundle.fieldArea,
+      nowMs: options.clock.nowMs(),
+      todayIsoDate: options.todayIsoDate(),
+    });
+    if (guidance.status === "live" && sensorSnapshot.location.status === "live") {
+      updateJourneyFromLocation(
+        guidance.distanceM,
+        sensorSnapshot.location.sample.accuracyM,
+        sensorSnapshot.location.sample.capturedAtMs,
+      );
     }
-    if (sensorSnapshot.guidance.status === "paused") {
-      guidance = {
-        status: "paused",
-        reasons: pauseReasonsFromSensors(sensorSnapshot),
-      };
-      return;
-    }
-    if (sensorSnapshot.location.status !== "live" || sensorSnapshot.heading.status !== "live") {
-      guidance = { status: "acquiring" };
-      return;
-    }
+  }
 
-    const selected = destination();
-    if (selected === null) {
-      guidance = { status: "paused", reasons: ["destination-unavailable"] };
-      return;
-    }
-    const locationEvaluation = evaluateLocation(
-      sensorSnapshot.location.sample,
-      options.clock.nowMs(),
-      INITIAL_NAVIGATION_POLICY,
-    );
-    if (locationEvaluation.status === "invalid") {
-      guidance = { status: "paused", reasons: [locationEvaluation.reason] };
-      return;
-    }
-    const declination = resolveDeclination(
-      options.bundle.fieldArea,
-      locationEvaluation.sample.coordinates,
-      options.todayIsoDate(),
-    );
-    const headingEvaluation = evaluateHeading(
-      sensorSnapshot.heading.sample,
-      declination,
-      INITIAL_NAVIGATION_POLICY,
-    );
-    if (headingEvaluation.status === "invalid") {
-      guidance = { status: "paused", reasons: [headingEvaluation.reason] };
-      return;
-    }
-
-    const distanceM = distanceMeters(locationEvaluation.sample.coordinates, selected.coordinates);
-    const targetBearingTrueDeg = trueBearingDegrees(
-      locationEvaluation.sample.coordinates,
-      selected.coordinates,
-    );
-    if (distanceM === null || targetBearingTrueDeg === null) {
-      guidance = { status: "paused", reasons: ["guidance-invalid"] };
-      return;
-    }
-    const relativeAngleDeg = shortestAngularDelta(
-      headingEvaluation.trueDegrees,
-      targetBearingTrueDeg,
-    );
-    if (relativeAngleDeg === null) {
-      guidance = { status: "paused", reasons: ["guidance-invalid"] };
-      return;
-    }
-
-    guidance = {
-      status: "live",
-      distanceM,
-      targetBearingTrueDeg,
-      deviceHeadingTrueDeg: headingEvaluation.trueDegrees,
-      relativeAngleDeg,
-      locationAccuracyM: locationEvaluation.sample.accuracyM,
-      headingAccuracyDeg: sensorSnapshot.heading.sample.accuracyDeg,
-    };
-    updateJourneyFromLocation(
-      distanceM,
-      locationEvaluation.sample.accuracyM,
-      locationEvaluation.sample.capturedAtMs,
+  function refreshFreshness(): void {
+    freshness.refresh(
+      sensorSnapshot,
+      journey.phase === "following" || journey.phase === "near",
+      () => {
+        deriveGuidance();
+        refreshFreshness();
+        notify();
+      },
     );
   }
 
   const stopSensors = options.sensors.subscribe((next) => {
     sensorSnapshot = next;
-    recordSensorSamples();
+    diagnosticRecorder.recordSensorSamples(sensorSnapshot);
     deriveGuidance();
+    refreshFreshness();
     notify();
   });
 
@@ -358,6 +203,7 @@ export function createJourneyApplication(options: JourneyApplicationOptions): Jo
 
   return {
     startAdventure() {
+      options.diagnostics.beginSession();
       const sensorStart = options.sensors.startFromUserGesture();
       journey = transitionJourney(journey, { type: "start" });
       selectNext(null);
@@ -375,16 +221,17 @@ export function createJourneyApplication(options: JourneyApplicationOptions): Jo
     beginWalk() {
       journey = transitionJourney(journey, { type: "follow" });
       deriveGuidance();
+      refreshFreshness();
       notify();
     },
     reveal() {
       journey = transitionJourney(journey, { type: "reveal" });
-      guidance = { status: "inactive" };
+      finishCollection();
       notify();
     },
     giveUp() {
       journey = transitionJourney(journey, { type: "give-up" });
-      guidance = { status: "inactive" };
+      finishCollection();
       notify();
     },
     reroll() {
@@ -412,6 +259,8 @@ export function createJourneyApplication(options: JourneyApplicationOptions): Jo
       notify();
     },
     async destroy() {
+      freshness.cancel();
+      options.diagnostics.stopRecording();
       stopSensors();
       listeners.clear();
       await options.sensors.destroy();

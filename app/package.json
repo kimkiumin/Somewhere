@@ -9,8 +9,8 @@
   },
   "scripts": {
     "dev": "bun --bun vite",
-    "build": "bun --bun vite build",
-    "build:harness": "bun --bun vite build --mode test-harness",
+    "build": "bun --bun vite build && bun scripts/assert-precache-unique.mjs dist",
+    "build:harness": "bun --bun vite build --mode test-harness && bun scripts/assert-precache-unique.mjs dist-e2e",
     "preview": "bun --bun vite preview",
     "preview:harness": "bun --bun vite preview --outDir dist-e2e",
     "typecheck": "tsc --noEmit",
@@ -23,6 +23,9 @@
   },
   "dependencies": {
     "zod": "4.4.3"
+  },
+  "overrides": {
+    "jake": "12.10.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",

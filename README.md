@@ -27,7 +27,8 @@ emotional experience of following the unknown.
   gate remains device-only
 
 The frozen dependency-free v0.1 simulation remains in `/prototype`. The current
-application lives in `/app`.
+application lives in `/app`. See [`docs/README.md`](docs/README.md) for the
+current-versus-archived documentation authority order.
 
 ## v0.2 Scope
 
@@ -63,7 +64,8 @@ Somewhere/
   AGENTS.md
   DESIGN.md
   data/                         # frozen v0.1 mock data
-  docs/                         # product and implementation sources
+  docs/README.md                # documentation authority index
+  docs/                         # current plan history and v0.1 sources
   prototype/                    # frozen v0.1 simulation and 11 Node tests
   app/                          # v0.2 Bun/Vite/TypeScript sensor PWA
     src/domain/                 # pure geo, signal, arrival, journey logic

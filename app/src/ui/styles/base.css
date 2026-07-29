@@ -1,0 +1,173 @@
+:root {
+  --color-canvas: #f5f1e8;
+  --color-panel: #fffdf8;
+  --color-muted: #e6ede3;
+  --color-deep: #17231c;
+  --color-deep-soft: #24372b;
+  --color-text: #17231c;
+  --color-text-muted: #5d665b;
+  --color-text-inverse: #fffdf8;
+  --color-border: #d8ddd2;
+  --color-accent: #2d5b73;
+  --color-accent-soft: #dce8ed;
+  --color-warm: #8f5233;
+  --color-warm-soft: #f1ded2;
+  --color-safe: #3f6b4a;
+  --color-caution: #805827;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --radius-sm: 10px;
+  --radius-md: 18px;
+  --radius-lg: 28px;
+  color: var(--color-text);
+  background: var(--color-canvas);
+  font-family: "SF Pro Text", Aptos, "Helvetica Neue", Arial, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--color-canvas);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100dvh;
+  margin: 0;
+  background: var(--color-canvas);
+}
+
+button,
+select,
+input {
+  font: inherit;
+}
+
+button {
+  min-height: 48px;
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.app-shell {
+  display: grid;
+  min-height: 100dvh;
+  align-content: center;
+  gap: var(--space-6);
+  width: min(100%, 480px);
+  margin-inline: auto;
+  padding: max(var(--space-6), env(safe-area-inset-top))
+    max(var(--space-5), env(safe-area-inset-right)) max(var(--space-6), env(safe-area-inset-bottom))
+    max(var(--space-5), env(safe-area-inset-left));
+}
+
+.app-shell--journey {
+  align-content: start;
+}
+
+.instrument-header,
+.section-heading,
+.status-row,
+.button-row,
+.safety-row,
+.diagnostic-row {
+  display: flex;
+  align-items: center;
+}
+
+.instrument-header,
+.section-heading,
+.status-row,
+.diagnostic-row {
+  justify-content: space-between;
+}
+
+.instrument-header {
+  gap: var(--space-4);
+}
+
+.wordmark,
+.eyebrow,
+.label,
+.status-pill {
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.wordmark,
+.eyebrow,
+.label {
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.wordmark,
+.eyebrow {
+  margin: 0;
+}
+
+.eyebrow,
+.muted {
+  color: var(--color-text-muted);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-block: 0;
+}
+
+h1,
+.display {
+  font-size: clamp(2.45rem, 12vw, 4.5rem);
+  font-weight: 650;
+  line-height: 1.02;
+}
+
+h2 {
+  font-size: 1.5rem;
+  font-weight: 620;
+  line-height: 1.25;
+}
+
+h3 {
+  font-size: 1.125rem;
+  font-weight: 620;
+  line-height: 1.35;
+}
+
+.lead {
+  max-width: 34ch;
+  font-size: 1.125rem;
+  line-height: 1.55;
+}
+
+.body-copy {
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.small-copy {
+  font-size: 0.875rem;
+  line-height: 1.45;
+}

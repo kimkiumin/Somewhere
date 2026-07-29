@@ -1,102 +1,34 @@
-import type { HeadingSample, LocationSample } from "../domain/signals";
 import type {
-  HeadingFailure,
-  LocationFailure,
   PermissionOutcome,
   SensorControllerPorts,
   Unsubscribe,
   VisibilityState,
   WakeLockOutcome,
 } from "./ports";
+import {
+  guidanceFor,
+  type HeadingState,
+  headingForPermission,
+  type LocationState,
+  type SensorSnapshot,
+  type WakeLockState,
+  wakeLockFor,
+} from "./sensor-state";
 
-type LocationState =
-  | { readonly status: "idle" }
-  | { readonly status: "acquiring" }
-  | { readonly status: "live"; readonly sample: LocationSample }
-  | { readonly status: "failed"; readonly failure: LocationFailure };
-
-type HeadingState =
-  | { readonly status: "idle" }
-  | { readonly status: "acquiring" }
-  | { readonly status: "live"; readonly sample: HeadingSample }
-  | { readonly status: "denied" }
-  | { readonly status: "unsupported" }
-  | { readonly status: "failed"; readonly failure: HeadingFailure };
-
-type WakeLockState =
-  | { readonly status: "idle" }
-  | { readonly status: "acquiring" }
-  | { readonly status: "active" }
-  | { readonly status: "released" }
-  | { readonly status: "unsupported" }
-  | { readonly status: "error"; readonly message: string };
-
-export type GuidancePauseReason =
-  | "visibility-hidden"
-  | "heading-denied"
-  | "heading-unsupported"
-  | "location-failed"
-  | "heading-failed";
-
-export type SensorGuidanceState =
-  | { readonly status: "inactive" }
-  | { readonly status: "acquiring" }
-  | { readonly status: "live" }
-  | { readonly status: "paused"; readonly reasons: readonly GuidancePauseReason[] };
-
-export type SensorSnapshot = {
-  readonly started: boolean;
-  readonly visibility: VisibilityState;
-  readonly location: LocationState;
-  readonly heading: HeadingState;
-  readonly wakeLock: WakeLockState;
-  readonly guidance: SensorGuidanceState;
-  readonly subscriptionCounts: {
-    readonly location: number;
-    readonly heading: number;
-    readonly visibility: number;
-    readonly wakeRelease: number;
-  };
-};
+export type {
+  GuidancePauseReason,
+  SensorGuidanceState,
+  SensorSnapshot,
+} from "./sensor-state";
 
 export interface SensorController {
   startFromUserGesture(): Promise<void>;
   retryFromUserGesture(): Promise<void>;
+  suspend(): void;
   snapshot(): SensorSnapshot;
   subscribe(listener: (snapshot: SensorSnapshot) => void): Unsubscribe;
   settle(): Promise<void>;
   destroy(): Promise<void>;
-}
-
-function guidanceFor(snapshot: Omit<SensorSnapshot, "guidance">): SensorGuidanceState {
-  if (!snapshot.started) {
-    return { status: "inactive" };
-  }
-  if (snapshot.visibility === "hidden") {
-    return { status: "paused", reasons: ["visibility-hidden"] };
-  }
-  if (snapshot.heading.status === "denied") {
-    return { status: "paused", reasons: ["heading-denied"] };
-  }
-  if (snapshot.heading.status === "unsupported") {
-    return { status: "paused", reasons: ["heading-unsupported"] };
-  }
-
-  const reasons: GuidancePauseReason[] = [];
-  if (snapshot.location.status === "failed") {
-    reasons.push("location-failed");
-  }
-  if (snapshot.heading.status === "failed") {
-    reasons.push("heading-failed");
-  }
-  if (reasons.length > 0) {
-    return { status: "paused", reasons };
-  }
-  if (snapshot.location.status === "live" && snapshot.heading.status === "live") {
-    return { status: "live" };
-  }
-
-  return { status: "acquiring" };
 }
 
 export function createSensorController(ports: SensorControllerPorts): SensorController {
@@ -174,41 +106,10 @@ export function createSensorController(ports: SensorControllerPorts): SensorCont
   }
 
   function applyPermission(outcome: PermissionOutcome): void {
-    switch (outcome.status) {
-      case "granted":
-        if (heading.status !== "live") {
-          heading = { status: "acquiring" };
-        }
-        break;
-      case "denied":
-        stopHeading?.();
-        stopHeading = null;
-        heading = { status: "denied" };
-        break;
-      case "unsupported":
-        stopHeading?.();
-        stopHeading = null;
-        heading = { status: "unsupported" };
-        break;
-      case "error":
-        stopHeading?.();
-        stopHeading = null;
-        heading = { status: "failed", failure: { reason: "unknown" } };
-        break;
-    }
-  }
-
-  function applyWakeLock(outcome: WakeLockOutcome): void {
-    switch (outcome.status) {
-      case "acquired":
-        wakeLock = { status: "active" };
-        break;
-      case "unsupported":
-        wakeLock = { status: "unsupported" };
-        break;
-      case "error":
-        wakeLock = { status: "error", message: outcome.message };
-        break;
+    heading = headingForPermission(outcome, heading);
+    if (outcome.status !== "granted") {
+      stopHeading?.();
+      stopHeading = null;
     }
   }
 
@@ -218,7 +119,7 @@ export function createSensorController(ports: SensorControllerPorts): SensorCont
       wakeLock = { status: "released" };
       return;
     }
-    applyWakeLock(outcome);
+    wakeLock = wakeLockFor(outcome);
   }
 
   async function acquireWakeLock(): Promise<void> {
@@ -240,6 +141,9 @@ export function createSensorController(ports: SensorControllerPorts): SensorCont
 
     pendingLifecycle = Promise.all([permission, wake]).then(
       async ([permissionOutcome, wakeOutcome]) => {
+        if (!started || destroyed) {
+          return;
+        }
         applyPermission(permissionOutcome);
         await applyWakeLockForCurrentVisibility(wakeOutcome);
         notify();
@@ -306,6 +210,33 @@ export function createSensorController(ports: SensorControllerPorts): SensorCont
       started = true;
       stopSensors();
       return beginAcquisitionFromUserGesture();
+    },
+    suspend() {
+      if (!started || destroyed) {
+        return;
+      }
+      started = false;
+      stopSensors();
+      location = { status: "idle" };
+      heading = { status: "idle" };
+      wakeLock = { status: "released" };
+      const previousLifecycle = pendingLifecycle;
+      pendingLifecycle = (async () => {
+        try {
+          await previousLifecycle;
+          await ports.wakeLock.release();
+          if (!started && !destroyed) {
+            wakeLock = { status: "released" };
+          }
+        } catch (error) {
+          wakeLock = {
+            status: "error",
+            message: error instanceof Error ? error.message : "Wake Lock release failed.",
+          };
+        }
+        notify();
+      })();
+      notify();
     },
     snapshot,
     subscribe(listener) {

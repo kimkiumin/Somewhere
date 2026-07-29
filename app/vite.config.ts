@@ -7,13 +7,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     VitePWA({
       registerType: "prompt",
-      includeAssets: [
-        "icons/icon.svg",
-        "icons/icon-192.png",
-        "icons/icon-512.png",
-        "icons/maskable-512.png",
-        "apple-touch-icon.png",
-      ],
+      includeManifestIcons: false,
       manifest: {
         name: "Somewhere — Hidden Compass",
         short_name: "Somewhere",
@@ -44,7 +38,7 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{html,js,css,json,webmanifest,png,svg}"],
+        globPatterns: ["**/*.{html,js,css,json,png,svg}"],
         navigateFallback: "index.html",
         runtimeCaching: [],
         cleanupOutdatedCaches: true,

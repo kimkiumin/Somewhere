@@ -10,6 +10,7 @@ export type SomewhereTestApi = {
   readonly setVisibility: (state: string) => void;
   readonly setHeadingPermission: (status: string) => void;
   readonly releaseWakeLock: () => void;
+  readonly advanceMs: (milliseconds: number) => void;
   readonly snapshot: () => ReturnType<JourneyApplication["snapshot"]>;
 };
 
@@ -91,6 +92,7 @@ export function createE2eHarness(
       sensors.setHeadingPermission(outcome);
     },
     releaseWakeLock: () => sensors.releaseWakeLockFromSystem(),
+    advanceMs: (milliseconds) => sensors.advanceMs(milliseconds),
     snapshot: () => application.snapshot(),
   };
 }
