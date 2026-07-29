@@ -1,6 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
 
+import { type AlarmPlan, alarmWork } from "../async/alarm";
+import { type AsyncEventType, type AsyncMessage, buildAsyncMessage } from "../async/message";
+import { RETENTION_MS } from "../async/retention";
 import { createReadyJourney, type JourneyTransition } from "./aggregate";
+import type { OutboxRecord } from "./reconciliation";
 import {
   inboxEventSchema,
   journeyCommandSchema,
@@ -169,30 +173,92 @@ export class JourneyDurableObject extends DurableObject<Env> {
     return { status: 204 };
   }
 
+  async reconcileAlarm(now: number): Promise<AlarmPlan> {
+    if (this.deleted) {
+      return { kind: "terminal" };
+    }
+    const state = this.store.readState();
+    switch (alarmWork(state, now)) {
+      case "terminal":
+      case "expire":
+        await this.deleteTerminalState();
+        return { kind: "terminal" };
+      case "feedback":
+      case "outbox":
+        return this.scheduleAlarm(now);
+    }
+  }
+
   override async alarm(): Promise<void> {
     if (this.deleted) {
       return;
     }
     const now = Date.now();
-    const events = this.store.leaseDue(now);
-    for (const event of events) {
-      await this.env.EVENTS_QUEUE.send({
-        eventDigest: event.eventDigest,
-        eventId: event.eventId,
-        eventType: event.eventType,
-        schemaVersion: 1,
-        writeEpoch: event.writeEpoch,
-      });
-    }
-    await this.scheduleAlarm();
-  }
-
-  private async scheduleAlarm(): Promise<void> {
-    const nextAlarmAt = this.store.nextAlarmAt();
-    if (nextAlarmAt === null) {
-      await this.ctx.storage.deleteAlarm();
+    const work = alarmWork(this.store.readState(), now);
+    if (work === "terminal" || work === "expire") {
+      await this.deleteTerminalState();
       return;
     }
-    await this.ctx.storage.setAlarm(nextAlarmAt);
+    const events = this.store.leaseDue(now);
+    for (const event of events) {
+      const message = await queueMessage(event);
+      if (message === undefined) {
+        this.store.acknowledge(event.eventId, now);
+        continue;
+      }
+      try {
+        await this.env.EVENTS_QUEUE.send(message);
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error;
+        }
+        continue;
+      }
+      this.store.acknowledge(event.eventId, now);
+      if (message.eventType === "journey.feedback.schedule") {
+        this.store.markFeedbackEligible(event.eventId);
+      }
+    }
+    await this.scheduleAlarm(now);
+  }
+
+  private async deleteTerminalState(): Promise<void> {
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    this.deleted = true;
+  }
+
+  private async scheduleAlarm(now = Date.now()): Promise<AlarmPlan> {
+    const plan = this.store.nextAlarmAt(now);
+    if (plan.kind === "terminal") {
+      await this.ctx.storage.deleteAlarm();
+      return plan;
+    }
+    await this.ctx.storage.setAlarm(plan.alarmAt);
+    return plan;
+  }
+}
+
+async function queueMessage(event: OutboxRecord): Promise<AsyncMessage | undefined> {
+  const eventType = asyncEventType(event.eventType);
+  if (eventType === undefined) {
+    return undefined;
+  }
+  return buildAsyncMessage({
+    eventType,
+    occurredAt: Math.max(1, event.expiresAt - RETENTION_MS.journey),
+    subjectDigest: event.eventDigest,
+    writeEpoch: event.writeEpoch,
+  });
+}
+
+function asyncEventType(value: string): AsyncEventType | undefined {
+  switch (value) {
+    case "journey.activated":
+      return "journey.activation.repair";
+    case "journey.feedback.eligible":
+      return "journey.feedback.schedule";
+    default:
+      return undefined;
   }
 }

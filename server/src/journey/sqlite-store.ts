@@ -1,9 +1,11 @@
+import { type AlarmPlan, planJourneyAlarm } from "../async/alarm";
 import { type JourneyCommand, type JourneyState, transitionJourney } from "./aggregate";
 import type { InboxRecord, OutboxRecord } from "./reconciliation";
 import { journeyStateSchema, outboxRecordSchema } from "./schemas";
 
 type PayloadRow = Readonly<{ payload: string }>;
 type CountRow = Readonly<{ count: number }>;
+const OUTBOX_RETRY_DELAYS_MS = [5_000, 30_000, 120_000, 600_000] as const;
 
 export class JourneyNotInitializedError extends Error {
   override readonly name = "JourneyNotInitializedError";
@@ -155,7 +157,7 @@ export class JourneySqliteStore {
         const leased = {
           ...parsed,
           attempts: parsed.attempts + 1,
-          nextAttemptAt: now + Math.min(60_000, 1_000 * 2 ** parsed.attempts),
+          nextAttemptAt: now + retryDelayMs(parsed.attempts),
         };
         this.storage.sql.exec(
           "UPDATE journey_outbox SET payload = ?, next_attempt_at = ? WHERE event_id = ?",
@@ -196,16 +198,51 @@ export class JourneySqliteStore {
     });
   }
 
-  nextAlarmAt(): number | null {
+  markFeedbackEligible(eventId: string): void {
+    this.storage.transactionSync(() => {
+      const state = this.readState();
+      if (
+        state === null ||
+        state.feedback === undefined ||
+        state.feedback.eventId !== eventId ||
+        state.feedback.status !== "scheduled"
+      ) {
+        return;
+      }
+      this.storage.sql.exec(
+        "UPDATE journey_state SET payload = ? WHERE singleton = 1",
+        JSON.stringify({
+          ...state,
+          feedback: { ...state.feedback, status: "eligible" },
+        }),
+      );
+    });
+  }
+
+  nextAlarmAt(now: number): AlarmPlan {
     const rows = this.storage.sql
       .exec<{ next_attempt_at: number }>(
-        "SELECT MIN(next_attempt_at) AS next_attempt_at FROM journey_outbox WHERE status = 'pending'",
+        "SELECT MIN(next_attempt_at) AS next_attempt_at FROM journey_outbox WHERE status = 'pending' AND expires_at > ?",
+        now,
       )
       .toArray();
-    return rows[0]?.next_attempt_at ?? null;
+    return planJourneyAlarm(this.readState(), rows[0]?.next_attempt_at ?? null);
   }
 }
 
 function outboxRecord(value: unknown): OutboxRecord {
   return outboxRecordSchema.parse(value);
+}
+
+function retryDelayMs(attempts: number): number {
+  switch (attempts) {
+    case 0:
+      return OUTBOX_RETRY_DELAYS_MS[0];
+    case 1:
+      return OUTBOX_RETRY_DELAYS_MS[1];
+    case 2:
+      return OUTBOX_RETRY_DELAYS_MS[2];
+    default:
+      return OUTBOX_RETRY_DELAYS_MS[3];
+  }
 }

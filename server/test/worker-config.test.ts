@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-type Binding = Readonly<Record<string, string>>;
+type Binding = Readonly<Record<string, number | string>>;
 
 type EnvironmentConfig = Readonly<{
   d1_databases?: readonly Binding[];
@@ -82,11 +82,15 @@ describe("worker-config", () => {
     for (const environment of environments) {
       expect(environment?.d1_databases).toHaveLength(1);
       expect(environment?.durable_objects?.bindings).toHaveLength(1);
-      expect(environment?.queues?.producers).toHaveLength(1);
+      expect(environment?.queues?.producers).toHaveLength(2);
       expect(environment?.queues?.consumers).toHaveLength(1);
+      expect(environment?.queues?.consumers?.[0]).toMatchObject({
+        max_batch_size: 100,
+        max_retries: 4,
+      });
     }
     expect(new Set(serialized)).toHaveLength(3);
-    expect(config.triggers?.crons).toHaveLength(1);
+    expect(config.triggers?.crons).toEqual(["*/5 * * * *"]);
   });
 
   it("disables identity-bearing invocation logs and traces", async () => {

@@ -40,20 +40,24 @@
       {
         "binding": "EVENTS_QUEUE",
         "queue": "somewhere-events-local"
+      },
+      {
+        "binding": "EVENTS_DLQ",
+        "queue": "somewhere-events-dlq-local"
       }
     ],
     "consumers": [
       {
         "queue": "somewhere-events-local",
-        "max_batch_size": 10,
+        "max_batch_size": 100,
         "max_batch_timeout": 5,
-        "max_retries": 5,
+        "max_retries": 4,
         "dead_letter_queue": "somewhere-events-dlq-local"
       }
     ]
   },
   "triggers": {
-    "crons": ["7 * * * *"]
+    "crons": ["*/5 * * * *"]
   },
   "exports": {
     "JourneyDurableObject": {
@@ -86,14 +90,18 @@
           {
             "binding": "EVENTS_QUEUE",
             "queue": "somewhere-events-staging"
+          },
+          {
+            "binding": "EVENTS_DLQ",
+            "queue": "somewhere-events-dlq-staging"
           }
         ],
         "consumers": [
           {
             "queue": "somewhere-events-staging",
-            "max_batch_size": 10,
+            "max_batch_size": 100,
             "max_batch_timeout": 5,
-            "max_retries": 5,
+            "max_retries": 4,
             "dead_letter_queue": "somewhere-events-dlq-staging"
           }
         ]
@@ -123,14 +131,18 @@
           {
             "binding": "EVENTS_QUEUE",
             "queue": "somewhere-events-production"
+          },
+          {
+            "binding": "EVENTS_DLQ",
+            "queue": "somewhere-events-dlq-production"
           }
         ],
         "consumers": [
           {
             "queue": "somewhere-events-production",
-            "max_batch_size": 10,
+            "max_batch_size": 100,
             "max_batch_timeout": 5,
-            "max_retries": 5,
+            "max_retries": 4,
             "dead_letter_queue": "somewhere-events-dlq-production"
           }
         ]
