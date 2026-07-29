@@ -17,7 +17,7 @@ async function createFixture(): Promise<Fixture> {
   const repo = await mkdtemp(path.join(os.tmpdir(), "somewhere-v2-clean-source."));
   const evidence = `${repo}-evidence`;
   await mkdir(path.join(repo, "app", "dist"), { recursive: true });
-  await writeFile(path.join(repo, ".gitignore"), "app/dist/\n");
+  await writeFile(path.join(repo, ".gitignore"), "app/dist/\n.wrangler/\n");
   await writeFile(path.join(repo, "source.ts"), "export const value = 1;\n");
   await writeFile(path.join(repo, "app", "dist", "index.html"), "<main>generated</main>\n");
   git(repo, ["init"]);
@@ -103,25 +103,31 @@ async function expectDirtySourceRejected(
 }
 
 describe("V2 evidence source cleanliness", () => {
-  test("classifies Wrangler runtime bundles as ignored generated output", () => {
-    // Given: an active prepared Worker generates its local bundle below server/.wrangler.
+  test("classifies Wrangler runtime bundles as ignored generated output", async () => {
+    const fixture = await createFixture();
+    try {
+      // Given: an active prepared Worker generates its local bundle below server/.wrangler.
 
-    // When: Git classifies the runtime bundle path without requiring the file to exist.
-    const result = spawnSync(
-      "git",
-      [
-        "-C",
-        PROJECT_ROOT,
-        "check-ignore",
-        "--quiet",
-        "--no-index",
-        "server/.wrangler/tmp/dev/index.js",
-      ],
-      { encoding: "utf8" },
-    );
+      // When: Git classifies the runtime bundle path without requiring the file to exist.
+      const result = spawnSync(
+        "git",
+        [
+          "-C",
+          fixture.repo,
+          "check-ignore",
+          "--quiet",
+          "--no-index",
+          "server/.wrangler/tmp/dev/index.js",
+        ],
+        { encoding: "utf8" },
+      );
 
-    // Then: runtime output cannot false-block provenance while arbitrary untracked source still does.
-    expect(result.status).toBe(0);
+      // Then: runtime output cannot false-block provenance while arbitrary untracked source still does.
+      expect(result.status).toBe(0);
+    } finally {
+      await rm(fixture.repo, { force: true, recursive: true });
+      await rm(fixture.evidence, { force: true, recursive: true });
+    }
   });
 
   test("allows ignored generated production output", async () => {
