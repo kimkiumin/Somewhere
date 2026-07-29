@@ -120,6 +120,8 @@ describe("journey application characterization", () => {
       capturedAtMs: context.rig.nowMs(),
     });
     emitDistance(context, 20);
+    context.rig.advanceMs(3_000);
+    emitDistance(context, 20);
     const arrived = context.application.snapshot();
 
     expect(arrived.journey.phase).toBe("arrived");
@@ -136,7 +138,7 @@ describe("journey application characterization", () => {
     expect(context.application.snapshot().guidance.status).toBe("live");
     context.rig.advanceMs(1);
 
-    expect(context.application.snapshot().guidance).toEqual({
+    expect(context.application.snapshot().guidance).toMatchObject({
       status: "paused",
       reasons: ["location-stale"],
     });
@@ -157,7 +159,7 @@ describe("journey application characterization", () => {
     });
     context.rig.advanceMs(1_001);
 
-    expect(context.application.snapshot().guidance).toEqual({
+    expect(context.application.snapshot().guidance).toMatchObject({
       status: "paused",
       reasons: ["heading-stale"],
     });

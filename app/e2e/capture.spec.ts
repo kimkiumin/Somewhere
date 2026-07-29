@@ -42,6 +42,8 @@ test("captures every product state and target viewport", async ({ page }, testIn
     await harnessCommand(page, "emitDistance", 20, 10);
     await harnessCommand(page, "emitDistance", 22, 10);
     await harnessCommand(page, "emitDistance", 18, 10);
+    await harnessCommand(page, "advanceMs", 3_000);
+    await harnessCommand(page, "emitDistance", 19, 10);
     await capture(page, testInfo, viewport, "arrived");
     await page.getByRole("button", { name: "Reveal destination" }).click();
     await capture(page, testInfo, viewport, "revealed");

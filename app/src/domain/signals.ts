@@ -1,3 +1,4 @@
+import { NAVIGATION_POLICY_V1 } from "@somewhere/contracts";
 import {
   type Coordinates,
   isValidCoordinates,
@@ -14,21 +15,23 @@ export type NavigationPolicy = {
   readonly arrivedM: number;
   readonly maxArrivalAccuracyM: number;
   readonly arrivalSamplesRequired: number;
+  readonly arrivalMinimumDwellMs: number;
   readonly arrivalWindowMs: number;
   readonly maxMeasuredHeadingAccuracyDeg: number;
 };
 
 export const INITIAL_NAVIGATION_POLICY = {
-  locationMaxAgeMs: 10_000,
-  headingMaxAgeMs: 10_000,
-  maxGuidanceAccuracyM: 50,
-  nearEnterM: 120,
-  nearExitM: 150,
-  arrivedM: 30,
-  maxArrivalAccuracyM: 25,
-  arrivalSamplesRequired: 3,
-  arrivalWindowMs: 12_000,
-  maxMeasuredHeadingAccuracyDeg: 25,
+  locationMaxAgeMs: NAVIGATION_POLICY_V1.locationMaxAgeMs,
+  headingMaxAgeMs: NAVIGATION_POLICY_V1.headingMaxAgeMs,
+  maxGuidanceAccuracyM: NAVIGATION_POLICY_V1.maxGuidanceAccuracyM,
+  nearEnterM: NAVIGATION_POLICY_V1.nearEnterM,
+  nearExitM: NAVIGATION_POLICY_V1.nearExitM,
+  arrivedM: NAVIGATION_POLICY_V1.arrivalEndpointM,
+  maxArrivalAccuracyM: NAVIGATION_POLICY_V1.maxArrivalAccuracyM,
+  arrivalSamplesRequired: NAVIGATION_POLICY_V1.arrivalConsecutiveSamples,
+  arrivalMinimumDwellMs: NAVIGATION_POLICY_V1.arrivalMinimumDwellMs,
+  arrivalWindowMs: NAVIGATION_POLICY_V1.arrivalSampleWindowMs,
+  maxMeasuredHeadingAccuracyDeg: NAVIGATION_POLICY_V1.maxMeasuredHeadingAccuracyDeg,
 } satisfies NavigationPolicy;
 
 export type LocationSample = {
@@ -138,7 +141,7 @@ export type Proximity = "following" | "near";
 export function nextProximity(
   current: Proximity,
   distanceM: number,
-  policy: NavigationPolicy,
+  policy: Pick<NavigationPolicy, "nearEnterM" | "nearExitM">,
 ): Proximity {
   if (!Number.isFinite(distanceM) || distanceM < 0) {
     return current;
@@ -200,8 +203,13 @@ export function advanceArrivalGate(
     sample.capturedAtMs,
   ];
 
+  const requiredTimes = candidateTimesMs.slice(-policy.arrivalSamplesRequired);
+  const firstRequiredTimeMs = requiredTimes[0];
   return {
-    arrived: candidateTimesMs.length >= policy.arrivalSamplesRequired,
+    arrived:
+      requiredTimes.length === policy.arrivalSamplesRequired &&
+      firstRequiredTimeMs !== undefined &&
+      sample.capturedAtMs - firstRequiredTimeMs >= policy.arrivalMinimumDwellMs,
     candidateTimesMs,
   };
 }

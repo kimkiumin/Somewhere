@@ -85,5 +85,7 @@ test("does not steal focus for automatic proximity or arrival", async ({ page })
   await harnessCommand(page, "emitDistance", 20, 10);
   await harnessCommand(page, "emitDistance", 20, 10);
   await harnessCommand(page, "emitDistance", 20, 10);
+  await harnessCommand(page, "advanceMs", 3_000);
+  await harnessCommand(page, "emitDistance", 20, 10);
   await expect(page.getByRole("button", { name: "Give up", exact: true })).toBeFocused();
 });

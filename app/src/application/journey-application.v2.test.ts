@@ -1,5 +1,6 @@
 import { type JourneyProjectionV1, PROJECTION_EXAMPLES_V1 } from "@somewhere/contracts";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import { routeEndpointDigest } from "../domain/polyline";
 import { createScriptedSensorRig } from "../testkit/fakes";
 import { DeterministicV2Api, MemoryFeedbackCapabilityStore } from "../testkit/v2-fakes";
 import { createSensorController } from "./controller";
@@ -34,6 +35,8 @@ function fixture() {
     sensors,
     store,
     diagnostics: createDiagnosticTrace({ buildSha: "test", policyVersion: "server-v1" }),
+    clock: rig.ports.clock,
+    scheduler: rig.ports.scheduler,
     createBody: (location) => ({
       contractVersion: 1,
       constraints: {
@@ -53,7 +56,39 @@ function fixture() {
       recoveryCapability: null,
     }),
   });
-  return { api, application, rig };
+  return { api, application, rig, store };
+}
+
+async function followingProjection(): Promise<JourneyProjectionV1> {
+  const base = projection("following", false);
+  if (base.phase !== "following") {
+    throw new TypeError("Expected a following projection");
+  }
+  const start = { latitude: 37.544_6, longitude: 127.037_4 };
+  const endpoint = { latitude: start.latitude + 80 / 111_195, longitude: start.longitude };
+  const routeDigest = await routeEndpointDigest(endpoint);
+  if (routeDigest === null) {
+    throw new TypeError("Route digest is unavailable");
+  }
+  const encodedPolyline = btoa(
+    JSON.stringify([
+      [start.longitude, start.latitude],
+      [endpoint.longitude, endpoint.latitude],
+    ]),
+  )
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+  return {
+    ...base,
+    guidance: {
+      kind: "route",
+      encodedPolyline,
+      routeDigest,
+      routeVersion: "route-v1",
+      expiresAt: 1_000_000,
+    },
+  };
 }
 
 describe("V2 journey application facade", () => {
@@ -107,5 +142,95 @@ describe("V2 journey application facade", () => {
       heading: 1,
       location: 1,
     });
+  });
+
+  test("TASK16_V2_ROUTE_ADAPTER emits guidance and submits only strong route-consistent arrival", async () => {
+    const context = fixture();
+    await context.application.startAdventure();
+    context.rig.advanceMs(1_000);
+    context.rig.emitLocation({
+      accuracyM: 7,
+      capturedAtMs: context.rig.nowMs(),
+      coordinates: { latitude: 37.544_6, longitude: 127.037_4 },
+    });
+    await vi.waitFor(() => expect(context.store.snapshot().status).toBe("ready"));
+
+    context.api.projection = await followingProjection();
+    context.application.beginWalk();
+    await vi.waitFor(() => expect(context.store.snapshot().projection?.phase).toBe("following"));
+    context.rig.emitHeading({
+      degrees: 0,
+      reference: "true",
+      accuracyDeg: 8,
+      capturedAtMs: context.rig.nowMs(),
+    });
+    await vi.waitFor(() => expect(context.application.snapshot().guidance.status).toBe("live"));
+
+    const endpointLatitude = 37.544_6 + 80 / 111_195;
+    const arrivalLatitude = endpointLatitude - 20 / 111_195;
+    for (const advanceMs of [1, 4_000, 4_000, 4_000]) {
+      context.rig.advanceMs(advanceMs);
+      context.rig.emitHeading({
+        degrees: 0,
+        reference: "true",
+        accuracyDeg: 8,
+        capturedAtMs: context.rig.nowMs(),
+      });
+      context.rig.emitLocation({
+        accuracyM: 10,
+        capturedAtMs: context.rig.nowMs(),
+        coordinates: { latitude: arrivalLatitude, longitude: 127.037_4 },
+      });
+    }
+
+    await vi.waitFor(() =>
+      expect(
+        context.api.calls.some(
+          (call) => call.kind === "mutate" && call.mutation.action === "arrival",
+        ),
+      ).toBe(true),
+    );
+    const arrivalCall = context.api.calls.find(
+      (call) => call.kind === "mutate" && call.mutation.action === "arrival",
+    );
+    expect(arrivalCall).toMatchObject({
+      mutation: {
+        action: "arrival",
+        body: {
+          consecutiveSamples: 4,
+          dwellMs: 12_000,
+          routeConsistency: "consistent",
+        },
+      },
+    });
+  });
+
+  test("TASK16_V2_ROUTE_ADAPTER never exposes an arrow for malformed server geometry", async () => {
+    const context = fixture();
+    await context.application.startAdventure();
+    context.rig.advanceMs(1_000);
+    context.rig.emitLocation({
+      accuracyM: 7,
+      capturedAtMs: context.rig.nowMs(),
+      coordinates: { latitude: 37.544_6, longitude: 127.037_4 },
+    });
+    await vi.waitFor(() => expect(context.store.snapshot().status).toBe("ready"));
+
+    context.api.projection = projection("following", false);
+    context.application.beginWalk();
+    await vi.waitFor(() => expect(context.store.snapshot().projection?.phase).toBe("following"));
+    context.rig.emitHeading({
+      degrees: 0,
+      reference: "true",
+      accuracyDeg: 8,
+      capturedAtMs: context.rig.nowMs(),
+    });
+
+    await vi.waitFor(() =>
+      expect(context.application.snapshot().guidance).toMatchObject({
+        status: "paused",
+        reasons: ["route-unavailable"],
+      }),
+    );
   });
 });

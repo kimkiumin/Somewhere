@@ -1,9 +1,15 @@
+import type { TrustedRoute } from "../domain/polyline";
 import type { SensorSnapshot } from "./controller";
 import { freshnessDeadlineMs } from "./journey-guidance";
 import type { Clock, DeadlineScheduler, Unsubscribe } from "./ports";
 
 export interface JourneyFreshnessWatchdog {
-  refresh(sensors: SensorSnapshot, active: boolean, onExpire: () => void): void;
+  refresh(
+    sensors: SensorSnapshot,
+    active: boolean,
+    onExpire: () => void,
+    route?: TrustedRoute | null,
+  ): void;
   cancel(): void;
 }
 
@@ -21,8 +27,8 @@ export function createJourneyFreshnessWatchdog(
   }
 
   return {
-    refresh(sensors, active, onExpire) {
-      const deadlineMs = active ? freshnessDeadlineMs(sensors) : null;
+    refresh(sensors, active, onExpire, route = null) {
+      const deadlineMs = active ? freshnessDeadlineMs(sensors, route) : null;
       if (deadlineMs === null || deadlineMs <= clock.nowMs()) {
         cancel();
         return;

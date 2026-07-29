@@ -32,6 +32,8 @@ export function createProductionComposition(): SomewhereComposition {
     sensors,
     store,
     diagnostics,
+    clock: ports.clock,
+    scheduler: ports.scheduler,
     createBody: (location) => ({
       contractVersion: 1,
       constraints: {

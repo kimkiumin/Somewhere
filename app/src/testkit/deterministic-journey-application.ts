@@ -13,6 +13,8 @@ import {
 } from "../application/journey-view";
 import type { Clock, DeadlineScheduler, Unsubscribe } from "../application/ports";
 import { type JourneyState, transitionJourney } from "../domain/journey";
+import type { TrustedRoute } from "../domain/polyline";
+import { initialRouteProgressState, type RouteProgressState } from "../domain/route-progress";
 import {
   type ArrivalGate,
   advanceArrivalGate,
@@ -21,7 +23,7 @@ import {
   nextProximity,
 } from "../domain/signals";
 import type { CuratedDestination, DestinationBundle } from "../platform/curated-destinations";
-import { selectDestination } from "../platform/curated-destinations";
+import { resolveDeclination, selectDestination } from "../platform/curated-destinations";
 
 export type { JourneyGuidance } from "../application/journey-guidance";
 export type { HiddenDestinationView, RevealedDestinationView } from "../application/journey-view";
@@ -68,6 +70,7 @@ export function createJourneyApplication(options: JourneyApplicationOptions): Jo
   let sensorSnapshot = options.sensors.snapshot();
   let guidance: JourneyGuidance = { status: "inactive" };
   let arrivalGate: ArrivalGate = initialArrivalGate();
+  let routeProgress: RouteProgressState = initialRouteProgressState();
   let lastProcessedLocationAtMs: number | null = null;
   const diagnosticRecorder = createJourneyDiagnosticRecorder(options.diagnostics);
   const freshness = createJourneyFreshnessWatchdog(options.clock, options.scheduler);
@@ -146,14 +149,44 @@ export function createJourneyApplication(options: JourneyApplicationOptions): Jo
   }
 
   function deriveGuidance(): void {
+    const selected = destination();
+    const route: TrustedRoute | null =
+      selected === null
+        ? null
+        : {
+            geometry: [
+              {
+                latitude: selected.coordinates.latitude + 1_000 / 111_195,
+                longitude: selected.coordinates.longitude,
+              },
+              selected.coordinates,
+            ],
+            routeDigest: `sha256:${"0".repeat(64)}`,
+            routeVersion: "deterministic-test-route-v1",
+            expiresAt: Number.MAX_SAFE_INTEGER,
+            receivedAtMs: options.clock.nowMs(),
+            validatedAtMs: options.clock.nowMs(),
+          };
+    routeProgress = initialRouteProgressState();
     guidance = deriveJourneyGuidance({
       journey,
       sensors: sensorSnapshot,
-      destination: destination(),
-      fieldArea: options.bundle.fieldArea,
+      route,
+      routeProgressState: routeProgress,
+      declinationDegreesEast:
+        sensorSnapshot.location.status === "live"
+          ? resolveDeclination(
+              options.bundle.fieldArea,
+              sensorSnapshot.location.sample.coordinates,
+              options.todayIsoDate(),
+            )
+          : null,
+      visibleSinceMs: null,
       nowMs: options.clock.nowMs(),
-      todayIsoDate: options.todayIsoDate(),
     });
+    if (guidance.routeProgressState !== undefined) {
+      routeProgress = guidance.routeProgressState;
+    }
     if (guidance.status === "live" && sensorSnapshot.location.status === "live") {
       updateJourneyFromLocation(
         guidance.distanceM,
@@ -197,6 +230,7 @@ export function createJourneyApplication(options: JourneyApplicationOptions): Jo
       destinationId: selected.id,
     });
     arrivalGate = initialArrivalGate();
+    routeProgress = initialRouteProgressState();
     lastProcessedLocationAtMs = null;
     guidance = { status: "inactive" };
   }

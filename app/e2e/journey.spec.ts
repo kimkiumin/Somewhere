@@ -20,6 +20,9 @@ test("completes a hidden destination journey without leaking identity", async ({
   await harnessCommand(page, "emitDistance", 22, 10);
   await expect(page.getByText("Arrived.")).toHaveCount(0);
   await harnessCommand(page, "emitDistance", 18, 10);
+  await expect(page.getByText("Arrived.")).toHaveCount(0);
+  await harnessCommand(page, "advanceMs", 3_000);
+  await harnessCommand(page, "emitDistance", 19, 10);
   await expect(page.getByRole("heading", { name: "Arrived." })).toBeVisible();
 
   await expect(page.getByText("가족마당")).toHaveCount(0);

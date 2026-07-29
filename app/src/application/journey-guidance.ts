@@ -1,60 +1,113 @@
-import { distanceMeters, shortestAngularDelta, trueBearingDegrees } from "../domain/geo";
+import { NAVIGATION_POLICY_V1 } from "@somewhere/contracts";
+import { shortestAngularDelta, trueBearingDegrees } from "../domain/geo";
 import type { JourneyState } from "../domain/journey";
+import type { TrustedRoute } from "../domain/polyline";
+import { advanceRouteProgress, type RouteProgressState } from "../domain/route-progress";
 import { evaluateHeading, evaluateLocation, INITIAL_NAVIGATION_POLICY } from "../domain/signals";
-import type { CuratedDestination, DestinationBundle } from "../platform/curated-destinations";
-import { resolveDeclination } from "../platform/curated-destinations";
 import type { SensorSnapshot } from "./controller";
 
+type GuidanceBase = {
+  readonly journey: JourneyState;
+  readonly sensors: SensorSnapshot;
+  readonly nowMs: number;
+};
+
+export type TrustedRouteGuidanceInput = GuidanceBase & {
+  readonly route: TrustedRoute | null;
+  readonly routeProgressState: RouteProgressState;
+  readonly declinationDegreesEast: number | null;
+  readonly visibleSinceMs: number | null;
+};
+
+export type JourneyGuidanceInput = TrustedRouteGuidanceInput;
+
+type GuidanceUnavailable = {
+  readonly status: "inactive" | "acquiring";
+  readonly routeProgressState?: RouteProgressState;
+};
+
 export type JourneyGuidance =
-  | { readonly status: "inactive" }
-  | { readonly status: "acquiring" }
-  | { readonly status: "paused"; readonly reasons: readonly string[] }
+  | GuidanceUnavailable
+  | {
+      readonly status: "paused";
+      readonly reasons: readonly string[];
+      readonly routeProgressState?: RouteProgressState;
+    }
   | {
       readonly status: "live";
       readonly distanceM: number;
+      readonly remainingRouteM: number;
+      readonly routeProgressM: number;
+      readonly routeDeviationM: number;
+      readonly endpointDistanceM: number;
+      readonly finalCorridorDeviationM: number;
       readonly targetBearingTrueDeg: number;
       readonly deviceHeadingTrueDeg: number;
       readonly relativeAngleDeg: number;
       readonly locationAccuracyM: number;
       readonly headingAccuracyDeg: number | null;
+      readonly routeProgressState: RouteProgressState;
     };
 
-export type JourneyGuidanceInput = {
-  readonly journey: JourneyState;
-  readonly sensors: SensorSnapshot;
-  readonly destination: CuratedDestination | null;
-  readonly fieldArea: DestinationBundle["fieldArea"];
-  readonly nowMs: number;
-  readonly todayIsoDate: string;
-};
-
-export function freshnessDeadlineMs(sensors: SensorSnapshot): number | null {
+export function freshnessDeadlineMs(
+  sensors: SensorSnapshot,
+  route: TrustedRoute | null = null,
+): number | null {
   if (sensors.location.status !== "live" || sensors.heading.status !== "live") {
     return null;
   }
-  return (
-    Math.min(
-      sensors.location.sample.capturedAtMs + INITIAL_NAVIGATION_POLICY.locationMaxAgeMs,
-      sensors.heading.sample.capturedAtMs + INITIAL_NAVIGATION_POLICY.headingMaxAgeMs,
-    ) + 1
-  );
+  const deadlines = [
+    sensors.location.sample.capturedAtMs + NAVIGATION_POLICY_V1.locationMaxAgeMs,
+    sensors.heading.sample.capturedAtMs + NAVIGATION_POLICY_V1.headingMaxAgeMs,
+  ];
+  if (route !== null) {
+    deadlines.push(
+      route.validatedAtMs + NAVIGATION_POLICY_V1.routeRevalidateAfterMs,
+      route.receivedAtMs + NAVIGATION_POLICY_V1.routeAbsoluteMaxAgeMs,
+      route.expiresAt - 1,
+    );
+  }
+  return Math.min(...deadlines) + 1;
+}
+
+function paused(
+  reasons: readonly string[],
+  routeProgressState: RouteProgressState,
+): JourneyGuidance {
+  return { status: "paused", reasons, routeProgressState };
 }
 
 export function deriveJourneyGuidance(input: JourneyGuidanceInput): JourneyGuidance {
+  const initialState = input.routeProgressState;
   if (input.journey.phase !== "following" && input.journey.phase !== "near") {
-    return { status: "inactive" };
+    return { status: "inactive", routeProgressState: initialState };
+  }
+  if (input.route === null) {
+    return paused(["route-unavailable"], initialState);
   }
   if (input.sensors.guidance.status === "paused") {
-    return {
-      status: "paused",
-      reasons: input.sensors.guidance.reasons,
-    };
+    return paused(input.sensors.guidance.reasons, initialState);
   }
   if (input.sensors.location.status !== "live" || input.sensors.heading.status !== "live") {
-    return { status: "acquiring" };
+    return { status: "acquiring", routeProgressState: initialState };
   }
-  if (input.destination === null) {
-    return { status: "paused", reasons: ["destination-unavailable"] };
+
+  const route = input.route;
+  if (
+    input.nowMs >= route.expiresAt ||
+    input.nowMs - route.receivedAtMs > NAVIGATION_POLICY_V1.routeAbsoluteMaxAgeMs
+  ) {
+    return paused(["route-expired"], initialState);
+  }
+  if (input.nowMs - route.validatedAtMs > NAVIGATION_POLICY_V1.routeRevalidateAfterMs) {
+    return paused(["route-revalidation-required"], initialState);
+  }
+  if (
+    input.visibleSinceMs !== null &&
+    (input.sensors.location.sample.capturedAtMs <= input.visibleSinceMs ||
+      input.sensors.heading.sample.capturedAtMs <= input.visibleSinceMs)
+  ) {
+    return paused(["post-visibility-samples-required"], initialState);
   }
 
   const locationEvaluation = evaluateLocation(
@@ -63,49 +116,55 @@ export function deriveJourneyGuidance(input: JourneyGuidanceInput): JourneyGuida
     INITIAL_NAVIGATION_POLICY,
   );
   if (locationEvaluation.status === "invalid") {
-    return { status: "paused", reasons: [locationEvaluation.reason] };
+    return paused([locationEvaluation.reason], initialState);
   }
-  const declination = resolveDeclination(
-    input.fieldArea,
-    locationEvaluation.sample.coordinates,
-    input.todayIsoDate,
-  );
   const headingEvaluation = evaluateHeading(
     input.sensors.heading.sample,
     input.nowMs,
-    declination,
+    input.declinationDegreesEast,
     INITIAL_NAVIGATION_POLICY,
   );
   if (headingEvaluation.status === "invalid") {
-    return { status: "paused", reasons: [headingEvaluation.reason] };
+    return paused([headingEvaluation.reason], initialState);
   }
 
-  const distanceM = distanceMeters(
+  const progress = advanceRouteProgress(
+    initialState,
+    route.geometry,
     locationEvaluation.sample.coordinates,
-    input.destination.coordinates,
+    NAVIGATION_POLICY_V1,
   );
+  if (progress.status === "suppressed") {
+    return paused([progress.reason], progress.state);
+  }
   const targetBearingTrueDeg = trueBearingDegrees(
     locationEvaluation.sample.coordinates,
-    input.destination.coordinates,
+    progress.forwardTarget,
   );
-  if (distanceM === null || targetBearingTrueDeg === null) {
-    return { status: "paused", reasons: ["guidance-invalid"] };
+  if (targetBearingTrueDeg === null) {
+    return paused(["guidance-invalid"], progress.state);
   }
   const relativeAngleDeg = shortestAngularDelta(
     headingEvaluation.trueDegrees,
     targetBearingTrueDeg,
   );
   if (relativeAngleDeg === null) {
-    return { status: "paused", reasons: ["guidance-invalid"] };
+    return paused(["guidance-invalid"], progress.state);
   }
 
   return {
     status: "live",
-    distanceM,
+    distanceM: progress.remainingM,
+    remainingRouteM: progress.remainingM,
+    routeProgressM: progress.progressM,
+    routeDeviationM: progress.deviationM,
+    endpointDistanceM: progress.endpointDistanceM,
+    finalCorridorDeviationM: progress.finalCorridorDeviationM,
     targetBearingTrueDeg,
     deviceHeadingTrueDeg: headingEvaluation.trueDegrees,
     relativeAngleDeg,
     locationAccuracyM: locationEvaluation.sample.accuracyM,
     headingAccuracyDeg: input.sensors.heading.sample.accuracyDeg,
+    routeProgressState: progress.state,
   };
 }

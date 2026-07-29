@@ -1,16 +1,30 @@
-import type { JourneyProjectionV1 } from "@somewhere/contracts";
+import { type JourneyProjectionV1, NAVIGATION_POLICY_V1 } from "@somewhere/contracts";
+import {
+  type ArrivalState,
+  advanceArrivalState,
+  initialArrivalState,
+} from "../domain/arrival-policy";
+import { type Coordinates, distanceMeters } from "../domain/geo";
 import type { JourneyState } from "../domain/journey";
+import {
+  type RouteGuidanceEnvelope,
+  type TrustedRoute,
+  validateRouteGuidance,
+} from "../domain/polyline";
+import { initialRouteProgressState, type RouteProgressState } from "../domain/route-progress";
+import { nextProximity, type Proximity } from "../domain/signals";
 import type { SensorController, SensorSnapshot } from "./controller";
 import type { DiagnosticSessionMetadata, DiagnosticTrace } from "./diagnostics";
 import { createJourneyDiagnosticRecorder } from "./journey-diagnostics";
-import type { JourneyGuidance } from "./journey-guidance";
+import { createJourneyFreshnessWatchdog } from "./journey-freshness";
+import { deriveJourneyGuidance, type JourneyGuidance } from "./journey-guidance";
 import {
   type HiddenDestinationView,
   hiddenProjectionView,
   type RevealedDestinationView,
   revealedProjectionView,
 } from "./journey-view";
-import type { Unsubscribe } from "./ports";
+import type { Clock, DeadlineScheduler, Unsubscribe } from "./ports";
 import type { JourneyCreateBody } from "./v2-api";
 import type { V2Store } from "./v2-store";
 
@@ -44,6 +58,8 @@ export type V2JourneyApplicationOptions = Readonly<{
   sensors: SensorController;
   store: V2Store;
   diagnostics: DiagnosticTrace;
+  clock: Clock;
+  scheduler: DeadlineScheduler;
   createBody: (
     location: Readonly<{
       accuracyM: number;
@@ -54,12 +70,33 @@ export type V2JourneyApplicationOptions = Readonly<{
   ) => JourneyCreateBody;
 }>;
 
+const DECLINATION_CALIBRATION = {
+  center: { latitude: 37.544_644_3, longitude: 127.037_376_9 },
+  validRadiusM: 2_000,
+  degreesEast: -9.011_45,
+  calculatedAt: "2026-07-28",
+  reviewAfter: "2027-07-28",
+} as const;
+
 export function createV2JourneyApplication(
   options: V2JourneyApplicationOptions,
 ): JourneyApplication {
   const listeners = new Set<(snapshot: JourneyApplicationSnapshot) => void>();
   const recorder = createJourneyDiagnosticRecorder(options.diagnostics);
+  const freshness = createJourneyFreshnessWatchdog(options.clock, options.scheduler);
   let sensors = options.sensors.snapshot();
+  let previousVisibility = sensors.visibility;
+  let visibleSinceMs: number | null = null;
+  let guidance: JourneyGuidance = { status: "inactive" };
+  let route: TrustedRoute | null = null;
+  let routeEnvelope: RouteGuidanceEnvelope | null = null;
+  let routeIdentity: string | null = null;
+  let routeProgress: RouteProgressState = initialRouteProgressState();
+  let arrival: ArrivalState = initialArrivalState();
+  let proximity: Proximity = "following";
+  let lastProcessedLocationAtMs: number | null = null;
+  let arrivalSubmitted = false;
+  let validationGeneration = 0;
   let creating = false;
 
   function projection(): JourneyProjectionV1 | null {
@@ -69,9 +106,9 @@ export function createV2JourneyApplication(
   function snapshot(): JourneyApplicationSnapshot {
     const serverProjection = projection();
     return {
-      journey: legacyJourney(serverProjection),
+      journey: journeyWithLocalProximity(serverProjection, proximity),
       sensors,
-      guidance: { status: "inactive" },
+      guidance,
       hiddenDestination: hiddenProjectionView(serverProjection),
       revealedDestination: revealedProjectionView(serverProjection),
       diagnosticEventCount: options.diagnostics.eventCount(),
@@ -102,10 +139,196 @@ export function createV2JourneyApplication(
     creating = false;
   }
 
+  function routeFromProjection(
+    serverProjection: JourneyProjectionV1 | null,
+  ): RouteGuidanceEnvelope | null {
+    if (
+      serverProjection === null ||
+      (serverProjection.phase !== "following" && serverProjection.phase !== "near") ||
+      serverProjection.guidance.kind !== "route"
+    ) {
+      return null;
+    }
+    return serverProjection.guidance;
+  }
+
+  function navigationActive(serverProjection: JourneyProjectionV1 | null): boolean {
+    return serverProjection?.phase === "following" || serverProjection?.phase === "near";
+  }
+
+  function calibratedDeclination(coordinates: Coordinates): number | null {
+    const today = new Date(options.clock.nowMs()).toISOString().slice(0, 10);
+    const distanceM = distanceMeters(DECLINATION_CALIBRATION.center, coordinates);
+    if (
+      today < DECLINATION_CALIBRATION.calculatedAt ||
+      today > DECLINATION_CALIBRATION.reviewAfter ||
+      distanceM === null ||
+      distanceM > DECLINATION_CALIBRATION.validRadiusM
+    ) {
+      return null;
+    }
+    return DECLINATION_CALIBRATION.degreesEast;
+  }
+
+  function resetRouteEvidence(): void {
+    routeProgress = initialRouteProgressState();
+    if (!arrival.arrived) {
+      arrival = initialArrivalState();
+      arrivalSubmitted = false;
+    }
+    proximity = "following";
+    lastProcessedLocationAtMs = null;
+  }
+
+  function processLocationEvidence(): void {
+    if (guidance.status !== "live") {
+      if (!arrival.arrived) {
+        arrival = initialArrivalState();
+      }
+      return;
+    }
+    if (
+      sensors.location.status !== "live" ||
+      sensors.location.sample.capturedAtMs === lastProcessedLocationAtMs
+    ) {
+      return;
+    }
+    const sample = sensors.location.sample;
+    lastProcessedLocationAtMs = sample.capturedAtMs;
+    proximity = nextProximity(proximity, guidance.remainingRouteM, NAVIGATION_POLICY_V1);
+    arrival = advanceArrivalState(
+      arrival,
+      {
+        endpointDistanceM: guidance.endpointDistanceM,
+        accuracyM: sample.accuracyM,
+        finalCorridorDeviationM: guidance.finalCorridorDeviationM,
+        capturedAtMs: sample.capturedAtMs,
+        routeIsFresh: true,
+        progressIsCredible: true,
+      },
+      NAVIGATION_POLICY_V1,
+    );
+    if (arrival.arrived && !arrivalSubmitted) {
+      arrivalSubmitted = true;
+      void options.store.mutate({
+        action: "arrival",
+        body: {
+          accuracyBand: "good",
+          consecutiveSamples: NAVIGATION_POLICY_V1.arrivalConsecutiveSamples,
+          contractVersion: 1,
+          dwellMs: NAVIGATION_POLICY_V1.arrivalMinimumDwellMs,
+          endpointDistanceBand: "within-arrival-threshold",
+          routeConsistency: "consistent",
+        },
+      });
+    }
+  }
+
+  function deriveGuidance(): void {
+    const serverProjection = projection();
+    guidance = deriveJourneyGuidance({
+      journey: journeyWithLocalProximity(serverProjection, proximity),
+      sensors,
+      route,
+      routeProgressState: routeProgress,
+      declinationDegreesEast:
+        sensors.location.status === "live"
+          ? calibratedDeclination(sensors.location.sample.coordinates)
+          : null,
+      visibleSinceMs,
+      nowMs: options.clock.nowMs(),
+    });
+    if (guidance.routeProgressState !== undefined) {
+      routeProgress = guidance.routeProgressState;
+    }
+    processLocationEvidence();
+  }
+
+  function refreshFreshness(): void {
+    const serverProjection = projection();
+    freshness.refresh(
+      sensors,
+      navigationActive(serverProjection),
+      () => {
+        deriveGuidance();
+        if (
+          route !== null &&
+          routeEnvelope !== null &&
+          options.clock.nowMs() - route.validatedAtMs > NAVIGATION_POLICY_V1.routeRevalidateAfterMs
+        ) {
+          void validateEnvelope(routeEnvelope, route.receivedAtMs);
+        }
+        refreshFreshness();
+        notify();
+      },
+      route,
+    );
+  }
+
+  async function validateEnvelope(
+    envelope: RouteGuidanceEnvelope,
+    receivedAtMs: number,
+  ): Promise<void> {
+    const generation = ++validationGeneration;
+    const result = await validateRouteGuidance(envelope, {
+      nowMs: options.clock.nowMs(),
+      receivedAtMs,
+      routeAbsoluteMaxAgeMs: NAVIGATION_POLICY_V1.routeAbsoluteMaxAgeMs,
+    });
+    if (generation !== validationGeneration) {
+      return;
+    }
+    route = result.ok ? result.route : null;
+    deriveGuidance();
+    refreshFreshness();
+    notify();
+  }
+
+  function syncProjectionRoute(
+    serverProjection: JourneyProjectionV1 | null,
+    receivedFromServer: boolean,
+  ): void {
+    const nextEnvelope = routeFromProjection(serverProjection);
+    if (nextEnvelope === null) {
+      validationGeneration += 1;
+      route = null;
+      routeEnvelope = null;
+      routeIdentity = null;
+      resetRouteEvidence();
+      return;
+    }
+    const nextIdentity = `${nextEnvelope.routeVersion}:${nextEnvelope.routeDigest}:${nextEnvelope.expiresAt}:${nextEnvelope.encodedPolyline}`;
+    if (nextIdentity !== routeIdentity) {
+      routeIdentity = nextIdentity;
+      routeEnvelope = nextEnvelope;
+      route = null;
+      resetRouteEvidence();
+    }
+    if (receivedFromServer || route === null) {
+      routeEnvelope = nextEnvelope;
+      void validateEnvelope(nextEnvelope, options.clock.nowMs());
+    }
+  }
+
   const stopSensors = options.sensors.subscribe((next) => {
+    if (previousVisibility === "hidden" && next.visibility === "visible") {
+      visibleSinceMs = options.clock.nowMs();
+      if (!arrival.arrived) {
+        arrival = initialArrivalState();
+      }
+    }
+    if (next.visibility === "hidden") {
+      if (!arrival.arrived) {
+        arrival = initialArrivalState();
+      }
+      routeProgress = initialRouteProgressState();
+    }
+    previousVisibility = next.visibility;
     sensors = next;
     recorder.recordSensorSamples(next);
     void createFromLiveLocation();
+    deriveGuidance();
+    refreshFreshness();
     notify();
   });
   const stopStore = options.store.subscribe((next) => {
@@ -117,7 +340,11 @@ export function createV2JourneyApplication(
       options.sensors.suspend();
       sensors = options.sensors.snapshot();
       options.diagnostics.stopRecording();
+      freshness.cancel();
     }
+    syncProjectionRoute(next.projection, next.status === "ready" || next.status === "conflict");
+    deriveGuidance();
+    refreshFreshness();
     notify();
   });
 
@@ -127,6 +354,8 @@ export function createV2JourneyApplication(
       await options.sensors.startFromUserGesture();
       sensors = options.sensors.snapshot();
       await createFromLiveLocation();
+      deriveGuidance();
+      refreshFreshness();
       notify();
     },
     async retrySignals() {
@@ -157,6 +386,8 @@ export function createV2JourneyApplication(
       notify();
     },
     async destroy() {
+      validationGeneration += 1;
+      freshness.cancel();
       stopSensors();
       stopStore();
       listeners.clear();
@@ -191,6 +422,17 @@ function legacyJourney(projection: JourneyProjectionV1 | null): JourneyState {
     default:
       return assertNever(projection);
   }
+}
+
+function journeyWithLocalProximity(
+  projection: JourneyProjectionV1 | null,
+  proximity: Proximity,
+): JourneyState {
+  const journey = legacyJourney(projection);
+  if (journey.phase === "following" && proximity === "near") {
+    return { phase: "near", destinationId: journey.destinationId };
+  }
+  return journey;
 }
 
 function assertNever(value: never): never {
