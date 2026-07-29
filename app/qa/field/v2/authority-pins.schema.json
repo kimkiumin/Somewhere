@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.example/qa/field/v2/authority-pins.schema.json",
+  "title": "Somewhere V2 evidence authority pins",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "status",
+    "fieldReleaseRegistrySha256",
+    "studyASupervisorRegistrySha256"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "status": { "enum": ["BLOCK", "ACTIVE"] },
+    "fieldReleaseRegistrySha256": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "studyASupervisorRegistrySha256": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "ACTIVE" } } },
+      "then": {
+        "properties": {
+          "fieldReleaseRegistrySha256": { "type": "string" },
+          "studyASupervisorRegistrySha256": { "type": "string" }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.example/qa/field/v2/trusted-signers.schema.json",
+  "title": "Somewhere V2 release authority signer registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "purpose", "signers"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "purpose": {
+      "enum": ["somewhere-v2-field-release", "somewhere-v2-study-a-supervision"]
+    },
+    "signers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["keyId", "publicKeyPem", "validFrom", "validUntil"],
+        "properties": {
+          "keyId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$"
+          },
+          "publicKeyPem": {
+            "type": "string",
+            "pattern": "^-----BEGIN PUBLIC KEY-----"
+          },
+          "validFrom": { "type": "string", "format": "date-time" },
+          "validUntil": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

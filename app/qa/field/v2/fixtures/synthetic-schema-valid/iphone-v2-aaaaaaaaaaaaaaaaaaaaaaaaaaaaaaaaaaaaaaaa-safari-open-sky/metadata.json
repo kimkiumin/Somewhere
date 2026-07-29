@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "evidenceOrigin": "synthetic",
+  "runId": "A",
+  "buildSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "navigationPolicyVersion": "navigation-v2-rc-1",
+  "navigationPolicySha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "deployedUrl": "https://staging.somewhere.example/",
+  "deviceModel": "iPhone 15 Pro Max",
+  "iosVersion": "18.4",
+  "safariVersion": "18.4",
+  "browserMode": "safari",
+  "environment": "open-sky",
+  "displayMode": "browser",
+  "wakeLockSupported": true,
+  "wakeLockSustained": true,
+  "startedAt": "2026-07-29T13:00:00.000Z",
+  "endedAt": "2026-07-29T13:20:00.000Z",
+  "durationSeconds": 1200,
+  "routeId": "seoul-forest-route-1",
+  "routeVersion": "route-2026-07-29",
+  "routeDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "routeExpiresAt": "2026-08-29T00:00:00.000Z",
+  "providerId": "manual-reviewed",
+  "providerVersion": "manual-2026-07-29",
+  "providerRightsDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+  "providerExpiresAt": "2026-08-29T00:00:00.000Z",
+  "checklistSha256": "28ecfe27dba8939b4027196808cc45a835006c43e59212bb44f0494b6c4e5482",
+  "screensSha256": {
+    "synthetic-placeholder.txt": "30f322d89681214dfd70d1f1a59650f456f11f9430df6ec5bed37e5213eb2e53"
+  },
+  "traceSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "traceStoredPrivately": true,
+  "rawTraceDisposition": "discarded",
+  "exactLocationPublished": false,
+  "moderatorPresent": true,
+  "gates": {
+    "P1": {
+      "status": "PASS",
+      "observedAt": "2026-07-29T13:20:00.000Z",
+      "notes": "synthetic shape check"
+    },
+    "P2": {
+      "status": "PASS",
+      "observedAt": "2026-07-29T13:20:00.000Z",
+      "notes": "synthetic shape check"
+    },
+    "P3": {
+      "status": "PASS",
+      "observedAt": "2026-07-29T13:20:00.000Z",
+      "notes": "synthetic shape check"
+    },
+    "P4": {
+      "status": "PASS",
+      "observedAt": "2026-07-29T13:20:00.000Z",
+      "notes": "synthetic shape check"
+    },
+    "P5": {
+      "status": "PASS",
+      "observedAt": "2026-07-29T13:20:00.000Z",
+      "notes": "synthetic shape check"
+    },
+    "P6": {
+      "status": "PASS",
+      "observedAt": "2026-07-29T13:20:00.000Z",
+      "notes": "synthetic shape check"
+    },
+    "P7": {
+      "status": "PASS",
+      "observedAt": "2026-07-29T13:20:00.000Z",
+      "notes": "synthetic shape check"
+    }
+  },
+  "unsafeEvents": 0,
+  "criticalDefects": 0,
+  "testerAttestation": {
+    "tester": "synthetic-fixture",
+    "moderator": "synthetic-fixture",
+    "signedAt": "2026-07-29T13:21:00.000Z",
+    "signatureSha256": "7777777777777777777777777777777777777777777777777777777777777777"
+  }
+}

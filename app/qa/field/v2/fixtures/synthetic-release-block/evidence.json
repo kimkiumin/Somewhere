@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "evidenceOrigin": "synthetic",
+  "releaseCandidate": {
+    "buildSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceTree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "buildDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "builtAt": "2026-07-29T10:00:00.000Z",
+    "deployedUrl": "https://staging.somewhere.example/",
+    "navigationPolicyVersion": "navigation-v2-rc-1",
+    "navigationPolicySha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "promotionReceiptSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "routeId": "seoul-forest-route-1",
+    "routeVersion": "route-2026-07-29",
+    "routeDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "routeReviewedAt": "2026-07-29T09:00:00.000Z",
+    "routeExpiresAt": "2026-08-29T00:00:00.000Z",
+    "providerId": "manual-reviewed",
+    "providerVersion": "manual-2026-07-29",
+    "providerRightsDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+    "providerExpiresAt": "2026-08-29T00:00:00.000Z"
+  },
+  "runDirectories": []
+}

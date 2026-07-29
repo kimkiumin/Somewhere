@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.example/qa/field/v2/evidence.schema.json",
+  "title": "Somewhere V2 physical release evidence package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "evidenceOrigin", "releaseCandidate", "runDirectories"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "evidenceOrigin": { "enum": ["synthetic", "physical"] },
+    "releaseCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "buildSha",
+        "sourceTree",
+        "buildDigest",
+        "builtAt",
+        "deployedUrl",
+        "navigationPolicyVersion",
+        "navigationPolicySha256",
+        "promotionReceiptSha256",
+        "routeId",
+        "routeVersion",
+        "routeDigest",
+        "routeReviewedAt",
+        "routeExpiresAt",
+        "providerId",
+        "providerVersion",
+        "providerRightsDigest",
+        "providerExpiresAt"
+      ],
+      "properties": {
+        "buildSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "sourceTree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "buildDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "builtAt": { "type": "string", "format": "date-time" },
+        "deployedUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "navigationPolicyVersion": { "const": "navigation-v2-rc-1" },
+        "navigationPolicySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "promotionReceiptSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "routeId": { "type": "string", "minLength": 3, "maxLength": 64 },
+        "routeVersion": { "type": "string", "minLength": 3, "maxLength": 64 },
+        "routeDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "routeReviewedAt": { "type": "string", "format": "date-time" },
+        "routeExpiresAt": { "type": "string", "format": "date-time" },
+        "providerId": { "type": "string", "minLength": 3, "maxLength": 64 },
+        "providerVersion": { "type": "string", "minLength": 3, "maxLength": 64 },
+        "providerRightsDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "providerExpiresAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "runDirectories": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^iphone-v2-[a-f0-9]{40}-(safari|home-screen)-(open-sky|building-dense)$"
+      }
+    }
+  }
+}
