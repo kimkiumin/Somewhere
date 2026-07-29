@@ -38,6 +38,29 @@ function command(type: JourneyCommand["type"], sequence: number, ordinal: number
         },
         type,
       };
+    case "arrival":
+      return {
+        ...common,
+        accuracyBand: "good",
+        consecutiveSamples: 4,
+        dwellMs: 12_000,
+        endpointDistanceBand: "within-arrival-threshold",
+        routeConsistency: "consistent",
+        type,
+      };
+    case "route-recover":
+      return { ...common, choice: "recalibrate", type };
+    case "stop-reason":
+      return { ...common, reason: "skip", type };
+    case "recovery-intent":
+      return {
+        ...common,
+        expiresAt: common.now + 120_000,
+        intentId: "ri_v1.AAAAAAAAAAAAAAAAAAAAAA",
+        type,
+      };
+    case "recovery-confirm":
+      return { ...common, intentId: "ri_v1.AAAAAAAAAAAAAAAAAAAAAA", type };
     default:
       return { ...common, type };
   }

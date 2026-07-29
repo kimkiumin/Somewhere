@@ -63,6 +63,21 @@ export const journeyCommandSchema = z.discriminatedUnion("type", [
     .readonly(),
   commandBase
     .extend({
+      expiresAt: positiveIntegerSchema,
+      intentId: z.string().regex(/^ri_v1\.[A-Za-z0-9_-]{22}$/),
+      type: z.literal("recovery-intent"),
+    })
+    .strict()
+    .readonly(),
+  commandBase
+    .extend({
+      intentId: z.string().regex(/^ri_v1\.[A-Za-z0-9_-]{22}$/),
+      type: z.literal("recovery-confirm"),
+    })
+    .strict()
+    .readonly(),
+  commandBase
+    .extend({
       capturedPauseEpoch: nonnegativeIntegerSchema,
       route: routeSchema,
       type: z.literal("route-activate"),
@@ -71,6 +86,14 @@ export const journeyCommandSchema = z.discriminatedUnion("type", [
     .readonly(),
   commandBase
     .extend({ type: z.literal("route-repair") })
+    .strict()
+    .readonly(),
+  commandBase
+    .extend({
+      choice: z.enum(["recalibrate", "reroute", "cached-route", "external-map"]),
+      routeVersion: z.string().min(1).max(96).optional(),
+      type: z.literal("route-recover"),
+    })
     .strict()
     .readonly(),
   commandBase
@@ -95,7 +118,29 @@ export const journeyCommandSchema = z.discriminatedUnion("type", [
     .strict()
     .readonly(),
   commandBase
-    .extend({ type: z.literal("arrival") })
+    .extend({
+      accuracyBand: z.enum(["poor", "acceptable", "good"]),
+      consecutiveSamples: nonnegativeIntegerSchema.max(100),
+      dwellMs: nonnegativeIntegerSchema.max(120_000),
+      endpointDistanceBand: z.enum(["outside", "near", "within-arrival-threshold"]),
+      routeConsistency: z.enum(["unknown", "inconsistent", "consistent"]),
+      type: z.literal("arrival"),
+    })
+    .strict()
+    .readonly(),
+  commandBase
+    .extend({
+      reason: z.enum([
+        "safety-concern",
+        "route-or-sensor",
+        "hard-condition",
+        "venue-situation",
+        "changed-mind",
+        "schedule-changed",
+        "skip",
+      ]),
+      type: z.literal("stop-reason"),
+    })
     .strict()
     .readonly(),
   commandBase
@@ -154,16 +199,50 @@ export const journeyStateSchema = z
     pauseEpoch: nonnegativeIntegerSchema,
     phase: phaseSchema,
     revealed: z.boolean(),
-    routeRepair: z
+    recoveryExpiresAt: positiveIntegerSchema.optional(),
+    recoveryIntent: z
       .object({
-        status: z.enum(["checking", "unavailable"]),
-        updatedAt: positiveIntegerSchema,
+        expiresAt: positiveIntegerSchema,
+        intentId: z.string().regex(/^ri_v1\.[A-Za-z0-9_-]{22}$/),
       })
       .strict()
       .readonly()
       .optional(),
+    routeRepair: z
+      .union([
+        z.object({ status: z.literal("idle") }).strict(),
+        z
+          .object({
+            choice: z.enum(["recalibrate", "reroute", "cached-route"]),
+            status: z.literal("repairing"),
+          })
+          .strict(),
+        z.object({ routeVersion: z.string().min(1), status: z.literal("ready") }).strict(),
+        z.object({ status: z.literal("external-map-handed-off") }).strict(),
+        z
+          .object({
+            reason: z.enum(["route-stale", "location-poor", "heading-poor", "provider"]),
+            status: z.literal("failed"),
+          })
+          .strict(),
+      ])
+      .readonly()
+      .optional(),
     selectedSnapshot: selectedSnapshotSchema,
     sequence: nonnegativeIntegerSchema,
+    stopReason: z
+      .enum([
+        "safety-concern",
+        "route-or-sensor",
+        "hard-condition",
+        "venue-situation",
+        "changed-mind",
+        "schedule-changed",
+        "skip",
+      ])
+      .optional(),
+    stopReasonState: z.enum(["required-or-skip", "recorded", "skipped"]).optional(),
+    stoppedAt: positiveIntegerSchema.optional(),
     writeEpoch: positiveIntegerSchema,
   })
   .strict()

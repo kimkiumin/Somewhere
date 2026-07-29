@@ -24,6 +24,11 @@ type StateChange = Readonly<{
   phase?: JourneyState["phase"];
   revealed?: boolean;
   routeRepair?: JourneyState["routeRepair"];
+  recoveryExpiresAt?: number;
+  recoveryIntent?: JourneyState["recoveryIntent"];
+  stopReason?: JourneyState["stopReason"];
+  stopReasonState?: JourneyState["stopReasonState"];
+  stoppedAt?: number;
 }>;
 
 function unchanged(state: JourneyState, kind: JourneyTransition["kind"]): JourneyTransition {
@@ -97,6 +102,7 @@ export function createReadyJourney(input: ReadyJourneyInput): JourneyState {
     pauseEpoch: 0,
     phase: "ready",
     revealed: false,
+    recoveryIntent: undefined,
     routeRepair: undefined,
     selectedSnapshot: input.selectedSnapshot,
     sequence: input.sequence,
@@ -135,13 +141,40 @@ export function transitionJourney(state: JourneyState, command: JourneyCommand):
       openStop: undefined,
       phase: "stopped",
       routeRepair: undefined,
+      stopReasonState: "required-or-skip",
+      stoppedAt: command.now,
+    });
+  }
+  if (
+    command.type === "stop-request" &&
+    state.phase === "arrived" &&
+    state.feedback !== undefined &&
+    command.expectedSequence === state.sequence - 1
+  ) {
+    return withOutcome(state, command, {
+      feedback: undefined,
+      openStop: {
+        confirmationId: command.stopConfirmationId,
+        pauseEpoch: state.pauseEpoch + 1,
+        phaseBeforePause: "following",
+      },
+      pauseEpoch: state.pauseEpoch + 1,
+      phase: "paused",
+      routeRepair: { status: "idle" },
     });
   }
   if (command.expectedSequence !== state.sequence) {
     return unchanged(state, "sequence_conflict");
   }
   if (state.phase === "stopped" || state.phase === "completed" || state.phase === "arrived") {
-    if (command.type !== "reveal") {
+    if (
+      command.type !== "reveal" &&
+      !(state.phase === "stopped" && command.type === "stop-reason") &&
+      !(
+        state.phase === "completed" &&
+        (command.type === "recovery-intent" || command.type === "recovery-confirm")
+      )
+    ) {
       return unchanged(state, "illegal_transition");
     }
   }
@@ -167,7 +200,7 @@ export function transitionJourney(state: JourneyState, command: JourneyCommand):
         routeRepair: undefined,
       });
     case "stop-request":
-      if (!isResumablePhase(state.phase) || state.openStop !== undefined) {
+      if (!isResumablePhase(state.phase)) {
         return unchanged(state, "illegal_transition");
       }
       return withOutcome(state, command, {
@@ -178,6 +211,7 @@ export function transitionJourney(state: JourneyState, command: JourneyCommand):
         },
         pauseEpoch: state.pauseEpoch + 1,
         phase: "paused",
+        routeRepair: { status: "idle" },
       });
     case "continue":
       if (
@@ -187,28 +221,97 @@ export function transitionJourney(state: JourneyState, command: JourneyCommand):
       ) {
         return unchanged(state, "illegal_transition");
       }
-      return withOutcome(state, command, { phase: state.openStop.phaseBeforePause });
+      return withOutcome(state, command, {
+        phase: state.openStop.phaseBeforePause,
+        routeRepair: undefined,
+      });
     case "route-repair":
       return state.phase === "paused"
         ? withOutcome(state, command, {
-            routeRepair: { status: "checking", updatedAt: command.now },
+            routeRepair: { choice: "recalibrate", status: "repairing" },
           })
         : unchanged(state, "illegal_transition");
+    case "route-recover":
+      if (
+        state.phase !== "following" &&
+        state.phase !== "route-recovery" &&
+        state.phase !== "near" &&
+        state.phase !== "paused"
+      ) {
+        return unchanged(state, "illegal_transition");
+      }
+      if (command.choice === "external-map") {
+        return withOutcome(state, command, {
+          revealed: true,
+          ...(state.phase === "paused"
+            ? { routeRepair: { status: "external-map-handed-off" } }
+            : {}),
+        });
+      }
+      return withOutcome(state, command, {
+        ...(state.phase === "paused"
+          ? {
+              routeRepair:
+                command.routeVersion === undefined
+                  ? { choice: command.choice, status: "repairing" }
+                  : { routeVersion: command.routeVersion, status: "ready" },
+            }
+          : { phase: "following", routeRepair: undefined }),
+      });
     case "arrival":
       if ((state.phase !== "following" && state.phase !== "near") || state.openStop !== undefined) {
         return unchanged(state, "illegal_transition");
       }
+      if (
+        command.endpointDistanceBand === "within-arrival-threshold" &&
+        command.accuracyBand === "good" &&
+        command.consecutiveSamples >= 4 &&
+        command.dwellMs >= 12_000 &&
+        command.dwellMs <= 20_000 &&
+        command.routeConsistency === "consistent"
+      ) {
+        return withOutcome(state, command, {
+          activeRoute: undefined,
+          feedback: {
+            dueAt: command.now + 60 * 60 * 1_000,
+            eventId: `event_${command.idempotencyKeyDigest.slice(0, 48)}`,
+            status: "scheduled",
+          },
+          phase: "arrived",
+          routeRepair: undefined,
+        });
+      }
       return withOutcome(state, command, {
-        activeRoute: undefined,
-        feedback: {
-          dueAt: command.now + 60 * 60 * 1_000,
-          eventId: `event_${command.idempotencyKeyDigest.slice(0, 48)}`,
-          status: "scheduled",
-        },
-        phase: "arrived",
-        routeRepair: undefined,
+        phase: command.endpointDistanceBand === "near" ? "near" : "following",
       });
+    case "stop-reason":
+      return state.phase === "stopped" && state.stopReasonState === "required-or-skip"
+        ? withOutcome(state, command, {
+            phase: "completed",
+            stopReason: command.reason,
+            stopReasonState: command.reason === "skip" ? "skipped" : "recorded",
+            ...(command.reason === "schedule-changed"
+              ? {}
+              : { recoveryExpiresAt: (state.stoppedAt ?? command.now) + 300_000 }),
+          })
+        : unchanged(state, "illegal_transition");
+    case "recovery-intent":
+      return state.phase === "completed" &&
+        state.recoveryExpiresAt !== undefined &&
+        command.now < state.recoveryExpiresAt
+        ? withOutcome(state, command, {
+            recoveryIntent: { expiresAt: command.expiresAt, intentId: command.intentId },
+          })
+        : unchanged(state, "illegal_transition");
+    case "recovery-confirm":
+      return state.phase === "completed" &&
+        state.recoveryIntent?.intentId === command.intentId &&
+        command.now < state.recoveryIntent.expiresAt
+        ? withOutcome(state, command, { recoveryIntent: undefined })
+        : unchanged(state, "illegal_transition");
     case "reveal":
-      return withOutcome(state, command, { revealed: true });
+      return state.revealed
+        ? unchanged(state, "illegal_transition")
+        : withOutcome(state, command, { revealed: true });
   }
 }

@@ -6,6 +6,8 @@ export const API_HEADERS = {
 } as const;
 
 const ERROR_STATUS = {
+  capability_expired: 410,
+  capability_invalid: 404,
   idempotency_conflict: 409,
   invalid_request: 400,
   invalid_transition: 409,
@@ -16,11 +18,15 @@ const ERROR_STATUS = {
   payload_too_large: 413,
   provider_unavailable: 503,
   request_forbidden: 403,
+  recovery_not_allowed: 409,
+  recovery_review_required: 409,
   route_unavailable: 503,
   schema_invalid: 422,
+  service_unavailable: 503,
   sequence_conflict: 409,
   session_expired: 401,
   unsupported_media_type: 415,
+  invalid_arrival_evidence: 422,
 } as const;
 
 export type SliceErrorCode = keyof typeof ERROR_STATUS;

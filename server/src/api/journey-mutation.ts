@@ -1,12 +1,22 @@
+import type { Database } from "../db/database";
+import { SessionRepository } from "../db/session-repository";
 import { parseExpectedSequence } from "../security/sequence";
-import { hmacDigest, isCanonicalToken } from "../security/tokens";
+import { hmacDigest, isCanonicalToken, randomBase64Url } from "../security/tokens";
 import { publicError } from "./http-response";
 import {
-  projectCommittedJourney,
-  projectReadyJourney,
-  projectRevealedJourney,
-} from "./journey-composition";
-import { clearGuard, findDeleteReplay, writeDeleteTombstone } from "./journey-persistence";
+  commandFor,
+  keysFor,
+  type LifecycleMutationAction,
+  parseLifecycleBody,
+} from "./journey-lifecycle-body";
+import { predictSnapshot } from "./journey-lifecycle-prediction";
+import {
+  clearGuard,
+  findDeleteReplay,
+  markJourneyStopped,
+  writeDeleteTombstone,
+} from "./journey-persistence";
+import { projectLifecycleJourney } from "./journey-projection";
 import {
   authError,
   authenticateMutation,
@@ -19,7 +29,6 @@ import {
 } from "./journey-request";
 import { openForSession, sealForSession } from "./session-cipher";
 
-const VERSION_KEYS = new Set(["contractVersion"]);
 const JSON_HEADERS = {
   "cache-control": "no-store, private",
   "content-type": "application/json; charset=utf-8",
@@ -38,10 +47,20 @@ export async function getJourney(
   if (session === undefined) {
     return publicError("session_expired");
   }
-  return projectSnapshot(
-    await env.JOURNEYS.getByName(journeyId).snapshot(session.bindingDigest),
-    session,
-  );
+  if (
+    (await findDeleteReplay(
+      env.DB,
+      await hmacDigest(dependencies.hmacKey, journeyId),
+      dependencies.now(),
+    )) !== undefined
+  ) {
+    return publicError("journey_expired");
+  }
+  const snapshot = await env.JOURNEYS.getByName(journeyId).snapshot(session.bindingDigest);
+  if (snapshot !== undefined && dependencies.now() >= snapshot.expiresAt) {
+    return publicError("journey_expired");
+  }
+  return projectSnapshot(snapshot, session);
 }
 
 export async function mutateJourney(
@@ -49,13 +68,18 @@ export async function mutateJourney(
   env: Env,
   dependencies: JourneyControllerDependencies,
   journeyId: string,
-  action: "commit" | "reveal",
+  action: LifecycleMutationAction,
 ): Promise<Response> {
-  const parsed = await parseMutationBody(request, 1_024, VERSION_KEYS);
+  const parsed = await parseMutationBody(
+    request,
+    action === "route-recover" || action === "arrival" ? 2_048 : 1_024,
+    keysFor(action),
+  );
   if ("error" in parsed) {
     return publicError(parsed.error);
   }
-  if (parsed.body !== '{"contractVersion":1}') {
+  const body = parseLifecycleBody(action, parsed.value);
+  if (body === undefined) {
     return publicError("schema_invalid");
   }
   const session = await authenticateMutation(request, dependencies);
@@ -71,31 +95,49 @@ export async function mutateJourney(
       expectedSequence === undefined ? "sequence_conflict" : "idempotency_conflict",
     );
   }
+  if (
+    (await findDeleteReplay(
+      env.DB,
+      await hmacDigest(dependencies.hmacKey, journeyId),
+      dependencies.now(),
+    )) !== undefined
+  ) {
+    return publicError("journey_expired");
+  }
   const stub = env.JOURNEYS.getByName(journeyId);
   const snapshot = await stub.snapshot(session.bindingDigest);
   if (snapshot === undefined) {
     return publicError("not_found");
   }
+  const now = dependencies.now();
+  if (now >= snapshot.expiresAt) {
+    return publicError("journey_expired");
+  }
   const prepared = await preparedFromSnapshot(snapshot, session);
-  const nextProjection =
-    action === "commit"
-      ? projectCommittedJourney(prepared, snapshot.sequence + 1, false)
-      : projectRevealedJourney(
-          snapshot.phase === "ready"
-            ? projectReadyJourney(prepared, snapshot.sequence, false)
-            : projectCommittedJourney(prepared, snapshot.sequence, false),
-          prepared.identity,
-          snapshot.sequence + 1,
-        );
-  const responseBody = JSON.stringify(nextProjection);
+  const commandDetails = commandFor(action, body, snapshot);
+  const nextSnapshot = predictSnapshot(action, body, snapshot, commandDetails, now);
+  const nextProjection = projectLifecycleJourney(prepared, nextSnapshot);
+  const feedbackCapability =
+    action === "arrival" && nextSnapshot.phase === "arrived"
+      ? `fb_v1.${randomBase64Url(32)}`
+      : undefined;
+  const responseBody = JSON.stringify(
+    feedbackCapability === undefined
+      ? nextProjection
+      : {
+          feedbackCapability,
+          requestId: `req_v1.${randomBase64Url(16)}`,
+          result: nextProjection,
+        },
+  );
   const result = await stub.transition({
     bodyDigest: await sha256(parsed.body),
     expectedSequence,
     idempotencyKeyDigest: await hmacDigest(dependencies.hmacKey, rawKey),
-    now: dependencies.now(),
+    now,
     outcomeCiphertext: await sealForSession(responseBody, session.sessionToken),
-    type: action,
     writeEpoch: 1,
+    ...commandDetails,
   });
   if (result.kind === "replay" && result.outcomeCiphertext !== undefined) {
     const replay = await openForSession(result.outcomeCiphertext, session.sessionToken);
@@ -103,9 +145,33 @@ export async function mutateJourney(
       ? new Response(replay, { headers: JSON_HEADERS, status: 200 })
       : publicError("idempotency_conflict");
   }
-  return result.kind === "applied"
-    ? new Response(responseBody, { headers: JSON_HEADERS, status: 200 })
-    : publicError(transitionError(result.kind));
+  if (result.kind !== "applied") {
+    return publicError(transitionError(result.kind));
+  }
+  if (action === "confirm-stop") {
+    await markJourneyStopped({
+      bindingDigest: session.bindingDigest,
+      database: env.DB,
+      journeyDigest: await hmacDigest(dependencies.hmacKey, journeyId),
+      now,
+      previousCandidateDigest:
+        snapshot.selectedSnapshot.receiptDigest ??
+        (await hmacDigest(dependencies.hmacKey, snapshot.selectedSnapshot.selectionReceiptId)),
+    });
+  }
+  if (feedbackCapability !== undefined && nextSnapshot.feedback !== undefined) {
+    const capabilityDigest = await hmacDigest(dependencies.hmacKey, feedbackCapability);
+    await new SessionRepository(env.DB satisfies Database).insertFeedbackEligibility({
+      capability_digest: capabilityDigest,
+      consumed_at: null,
+      due_at: nextSnapshot.feedback.dueAt,
+      eligibility_id: `eligibility:${capabilityDigest.slice(0, 48)}`,
+      eligibility_state: "eligible",
+      expires_at: now + 7 * 24 * 60 * 60 * 1_000,
+      journey_hmac_digest: await hmacDigest(dependencies.hmacKey, journeyId),
+    });
+  }
+  return new Response(responseBody, { headers: JSON_HEADERS, status: 200 });
 }
 
 export async function deleteJourney(
@@ -143,6 +209,9 @@ export async function deleteJourney(
   const snapshot = await stub.snapshot(session.bindingDigest);
   if (snapshot === undefined) {
     return publicError("not_found");
+  }
+  if (dependencies.now() >= snapshot.expiresAt) {
+    return publicError("journey_expired");
   }
   if (snapshot.sequence !== expectedSequence) {
     return publicError("sequence_conflict");

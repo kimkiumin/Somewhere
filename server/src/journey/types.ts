@@ -48,6 +48,29 @@ export type FeedbackState = Readonly<{
   status: "scheduled" | "eligible" | "consumed";
 }>;
 
+export type StopReason =
+  | "safety-concern"
+  | "route-or-sensor"
+  | "hard-condition"
+  | "venue-situation"
+  | "changed-mind"
+  | "schedule-changed"
+  | "skip";
+
+export type RouteRepair = Readonly<
+  | { status: "idle" }
+  | {
+      choice: "recalibrate" | "reroute" | "cached-route";
+      status: "repairing";
+    }
+  | { routeVersion: string; status: "ready" }
+  | { status: "external-map-handed-off" }
+  | {
+      reason: "route-stale" | "location-poor" | "heading-poor" | "provider";
+      status: "failed";
+    }
+>;
+
 export type JourneyState = Readonly<{
   activeRoute: ActiveRoute | undefined;
   browserBindingDigest: string;
@@ -60,14 +83,19 @@ export type JourneyState = Readonly<{
   pauseEpoch: number;
   phase: JourneyPhase;
   revealed: boolean;
-  routeRepair:
+  recoveryExpiresAt?: number | undefined;
+  recoveryIntent?:
     | Readonly<{
-        status: "checking" | "unavailable";
-        updatedAt: number;
+        expiresAt: number;
+        intentId: string;
       }>
     | undefined;
+  routeRepair: RouteRepair | undefined;
   selectedSnapshot: SelectedSnapshot;
   sequence: number;
+  stopReason?: StopReason | undefined;
+  stopReasonState?: "required-or-skip" | "recorded" | "skipped" | undefined;
+  stoppedAt?: number | undefined;
   writeEpoch: number;
 }>;
 
@@ -91,10 +119,37 @@ export type JourneyCommand =
   | (CommandBase & Readonly<{ type: "route-repair" }>)
   | (CommandBase &
       Readonly<{
+        choice: "recalibrate" | "reroute" | "cached-route" | "external-map";
+        routeVersion?: string | undefined;
+        type: "route-recover";
+      }>)
+  | (CommandBase &
+      Readonly<{
         stopConfirmationId: string;
         type: "stop-request" | "continue" | "confirm-stop";
       }>)
-  | (CommandBase & Readonly<{ type: "arrival" | "reveal" }>);
+  | (CommandBase &
+      Readonly<{
+        accuracyBand: "poor" | "acceptable" | "good";
+        consecutiveSamples: number;
+        dwellMs: number;
+        endpointDistanceBand: "outside" | "near" | "within-arrival-threshold";
+        routeConsistency: "unknown" | "inconsistent" | "consistent";
+        type: "arrival";
+      }>)
+  | (CommandBase & Readonly<{ reason: StopReason; type: "stop-reason" }>)
+  | (CommandBase &
+      Readonly<{
+        expiresAt: number;
+        intentId: string;
+        type: "recovery-intent";
+      }>)
+  | (CommandBase &
+      Readonly<{
+        intentId: string;
+        type: "recovery-confirm";
+      }>)
+  | (CommandBase & Readonly<{ type: "reveal" }>);
 
 export type JourneyOutboxEvent = Readonly<{
   attempts: number;

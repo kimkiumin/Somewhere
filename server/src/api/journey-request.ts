@@ -3,24 +3,23 @@ import { parseStrictBody } from "../security/schema";
 import type { AuthenticatedSession, SessionService } from "../security/session";
 import { hmacDigest } from "../security/tokens";
 import { jsonResponse, publicError, type SliceErrorCode } from "./http-response";
-import {
-  type PreparedJourney,
-  PreparedJourneySchema,
-  projectCommittedJourney,
-  projectReadyJourney,
-  projectRevealedJourney,
-} from "./journey-composition";
+import { type PreparedJourney, PreparedJourneySchema } from "./journey-composition";
+import { type LifecycleSnapshot, projectLifecycleJourney } from "./journey-projection";
 import { openForSession } from "./session-cipher";
 
-export type JourneySnapshot = Readonly<{
-  phase: string;
-  revealed: boolean;
-  selectedSnapshot: Readonly<{
-    createRequestDigest?: string;
-    destinationSnapshotCiphertext: string;
+export type JourneySnapshot = LifecycleSnapshot &
+  Readonly<{
+    expiresAt: number;
+    phase: string;
+    revealed: boolean;
+    selectedSnapshot: Readonly<{
+      createRequestDigest?: string;
+      destinationSnapshotCiphertext: string;
+      receiptDigest?: string;
+      selectionReceiptId: string;
+    }>;
+    sequence: number;
   }>;
-  sequence: number;
-}>;
 
 export type JourneyControllerDependencies = Readonly<{
   hmacKey: CryptoKey;
@@ -37,14 +36,7 @@ export async function projectSnapshot(
     return publicError("not_found");
   }
   const prepared = await preparedFromSnapshot(snapshot, session);
-  const base =
-    snapshot.phase === "ready"
-      ? projectReadyJourney(prepared, snapshot.sequence, false)
-      : projectCommittedJourney(prepared, snapshot.sequence, false);
-  return jsonResponse(
-    snapshot.revealed ? projectRevealedJourney(base, prepared.identity, snapshot.sequence) : base,
-    status,
-  );
+  return jsonResponse(projectLifecycleJourney(prepared, snapshot), status);
 }
 
 export async function preparedFromSnapshot(

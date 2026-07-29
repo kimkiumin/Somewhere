@@ -3,7 +3,7 @@ import { JourneyCreateBodyV1Schema } from "../../../contracts/src/journey";
 import { hmacDigest, isCanonicalToken, randomBase64Url } from "../security/tokens";
 import { jsonResponse, publicError } from "./http-response";
 import { buildJourneyPreparation, projectReadyJourney } from "./journey-composition";
-import { findGuard, persistPreparation } from "./journey-persistence";
+import { consumeRecoveryDigest, findGuard, persistPreparation } from "./journey-persistence";
 import {
   authError,
   authenticateMutation,
@@ -63,6 +63,42 @@ export async function createJourney(
     return publicError("invalid_transition");
   }
   const now = dependencies.now();
+  if (body.data.recoveryCapability === null) {
+    if (
+      guard?.previous_candidate_digest !== null &&
+      guard?.previous_candidate_digest !== undefined &&
+      guard.last_stopped_at !== null &&
+      now < guard.last_stopped_at + 300_000
+    ) {
+      return publicError("recovery_review_required");
+    }
+  } else {
+    const constraints = JSON.stringify(body.data.constraints);
+    const capabilityDigest = await hmacDigest(
+      dependencies.hmacKey,
+      `${body.data.recoveryCapability}\0${constraints}`,
+    );
+    if (
+      guard?.recovery_capability_digest !== capabilityDigest ||
+      guard.recovery_consumed_at !== null ||
+      guard.last_stopped_at === null
+    ) {
+      return publicError("capability_invalid");
+    }
+    if (now > guard.last_stopped_at + 120_000) {
+      return publicError("capability_expired");
+    }
+    if (
+      !(await consumeRecoveryDigest({
+        bindingDigest: session.bindingDigest,
+        database: env.DB,
+        digest: capabilityDigest,
+        now,
+      }))
+    ) {
+      return publicError("capability_invalid");
+    }
+  }
   const prepared = await buildJourneyPreparation({
     body: body.data,
     journeyId,

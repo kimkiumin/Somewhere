@@ -9,6 +9,7 @@ import {
 } from "./schemas";
 import { JourneySqliteStore } from "./sqlite-store";
 import { finalizeDeleteAfterTombstone } from "./tombstone";
+import type { JourneyPhase, RouteRepair } from "./types";
 
 type SafeMutationResult = Readonly<{
   kind: JourneyTransition["kind"];
@@ -26,8 +27,18 @@ export type InternalJourneySnapshot = Readonly<{
         routeDigest: string;
       }>
     | undefined;
-  phase: string;
+  expiresAt: number;
+  feedback: Readonly<{ dueAt: number }> | undefined;
+  openStop:
+    | Readonly<{
+        confirmationId: string;
+        phaseBeforePause: "ready" | "committed" | "following" | "route-recovery" | "near";
+      }>
+    | undefined;
+  phase: JourneyPhase;
+  recoveryExpiresAt?: number | undefined;
   revealed: boolean;
+  routeRepair: RouteRepair | undefined;
   selectedSnapshot: Readonly<{
     createRequestDigest?: string;
     destinationSnapshotCiphertext: string;
@@ -35,6 +46,17 @@ export type InternalJourneySnapshot = Readonly<{
     selectionReceiptId: string;
   }>;
   sequence: number;
+  stopReasonState?: "required-or-skip" | "recorded" | "skipped" | undefined;
+  stopReason?:
+    | "safety-concern"
+    | "route-or-sensor"
+    | "hard-condition"
+    | "venue-situation"
+    | "changed-mind"
+    | "schedule-changed"
+    | "skip"
+    | undefined;
+  stoppedAt?: number | undefined;
 }>;
 
 export class JourneyDurableObject extends DurableObject<Env> {
@@ -100,10 +122,18 @@ export class JourneyDurableObject extends DurableObject<Env> {
     }
     return {
       activeRoute: state.activeRoute,
+      expiresAt: state.expiresAt,
+      feedback: state.feedback === undefined ? undefined : { dueAt: state.feedback.dueAt },
+      openStop: state.openStop,
       phase: state.phase,
+      recoveryExpiresAt: state.recoveryExpiresAt,
       revealed: state.revealed,
+      routeRepair: state.routeRepair,
       selectedSnapshot: state.selectedSnapshot,
       sequence: state.sequence,
+      stopReasonState: state.stopReasonState,
+      stopReason: state.stopReason,
+      stoppedAt: state.stoppedAt,
     };
   }
 

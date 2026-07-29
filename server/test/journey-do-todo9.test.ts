@@ -146,11 +146,16 @@ describe("journey-do serialized aggregate", () => {
 
     // When: arrival evidence is accepted.
     const arrived = transitionJourney(following.state, {
+      accuracyBand: "good",
       bodyDigest: "3".repeat(64),
+      consecutiveSamples: 4,
+      dwellMs: 12_000,
+      endpointDistanceBand: "within-arrival-threshold",
       expectedSequence: 6,
       idempotencyKeyDigest: "4".repeat(64),
       now: 3_000,
       outcomeCiphertext: "arrival",
+      routeConsistency: "consistent",
       type: "arrival",
       writeEpoch: 7,
     });
