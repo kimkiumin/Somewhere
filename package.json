@@ -1,0 +1,36 @@
+{
+  "name": "@somewhere/workspace",
+  "version": "2.0.0",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "app",
+    "contracts"
+  ],
+  "scripts": {
+    "verify": "bun run verify:baseline && bun run test:contracts",
+    "verify:baseline": "bun -e 'const child=Bun.spawn([\"bun\",\"run\",\"--cwd\",\"app\",\"verify\"],{stdout:\"inherit\",stderr:\"inherit\"});const code=await child.exited;const {rm}=await import(\"node:fs/promises\");for(const path of [\"app/dist\",\"app/dist-e2e\",\"app/test-results\",\"app/playwright-report\",\"output/playwright\"]){await rm(path,{recursive:true,force:true});}process.exit(code);'",
+    "test:contracts": "bun run --cwd contracts test",
+    "test:app": "bun run --cwd app test:unit",
+    "typecheck": "bun run --cwd contracts typecheck && bun run --cwd app typecheck",
+    "lint": "bun run --cwd app lint",
+    "build": "bun run --cwd app build"
+  },
+  "overrides": {
+    "jake": "12.10.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.6",
+    "@cloudflare/vitest-pool-workers": "0.19.0",
+    "@cloudflare/workers-types": "5.20260729.1",
+    "@types/bun": "1.3.14",
+    "@vitest/coverage-v8": "4.1.10",
+    "lighthouse": "13.4.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10",
+    "wrangler": "4.115.0"
+  }
+}
