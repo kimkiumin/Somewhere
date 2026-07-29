@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { closeSync, openSync } from "node:fs";
+import { closeSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
@@ -13,7 +13,17 @@ import { portOpen } from "./lib/lane-lifecycle.mjs";
 
 const specification = {
   required: ["--repo", "--asset-dir", "--state-dir", "--runtime-dir", "--host", "--port", "--output"],
+  optional: ["--ownership-output"],
 };
+
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function processGroupAlive(pid) {
   try {
@@ -22,6 +32,16 @@ function processGroupAlive(pid) {
   } catch {
     return false;
   }
+}
+
+function processStartTime(pid) {
+  const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+  const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+  const startTime = fields[19];
+  if (startTime === undefined || !/^\d+$/.test(startTime)) {
+    throw new TypeError(`prepared Worker process identity unavailable: ${pid}`);
+  }
+  return startTime;
 }
 
 async function stopProcessGroup(pid) {
@@ -84,6 +104,15 @@ async function start(options) {
   if (generated.exitCode !== 0) throw new ReleaseInputError(generated.stderr.toString().trim());
   const logPath = resolve(runtime, "worker.log");
   const descriptor = openSync(logPath, "a");
+  const acquisitionProcessGroupId = options["ownership-output"] === undefined
+    ? null
+    : Number(process.env.SOMEWHERE_ACQUISITION_PROCESS_GROUP_ID);
+  if (
+    acquisitionProcessGroupId !== null
+    && (!Number.isSafeInteger(acquisitionProcessGroupId) || acquisitionProcessGroupId <= 0)
+  ) {
+    throw new ReleaseInputError("acquisition process group identity unavailable");
+  }
   const child = spawn("bunx", [
     "wrangler",
     "dev",
@@ -106,10 +135,41 @@ async function start(options) {
     "--show-interactive-dev-session=false",
   ], {
     cwd: repo,
-    detached: true,
+    detached: acquisitionProcessGroupId === null,
     env: process.env,
     stdio: ["ignore", descriptor, descriptor],
   });
+  let workerStartTime;
+  try {
+    workerStartTime = processStartTime(child.pid);
+    if (options["ownership-output"] !== undefined) {
+      const ownershipOutput = resolve(options["ownership-output"]);
+      const temporary = `${ownershipOutput}.tmp-${process.pid}`;
+      writeFileSync(temporary, `${JSON.stringify({
+        schemaVersion: 1,
+        pid: child.pid,
+        processGroupId: acquisitionProcessGroupId ?? child.pid,
+        processStartTime: workerStartTime,
+        port,
+      })}\n`, { flag: "wx" });
+      renameSync(temporary, ownershipOutput);
+    }
+  } catch (error) {
+    try {
+      if (acquisitionProcessGroupId === null) {
+        process.kill(-child.pid, "SIGKILL");
+      } else {
+        child.kill("SIGKILL");
+      }
+    } catch {
+      // Preserve the ownership handoff failure.
+    }
+    if (options["ownership-output"] !== undefined) {
+      rmSync(`${resolve(options["ownership-output"])}.tmp-${process.pid}`, { force: true });
+    }
+    closeSync(descriptor);
+    throw error;
+  }
   child.unref();
   closeSync(descriptor);
   const baseUrl = `https://${options.host}:${port}`;
@@ -129,21 +189,23 @@ async function start(options) {
       healthy = true;
       break;
     }
-    if (!processGroupAlive(child.pid)) break;
+    if (!processAlive(child.pid)) break;
     await Bun.sleep(100);
   }
   if (healthy) {
     await Bun.sleep(200);
-    healthy = processGroupAlive(child.pid) && (await healthProbe()).exitCode === 0;
+    healthy = processAlive(child.pid) && (await healthProbe()).exitCode === 0;
   }
   if (!healthy) {
-    await stopProcessGroup(child.pid);
+    if (acquisitionProcessGroupId === null) await stopProcessGroup(child.pid);
     throw new ReleaseInputError(`prepared Worker failed health check: ${await Bun.file(logPath).text()}`);
   }
   await writeJson(resolve(options.output), {
     schemaVersion: 1,
     gate: "PASS",
     pid: child.pid,
+    processGroupId: acquisitionProcessGroupId ?? child.pid,
+    processStartTime: workerStartTime,
     port,
     baseUrl,
     stateDir: state,

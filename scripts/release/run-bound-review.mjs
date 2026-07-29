@@ -38,7 +38,7 @@ function reviewerEnvironment() {
     throw new TypeError("reviewer CODEX_HOME is required");
   }
   environment.CODEX_HOME = resolve(environment.CODEX_HOME);
-  environment.HOME = environment.HOME ?? dirname(environment.CODEX_HOME);
+  environment.HOME = dirname(environment.CODEX_HOME);
   return environment;
 }
 
