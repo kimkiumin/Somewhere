@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
-import { cp, readFile, rename, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import {
@@ -13,19 +13,73 @@ import {
 
 afterEach(cleanupTemporaryRoots);
 
+function validate(mode: "release" | "schema", input: string, output: string) {
+  return run(validator, ["--mode", mode, "--input", input, "--output", output]);
+}
+
 describe("Somewhere V2 physical evidence gate", () => {
+  test.each([
+    ["release", "absent-root", 2, "BLOCK", "MISSING_PHYSICAL_DEVICE_EVIDENCE"],
+    ["schema", "absent-root", 1, "FAIL", "EVIDENCE_INVALID_OR_TAMPERED"],
+    ["release", "existing-empty", 1, "FAIL", "EVIDENCE_INVALID_OR_TAMPERED"],
+    ["release", "dangling-root", 1, "FAIL", "EVIDENCE_INVALID_OR_TAMPERED"],
+    ["release", "dangling-evidence", 1, "FAIL", "EVIDENCE_INVALID_OR_TAMPERED"],
+    ["release", "missing-nested", 1, "FAIL", "EVIDENCE_INVALID_OR_TAMPERED"],
+  ] as const)("%s mode classifies %s input", async (mode, state, status, gate, reason) => {
+    // Given: an absent input root or an existing but invalid input boundary.
+    const root = await temporaryRoot(`missing-${mode}`);
+    const input = join(root, "physical-iphone");
+    const output = join(root, "verdict.json");
+    if (state === "existing-empty" || state === "dangling-evidence") await mkdir(input);
+    if (state === "dangling-root") await symlink("missing-target", input);
+    if (state === "dangling-evidence") {
+      await symlink("missing-target.json", join(input, "evidence.json"));
+    } else if (state === "missing-nested") {
+      await cp(join(qaRoot, "fixtures", "synthetic-schema-valid"), input, { recursive: true });
+      const evidence = JSON.parse(await readFile(join(input, "evidence.json"), "utf8"));
+      await rm(join(input, evidence.runDirectories[0]), { recursive: true });
+    }
+
+    // When: the selected validator mode reads the input boundary.
+    const result = validate(mode, input, output);
+
+    // Then: only a truly absent release input root blocks; every other case fails closed.
+    expect(result.status, result.stderr).toBe(status);
+    expect(await verdict(output)).toMatchObject({
+      schemaValid: false,
+      gate,
+      deviceGate: gate,
+      reason,
+    });
+  });
+
+  test("publishing a verdict replaces an output symlink without touching its target", async () => {
+    // Given: a caller-controlled output symlink to an existing protected file.
+    const root = await temporaryRoot("output-symlink");
+    const target = join(root, "protected.txt");
+    const output = join(root, "verdict.json");
+    await writeFile(target, "protected\n");
+    await symlink(target, output);
+
+    // When: validation publishes a verdict at the symlink path.
+    const result = validate("schema", join(qaRoot, "fixtures", "synthetic-schema-valid"), output);
+
+    // Then: the target is unchanged and the output entry is a regular verdict file.
+    expect(result.status, result.stderr).toBe(0);
+    expect(await readFile(target, "utf8")).toBe("protected\n");
+    expect((await lstat(output)).isSymbolicLink()).toBe(false);
+    expect(await verdict(output)).toMatchObject({
+      schemaValid: true,
+      gate: "BLOCK",
+      deviceGate: "BLOCK",
+    });
+  });
+
   test("TASK21_DEVICE_PASS_REQUIRES_RC_BUILD", async () => {
     const root = await temporaryRoot("synthetic");
     const fixture = join(qaRoot, "fixtures", "synthetic-schema-valid");
     const schemaOutput = join(root, "schema.json");
-    const schemaResult = run(validator, [
-      "--mode",
-      "schema",
-      "--input",
-      fixture,
-      "--output",
-      schemaOutput,
-    ]);
+    const schemaResult = validate("schema", fixture, schemaOutput);
     expect(schemaResult.status, schemaResult.stderr).toBe(0);
     expect(await verdict(schemaOutput)).toMatchObject({
       schemaValid: true,
@@ -35,14 +89,7 @@ describe("Somewhere V2 physical evidence gate", () => {
     });
 
     const releaseOutput = join(root, "release.json");
-    const releaseResult = run(validator, [
-      "--mode",
-      "release",
-      "--input",
-      fixture,
-      "--output",
-      releaseOutput,
-    ]);
+    const releaseResult = validate("release", fixture, releaseOutput);
     expect(releaseResult.status, releaseResult.stderr).toBe(2);
     expect(await verdict(releaseOutput)).toMatchObject({
       schemaValid: true,
@@ -70,10 +117,13 @@ describe("Somewhere V2 physical evidence gate", () => {
     await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
     const output = join(root, "verdict.json");
 
-    const result = run(validator, ["--mode", "schema", "--input", fixture, "--output", output]);
+    const result = validate("schema", fixture, output);
 
     expect(result.status, result.stderr).toBe(1);
-    expect(await verdict(output)).toMatchObject({ schemaValid: false, deviceGate: "FAIL" });
+    expect(await verdict(output)).toMatchObject({
+      schemaValid: false,
+      deviceGate: "FAIL",
+    });
   });
 
   test("rejects reused trace, incomplete P1-P7, and raw trace artifacts", async () => {
@@ -93,10 +143,13 @@ describe("Somewhere V2 physical evidence gate", () => {
     await writeFile(join(first, "raw-trace.json"), '{"preciseLocation":"forbidden"}\n');
     const output = join(root, "verdict.json");
 
-    const result = run(validator, ["--mode", "schema", "--input", fixture, "--output", output]);
+    const result = validate("schema", fixture, output);
 
     expect(result.status, result.stderr).toBe(1);
-    expect(await verdict(output)).toMatchObject({ schemaValid: false, deviceGate: "FAIL" });
+    expect(await verdict(output)).toMatchObject({
+      schemaValid: false,
+      deviceGate: "FAIL",
+    });
   });
 
   test("rejects a checklist changed after metadata creation", async () => {
@@ -110,10 +163,13 @@ describe("Somewhere V2 physical evidence gate", () => {
     await writeFile(checklist, `${await readFile(checklist, "utf8")}\nTampered.\n`);
     const output = join(root, "verdict.json");
 
-    const result = run(validator, ["--mode", "schema", "--input", fixture, "--output", output]);
+    const result = validate("schema", fixture, output);
 
     expect(result.status, result.stderr).toBe(1);
-    expect(await verdict(output)).toMatchObject({ schemaValid: false, deviceGate: "FAIL" });
+    expect(await verdict(output)).toMatchObject({
+      schemaValid: false,
+      deviceGate: "FAIL",
+    });
   });
 
   test("rejects a screenshot changed after metadata creation", async () => {
@@ -132,23 +188,19 @@ describe("Somewhere V2 physical evidence gate", () => {
     await writeFile(screenshot, "changed after attestation\n");
     const output = join(root, "verdict.json");
 
-    const result = run(validator, ["--mode", "schema", "--input", fixture, "--output", output]);
+    const result = validate("schema", fixture, output);
 
     expect(result.status, result.stderr).toBe(1);
-    expect(await verdict(output)).toMatchObject({ schemaValid: false, deviceGate: "FAIL" });
+    expect(await verdict(output)).toMatchObject({
+      schemaValid: false,
+      deviceGate: "FAIL",
+    });
   });
 
   test("a declared physical but tampered package is FAIL rather than BLOCK", async () => {
     const root = await temporaryRoot("tampered");
     const output = join(root, "verdict.json");
-    const result = run(validator, [
-      "--mode",
-      "release",
-      "--input",
-      join(qaRoot, "fixtures", "physical-tampered"),
-      "--output",
-      output,
-    ]);
+    const result = validate("release", join(qaRoot, "fixtures", "physical-tampered"), output);
     expect(result.status, result.stderr).toBe(1);
     expect(await verdict(output)).toMatchObject({
       evidenceOrigin: "physical",
