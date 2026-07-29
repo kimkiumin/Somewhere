@@ -7,6 +7,7 @@ import {
   projectReadyJourney,
   projectRevealedJourney,
 } from "../src/api/journey-composition";
+import { projectLifecycleJourney } from "../src/api/journey-projection";
 
 const CREATE_INPUT = JourneyCreateBodyV1Schema.parse({
   contractVersion: 1,
@@ -54,6 +55,37 @@ describe("hidden journey composition", () => {
     expect(serialized).not.toContain("receipt");
     expect(serialized).not.toContain("pool");
     expect(serialized).not.toContain("provider");
+  });
+
+  it("serializes create and snapshot replay to identical bytes", async () => {
+    // Given: one prepared ready journey used by both original and replay projections.
+    const prepared = await buildJourneyPreparation({
+      body: CREATE_INPUT,
+      journeyId: "j_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      now: new Date("2026-07-29T00:00:00Z"),
+      randomUint32: () => 0,
+      requestId: "req_v1.AAAAAAAAAAAAAAAAAAAAAA",
+    });
+    if (prepared.kind !== "ready") {
+      throw new TypeError("reviewed fixture unexpectedly failed");
+    }
+
+    // When: the create and persisted-snapshot response paths serialize the same state.
+    const original = JSON.stringify(projectReadyJourney(prepared, 1, false));
+    const replay = JSON.stringify(
+      projectLifecycleJourney(prepared, {
+        activeRoute: undefined,
+        feedback: undefined,
+        openStop: undefined,
+        phase: "ready",
+        revealed: false,
+        routeRepair: undefined,
+        sequence: 1,
+      }),
+    );
+
+    // Then: idempotent create replay is byte-identical without response normalization.
+    expect(replay).toBe(original);
   });
 
   it("releases route only after Commit and Reveal preserves phase", async () => {

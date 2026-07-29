@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { type FeedbackReaction, FeedbackRepository } from "../feedback/repository";
 import { type Database, firstParsed, parseBoundary } from "./database";
 import { opaqueIdSchema, positiveIntegerSchema, sha256DigestSchema } from "./values";
 
@@ -149,5 +150,17 @@ export class SessionRepository {
       )
       .run();
     return record;
+  }
+
+  consumeFeedback(
+    input: Readonly<{
+      capabilityDigest: string;
+      feedbackId: string;
+      idempotencyDigest: string;
+      now: number;
+      reaction: "dislike" | "like" | "love" | "did_not_visit";
+    }>,
+  ): Promise<FeedbackReaction> {
+    return new FeedbackRepository(this.database).consume(input);
   }
 }

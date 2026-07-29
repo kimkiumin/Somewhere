@@ -1,5 +1,8 @@
-import type { Database } from "../db/database";
-import { SessionRepository } from "../db/session-repository";
+import { ArrivalMutationResponseV1Schema } from "../../../contracts/src";
+import { DeletionRepository } from "../deletion/repository";
+import { runDeletionSaga } from "../deletion/saga";
+import { describeFeedbackCapability, issueFeedbackCapability } from "../feedback/capability";
+import { FeedbackRepository } from "../feedback/repository";
 import { parseExpectedSequence } from "../security/sequence";
 import { hmacDigest, isCanonicalToken, randomBase64Url } from "../security/tokens";
 import { publicError } from "./http-response";
@@ -11,10 +14,9 @@ import {
 } from "./journey-lifecycle-body";
 import { predictSnapshot } from "./journey-lifecycle-prediction";
 import {
-  clearGuard,
   findDeleteReplay,
+  findDeleteReplayWindow,
   markJourneyStopped,
-  writeDeleteTombstone,
 } from "./journey-persistence";
 import { projectLifecycleJourney } from "./journey-projection";
 import {
@@ -119,13 +121,14 @@ export async function mutateJourney(
   const nextProjection = projectLifecycleJourney(prepared, nextSnapshot);
   const feedbackCapability =
     action === "arrival" && nextSnapshot.phase === "arrived"
-      ? `fb_v1.${randomBase64Url(32)}`
+      ? await issueFeedbackCapability(dependencies.hmacKey)
       : undefined;
   const responseBody = JSON.stringify(
     feedbackCapability === undefined
       ? nextProjection
       : {
-          feedbackCapability,
+          contractVersion: 1,
+          feedbackCapability: feedbackCapability.raw,
           requestId: `req_v1.${randomBase64Url(16)}`,
           result: nextProjection,
         },
@@ -141,9 +144,24 @@ export async function mutateJourney(
   });
   if (result.kind === "replay" && result.outcomeCiphertext !== undefined) {
     const replay = await openForSession(result.outcomeCiphertext, session.sessionToken);
-    return typeof replay === "string"
-      ? new Response(replay, { headers: JSON_HEADERS, status: 200 })
-      : publicError("idempotency_conflict");
+    if (typeof replay !== "string") {
+      return publicError("idempotency_conflict");
+    }
+    const replayedArrival = parseArrivalReplay(replay);
+    if (replayedArrival !== undefined) {
+      await persistFeedbackEligibility({
+        bindingDigest: session.bindingDigest,
+        database: env.DB,
+        dueAt: replayedArrival.result.feedbackDueAt,
+        hmacKey: dependencies.hmacKey,
+        journeyId,
+        rawCapability: replayedArrival.feedbackCapability,
+      });
+    }
+    return new Response(replay, {
+      headers: { ...JSON_HEADERS, "idempotent-replayed": "true" },
+      status: 200,
+    });
   }
   if (result.kind !== "applied") {
     return publicError(transitionError(result.kind));
@@ -160,18 +178,54 @@ export async function mutateJourney(
     });
   }
   if (feedbackCapability !== undefined && nextSnapshot.feedback !== undefined) {
-    const capabilityDigest = await hmacDigest(dependencies.hmacKey, feedbackCapability);
-    await new SessionRepository(env.DB satisfies Database).insertFeedbackEligibility({
-      capability_digest: capabilityDigest,
-      consumed_at: null,
-      due_at: nextSnapshot.feedback.dueAt,
-      eligibility_id: `eligibility:${capabilityDigest.slice(0, 48)}`,
-      eligibility_state: "eligible",
-      expires_at: now + 7 * 24 * 60 * 60 * 1_000,
-      journey_hmac_digest: await hmacDigest(dependencies.hmacKey, journeyId),
+    await persistFeedbackEligibility({
+      bindingDigest: session.bindingDigest,
+      database: env.DB,
+      dueAt: nextSnapshot.feedback.dueAt,
+      hmacKey: dependencies.hmacKey,
+      journeyId,
+      rawCapability: feedbackCapability.raw,
     });
   }
   return new Response(responseBody, { headers: JSON_HEADERS, status: 200 });
+}
+
+function parseArrivalReplay(
+  replay: string,
+): ReturnType<typeof ArrivalMutationResponseV1Schema.parse> | undefined {
+  try {
+    const parsed: unknown = JSON.parse(replay);
+    const result = ArrivalMutationResponseV1Schema.safeParse(parsed);
+    return result.success ? result.data : undefined;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function persistFeedbackEligibility(
+  input: Readonly<{
+    bindingDigest: string;
+    database: D1Database;
+    dueAt: number;
+    hmacKey: CryptoKey;
+    journeyId: string;
+    rawCapability: string;
+  }>,
+): Promise<void> {
+  const repository = new FeedbackRepository(input.database);
+  const capability = await describeFeedbackCapability(input.rawCapability, input.hmacKey);
+  await repository.issue({
+    bindingDigest: input.bindingDigest,
+    capabilityDigest: capability.digest,
+    consentGranted: await repository.hasActiveConsent(input.bindingDigest),
+    dueAt: input.dueAt,
+    expiresAt: input.dueAt + 6 * 24 * 60 * 60 * 1_000 + 23 * 60 * 60 * 1_000,
+    feedbackId: capability.feedbackId,
+    journeyDigest: await hmacDigest(input.hmacKey, input.journeyId),
+  });
 }
 
 export async function deleteJourney(
@@ -199,33 +253,60 @@ export async function deleteJourney(
   }
   const journeyDigest = await hmacDigest(dependencies.hmacKey, journeyId);
   const deleteRequestDigest = await hmacDigest(dependencies.hmacKey, rawKey);
-  const replay = await findDeleteReplay(env.DB, journeyDigest, dependencies.now());
+  const now = dependencies.now();
+  const replay = await findDeleteReplayWindow(env.DB, journeyDigest, now);
   if (replay !== undefined) {
-    return replay === deleteRequestDigest
+    return replay.deleteRequestDigest === deleteRequestDigest && replay.replayExpiresAt > now
       ? new Response(null, { headers: { "cache-control": "no-store, private" }, status: 204 })
       : publicError("journey_expired");
   }
+  const repository = new DeletionRepository(env.DB);
   const stub = env.JOURNEYS.getByName(journeyId);
-  const snapshot = await stub.snapshot(session.bindingDigest);
-  if (snapshot === undefined) {
-    return publicError("not_found");
+  try {
+    let intent = await repository.find(journeyDigest, now);
+    if (intent === undefined) {
+      const snapshot = await stub.snapshot(session.bindingDigest);
+      if (snapshot === undefined) {
+        return publicError("not_found");
+      }
+      if (now >= snapshot.expiresAt) {
+        return publicError("journey_expired");
+      }
+      if (snapshot.sequence !== expectedSequence) {
+        return publicError("sequence_conflict");
+      }
+      intent = await repository.prepare({
+        deleteRequestDigest,
+        journeyDigest,
+        now,
+        sessionBindingDigest: session.bindingDigest,
+      });
+    }
+    if (intent.delete_request_digest !== deleteRequestDigest) {
+      return publicError("journey_expired");
+    }
+    const result = await runDeletionSaga({
+      advance: (stage) => repository.advance(journeyDigest, stage),
+      appendAudit: () => repository.appendAudit(intent, now),
+      cleanupBindings: () => repository.cleanupBindings(intent),
+      complete: () => repository.complete(journeyDigest),
+      deleteObject: async () => {
+        await stub.deleteAfterTombstone({ durable: true, replayStatus: 204 });
+      },
+      inventory: () => repository.inventory(journeyDigest),
+      loadStage: async () => intent.stage,
+      writeTombstone: () => repository.writeTombstone(intent),
+    });
+    return result.kind === "complete"
+      ? new Response(null, {
+          headers: { "cache-control": "no-store, private" },
+          status: 204,
+        })
+      : publicError("service_unavailable");
+  } catch (error) {
+    if (error instanceof Error) {
+      return publicError("service_unavailable");
+    }
+    throw error;
   }
-  if (dependencies.now() >= snapshot.expiresAt) {
-    return publicError("journey_expired");
-  }
-  if (snapshot.sequence !== expectedSequence) {
-    return publicError("sequence_conflict");
-  }
-  await writeDeleteTombstone({
-    database: env.DB,
-    deleteRequestDigest,
-    journeyDigest,
-    now: dependencies.now(),
-  });
-  await stub.deleteAfterTombstone({ durable: true, replayStatus: 204 });
-  await clearGuard(env.DB, session.bindingDigest, journeyDigest);
-  return new Response(null, {
-    headers: { "cache-control": "no-store, private" },
-    status: 204,
-  });
 }

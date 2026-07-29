@@ -1,4 +1,5 @@
 import { D1HttpSessionRepository, loadSessionHmacKey } from "./api/d1-session";
+import { handleFeedbackApi } from "./api/feedback-controller";
 import { API_HEADERS, jsonResponse, methodNotAllowed, publicError } from "./api/http-response";
 import { handleJourneyApi } from "./api/journey-controller";
 import type { Database } from "./db/database";
@@ -32,6 +33,9 @@ export function handleRequest(
   if (env !== undefined && pathname.startsWith("/api/v1/journeys")) {
     return handleRuntimeJourney(request, env, dependencies);
   }
+  if (env !== undefined && pathname.startsWith("/api/v1/feedback")) {
+    return handleRuntimeFeedback(request, env, dependencies);
+  }
   if (env !== undefined) {
     return publicError("not_found");
   }
@@ -39,6 +43,16 @@ export function handleRequest(
     headers: API_HEADERS,
     status: 404,
   });
+}
+
+async function handleRuntimeFeedback(
+  request: Request,
+  env: Env,
+  dependencies: HttpBoundaryDependencies | undefined,
+): Promise<Response> {
+  const key = await loadSessionHmacKey(env.DB);
+  const response = await handleFeedbackApi(request, env, key, dependencies?.now() ?? Date.now());
+  return response ?? publicError("not_found");
 }
 
 async function handleSession(

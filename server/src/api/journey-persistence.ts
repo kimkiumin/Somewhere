@@ -10,7 +10,10 @@ type GuardRow = Readonly<{
   recovery_consumed_at: number | null;
 }>;
 
-type TombstoneRow = Readonly<{ delete_request_digest: string }>;
+type TombstoneRow = Readonly<{
+  delete_request_digest: string;
+  replay_expires_at?: number;
+}>;
 
 export async function findGuard(
   database: D1Database,
@@ -225,6 +228,25 @@ export async function findDeleteReplay(
   return isTombstoneRow(value) ? value.delete_request_digest : undefined;
 }
 
+export async function findDeleteReplayWindow(
+  database: D1Database,
+  journeyDigest: string,
+  now: number,
+): Promise<Readonly<{ deleteRequestDigest: string; replayExpiresAt: number }> | undefined> {
+  const value = await database
+    .prepare(
+      "SELECT delete_request_digest, replay_expires_at FROM journey_tombstones WHERE journey_hmac_digest = ? AND expires_at > ?",
+    )
+    .bind(journeyDigest, now)
+    .first();
+  return isTombstoneReplayRow(value)
+    ? {
+        deleteRequestDigest: value.delete_request_digest,
+        replayExpiresAt: value.replay_expires_at,
+      }
+    : undefined;
+}
+
 export async function writeDeleteTombstone(
   input: Readonly<{
     database: D1Database;
@@ -271,5 +293,15 @@ function isTombstoneRow(value: unknown): value is TombstoneRow {
     typeof value === "object" &&
     "delete_request_digest" in value &&
     typeof value.delete_request_digest === "string"
+  );
+}
+
+function isTombstoneReplayRow(
+  value: unknown,
+): value is TombstoneRow & Readonly<{ replay_expires_at: number }> {
+  return (
+    isTombstoneRow(value) &&
+    "replay_expires_at" in value &&
+    typeof value.replay_expires_at === "number"
   );
 }

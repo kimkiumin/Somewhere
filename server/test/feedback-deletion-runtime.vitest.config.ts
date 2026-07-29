@@ -10,6 +10,6 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ["test/journey-do-cloudflare.runtime.ts"],
+    include: ["test/feedback-deletion.runtime.ts"],
   },
 });

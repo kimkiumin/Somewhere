@@ -186,13 +186,19 @@ export async function buildJourneyPreparation(
 
 export function projectReadyJourney(prepared: PreparedJourney, sequence: number, revealed: false) {
   return {
-    actions: ["commit", "reveal", "stop"],
     contractVersion: 1,
-    disclosure: prepared.disclosure,
     journeyId: prepared.journeyId,
-    phase: "ready",
-    revealed,
     sequence,
+    disclosure: {
+      routeDistanceM: prepared.disclosure.routeDistanceM,
+      routeDurationMinutes: prepared.disclosure.routeDurationMinutes,
+      representativeCategories: prepared.disclosure.representativeCategories,
+      priceBand: prepared.disclosure.priceBand,
+      policyVersion: prepared.disclosure.policyVersion,
+    },
+    phase: "ready",
+    actions: ["commit", "reveal", "stop"],
+    revealed,
   } as const;
 }
 

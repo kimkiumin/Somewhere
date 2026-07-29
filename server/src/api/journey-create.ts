@@ -2,8 +2,9 @@ import { JourneyCreateBodyV1Schema } from "../../../contracts/src/journey";
 
 import { hmacDigest, isCanonicalToken, randomBase64Url } from "../security/tokens";
 import { jsonResponse, publicError } from "./http-response";
-import { buildJourneyPreparation, projectReadyJourney } from "./journey-composition";
+import { buildJourneyPreparation } from "./journey-composition";
 import { consumeRecoveryDigest, findGuard, persistPreparation } from "./journey-persistence";
+import { projectLifecycleJourney } from "./journey-projection";
 import {
   authError,
   authenticateMutation,
@@ -142,5 +143,16 @@ export async function createJourney(
     sequence: 1,
     writeEpoch: 1,
   });
-  return jsonResponse(projectReadyJourney(prepared, 1, false), 201);
+  return jsonResponse(
+    projectLifecycleJourney(prepared, {
+      activeRoute: undefined,
+      feedback: undefined,
+      openStop: undefined,
+      phase: "ready",
+      revealed: false,
+      routeRepair: undefined,
+      sequence: 1,
+    }),
+    201,
+  );
 }

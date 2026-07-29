@@ -10,6 +10,7 @@ import {
 } from "./policy";
 
 export * from "./http";
+export * from "./feedback";
 export * from "./journey";
 export * from "./policy";
 export * from "./provider";

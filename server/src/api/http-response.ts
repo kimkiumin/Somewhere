@@ -8,6 +8,7 @@ export const API_HEADERS = {
 const ERROR_STATUS = {
   capability_expired: 410,
   capability_invalid: 404,
+  consent_required: 403,
   idempotency_conflict: 409,
   invalid_request: 400,
   invalid_transition: 409,
@@ -39,7 +40,10 @@ export function jsonResponse(value: unknown, status = 200, headers?: HeadersInit
 }
 
 export function publicError(code: SliceErrorCode): Response {
-  const retryable = code === "provider_unavailable" || code === "route_unavailable";
+  const retryable =
+    code === "provider_unavailable" ||
+    code === "route_unavailable" ||
+    code === "service_unavailable";
   const error = {
     code,
     message: "요청을 처리할 수 없어요.",
