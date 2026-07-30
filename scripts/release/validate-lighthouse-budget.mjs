@@ -12,7 +12,7 @@ import {
 } from "./lib/release-core.mjs";
 
 const specification = {
-  required: ["--url", "--lighthouse-version", "--raw", "--build-receipt", "--lcp-ms", "--cls", "--inp-ms", "--compressed-initial-bytes", "--output"],
+  required: ["--url", "--lighthouse-version", "--raw", "--build-receipt", "--minimum-benchmark-index", "--lcp-ms", "--cls", "--inp-ms", "--compressed-initial-bytes", "--output"],
 };
 
 async function compressedBytes(receiptPath) {
@@ -54,8 +54,13 @@ async function validate(options) {
   const cls = report.audits?.["cumulative-layout-shift"]?.numericValue;
   const inpAudit = report.audits?.["interaction-to-next-paint"] ?? report.audits?.["total-blocking-time"];
   const inp = inpAudit?.numericValue;
-  if (![lcp, cls, inp].every((value) => typeof value === "number")) {
+  const benchmarkIndex = report.environment?.benchmarkIndex;
+  const minimumBenchmarkIndex = Number(options["minimum-benchmark-index"]);
+  if (![lcp, cls, inp, benchmarkIndex].every((value) => typeof value === "number")) {
     throw new TypeError("Lighthouse report misses required metrics");
+  }
+  if (!Number.isFinite(minimumBenchmarkIndex) || minimumBenchmarkIndex <= 0) {
+    throw new TypeError("Lighthouse minimum benchmark index must be positive");
   }
   const compressed = await compressedBytes(resolve(options["build-receipt"]));
   const budgets = {
@@ -64,15 +69,21 @@ async function validate(options) {
     inp: inp <= Number(options["inp-ms"]),
     compressed: compressed <= Number(options["compressed-initial-bytes"]),
   };
-  const gate = Object.values(budgets).every(Boolean) ? "PASS" : "FAIL";
+  const hostQualified = benchmarkIndex >= minimumBenchmarkIndex;
+  const gate = hostQualified
+    ? Object.values(budgets).every(Boolean) ? "PASS" : "FAIL"
+    : "BLOCK";
   await writeJson(resolve(options.output), {
     schemaVersion: 1,
     gate,
+    ...(hostQualified ? {} : { reason: "UNQUALIFIED_HOST_BENCHMARK" }),
     lighthouseVersion: options["lighthouse-version"],
+    environment: { benchmarkIndex, minimumBenchmarkIndex },
     metrics: { lcpMs: lcp, cls, interactionMs: inp, interactionSource: inpAudit.id, compressedInitialBytes: compressed },
     budgets,
   });
-  if (gate !== "PASS") process.exitCode = 1;
+  if (gate === "BLOCK") process.exitCode = 2;
+  if (gate === "FAIL") process.exitCode = 1;
 }
 
 const parsed = parseArguments(process.argv.slice(2), specification);

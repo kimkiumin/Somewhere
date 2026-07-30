@@ -115,7 +115,7 @@
         "id": "lighthouse",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F3/lighthouse-budget-verdict.json",
-        "argv": ["bun", "scripts/release/validate-lighthouse-budget.mjs", "--url", "${BASE_URL}/", "--lighthouse-version", "13.4.1", "--raw", "${FINAL_ROOT}/F3/lighthouse-raw.json", "--build-receipt", "${BUILD_RECEIPT}", "--lcp-ms", "2500", "--cls", "0.1", "--inp-ms", "200", "--compressed-initial-bytes", "153600", "--output", "${FINAL_ROOT}/F3/lighthouse-budget-verdict.json"]
+        "argv": ["bun", "scripts/release/validate-lighthouse-budget.mjs", "--url", "${BASE_URL}/", "--lighthouse-version", "13.4.1", "--raw", "${FINAL_ROOT}/F3/lighthouse-raw.json", "--build-receipt", "${BUILD_RECEIPT}", "--minimum-benchmark-index", "2000", "--lcp-ms", "2500", "--cls", "0.1", "--inp-ms", "200", "--compressed-initial-bytes", "153600", "--output", "${FINAL_ROOT}/F3/lighthouse-budget-verdict.json"]
       },
       {
         "id": "manual-browser-collect",
