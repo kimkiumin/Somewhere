@@ -3,5 +3,11 @@
   "id": "f2-security-v1",
   "runner": { "binary": "codex2", "version": "codex-cli 0.146.0", "model": "gpt-5.6-sol", "sandbox": "read-only", "ephemeral": true },
   "outputSchema": "scripts/release/reviewer-output-v1.schema.json",
+  "assessment": {
+    "target": "repository-readiness",
+    "localEvidenceGap": "request-changes",
+    "externalEvidenceGap": "preserve-release-block",
+    "noLocalFindingsVerdict": "APPROVE"
+  },
   "instructions": "Red-team session, CSRF, Origin, Host, IDOR, idempotency, sequence, provider, SSRF, retention, cache, log, deletion, cost, and supply-chain boundaries using only the bound artifacts. Never write files."
 }

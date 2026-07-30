@@ -7,6 +7,7 @@ import {
   sha256,
   snapshotRegularFile,
 } from "./release-core.mjs";
+import { validateLocalRuntimeEvidence } from "./local-runtime-evidence.mjs";
 
 function parseJson(snapshot, label) {
   try {
@@ -169,6 +170,12 @@ export async function createVerifyV2RuntimeEvidence(options) {
     registry,
     options.afterFirstSnapshot,
   );
+  validateLocalRuntimeEvidence(first.artifacts, {
+    sha,
+    sourceTree,
+    runtimeSuites: options.runtimeSuites,
+    preparedBuild: options.preparedBuild,
+  });
   const artifacts = manifestArtifacts(first.artifacts);
   const primary = {
     schemaVersion: 1,
@@ -187,10 +194,17 @@ export async function createVerifyV2RuntimeEvidence(options) {
       registry: { path: registry.path, sha256: registry.sha256 },
       artifactCount: artifacts.length,
       artifactSetSha256: artifactSetSha256(artifacts),
+      mode: options.preparedBuild === undefined ? "local-diagnostic" : "exact-prepared",
       artifacts,
     },
   };
-  await validateManifest(primary, { sha, sourceTree, registry: options.registry });
+  await validateManifest(primary, {
+    sha,
+    sourceTree,
+    registry: options.registry,
+    runtimeSuites: options.runtimeSuites,
+    preparedBuild: options.preparedBuild,
+  });
   return primary;
 }
 
@@ -209,6 +223,7 @@ async function validateManifest(primary, expected) {
     throw new ReleaseInputError("invalid verify-v2 runtime evidence manifest");
   }
   const observed = await snapshotArtifacts(manifest.artifactRoot, registry);
+  validateLocalRuntimeEvidence(observed.artifacts, expected);
   for (let index = 0; index < observed.artifacts.length; index += 1) {
     const actual = observed.artifacts[index];
     const recorded = manifest.artifacts[index];
@@ -235,6 +250,8 @@ export async function validateVerifyV2RuntimeEvidence(options) {
     sha: assertHex(options.sha, 40, "sha"),
     sourceTree: assertHex(options.sourceTree, 40, "source-tree"),
     registry: options.registry,
+    runtimeSuites: options.runtimeSuites,
+    preparedBuild: options.preparedBuild,
   });
   return { primary, primarySnapshot: snapshot, artifacts };
 }

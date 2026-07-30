@@ -5,6 +5,7 @@ import {
 } from "../../../contracts/src";
 import { authorizeFeedbackCapability } from "../feedback/capability";
 import { FeedbackRepository } from "../feedback/repository";
+import type { RequestPolicy } from "../security/request";
 import { hmacDigest, isCanonicalToken } from "../security/tokens";
 import { jsonResponse, methodNotAllowed, publicError } from "./http-response";
 import { parseMutationBody, sha256 } from "./journey-request";
@@ -15,6 +16,7 @@ export async function handleFeedbackApi(
   request: Request,
   env: Env,
   hmacKey: CryptoKey,
+  requestPolicy: RequestPolicy,
   now: number,
   writeEpoch = 1,
 ): Promise<Response | undefined> {
@@ -33,7 +35,7 @@ export async function handleFeedbackApi(
     return publicError("invalid_request");
   }
   return request.method === "POST"
-    ? recordReaction(request, env, hmacKey, now, feedbackId, writeEpoch)
+    ? recordReaction(request, env, hmacKey, requestPolicy, now, feedbackId, writeEpoch)
     : methodNotAllowed("POST");
 }
 
@@ -79,11 +81,17 @@ async function recordReaction(
   request: Request,
   env: Env,
   hmacKey: CryptoKey,
+  requestPolicy: RequestPolicy,
   now: number,
   feedbackId: string,
   writeEpoch: number,
 ): Promise<Response> {
-  const parsed = await parseMutationBody(request, 1_024, new Set(["contractVersion", "reaction"]));
+  const parsed = await parseMutationBody(
+    request,
+    requestPolicy,
+    1_024,
+    new Set(["contractVersion", "reaction"]),
+  );
   if ("error" in parsed) {
     return publicError(parsed.error);
   }

@@ -79,6 +79,9 @@
   "env": {
     "staging": {
       "name": "somewhere-api-staging",
+      "secrets": {
+        "required": ["CANONICAL_ORIGIN"]
+      },
       "services": [
         {
           "binding": "OPERATIONS_AUTHORITY",
@@ -126,6 +129,9 @@
     },
     "production": {
       "name": "somewhere-api-production",
+      "secrets": {
+        "required": ["CANONICAL_ORIGIN"]
+      },
       "services": [
         {
           "binding": "OPERATIONS_AUTHORITY",

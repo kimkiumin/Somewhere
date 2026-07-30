@@ -44,13 +44,13 @@
         "id": "verify-v2",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F2/verify-v2-verdict.json",
-        "argv": ["bun", "scripts/release/run-verify-v2.mjs", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--registry", "scripts/release/verify-v2-runtime-artifacts-v1.json", "--evidence-dir", "${FINAL_ROOT}/F2/verify-ops", "--output", "${FINAL_ROOT}/F2/verify-v2-verdict.json", "--argv-json", "[\"bun\",\"run\",\"verify:v2\"]"]
+        "argv": ["bun", "scripts/release/run-verify-v2.mjs", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--registry", "scripts/release/verify-v2-runtime-artifacts-v1.json", "--evidence-dir", "${FINAL_ROOT}/F2/verify-ops", "--output", "${FINAL_ROOT}/F2/verify-v2-verdict.json", "--argv-json", "[\"bun\",\"run\",\"verify:v2\"]", "--prepared-build-root", "${FINAL_ROOT}/prepared/build", "--prepared-build-receipt", "${BUILD_RECEIPT}", "--prepared-source-archive", "${FINAL_ROOT}/prepared/source.tar"]
       },
       {
         "id": "bun-audit",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F2/bun-audit.json",
-        "argv": ["bun", "audit", "--json"]
+        "argv": ["bun", "scripts/release/run-bun-audit.mjs", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--lockfile", "bun.lock", "--raw", "${FINAL_ROOT}/F2/bun-audit-raw.json", "--output", "${FINAL_ROOT}/F2/bun-audit.json"]
       },
       {
         "id": "red-team",
@@ -68,19 +68,19 @@
         "id": "review-work",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F2/review-work-verdict.json",
-        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f2-code-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F2/workflow-verdict.json,${FINAL_ROOT}/F2/ci-release-verdict.json,${FINAL_ROOT}/F2/verify-v2-verdict.json,${FINAL_ROOT}/F2/bun-audit.json,${FINAL_ROOT}/F2/red-team-verdict.json,${FINAL_ROOT}/F2/production-scan.json", "--output", "${FINAL_ROOT}/F2/review-work-verdict.json"]
+        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f2-code-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F2/workflow-verdict.json,${FINAL_ROOT}/F2/ci-release-verdict.json,${FINAL_ROOT}/F2/verify-v2-verdict.json,${FINAL_ROOT}/F2/bun-audit.json,${FINAL_ROOT}/F2/bun-audit-raw.json,bun.lock,${FINAL_ROOT}/F2/red-team-verdict.json,${FINAL_ROOT}/F2/red-team-raw.json,${FINAL_ROOT}/F2/production-scan.json,${BUILD_RECEIPT}", "--prepared-build-root", "${FINAL_ROOT}/prepared/build", "--prepared-build-receipt", "${BUILD_RECEIPT}", "--prepared-source-archive", "${FINAL_ROOT}/prepared/source.tar", "--output", "${FINAL_ROOT}/F2/review-work-verdict.json"]
       },
       {
         "id": "debugging",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F2/debugging-verdict.json",
-        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f2-runtime-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F2/verify-v2-verdict.json,${FINAL_ROOT}/F2/red-team-verdict.json", "--output", "${FINAL_ROOT}/F2/debugging-verdict.json"]
+        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f2-runtime-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F2/ci-release-verdict.json,${FINAL_ROOT}/external-gates.json,${FINAL_ROOT}/F2/verify-v2-verdict.json,${FINAL_ROOT}/F2/red-team-verdict.json,${FINAL_ROOT}/F2/red-team-raw.json", "--prepared-build-root", "${FINAL_ROOT}/prepared/build", "--prepared-build-receipt", "${BUILD_RECEIPT}", "--prepared-source-archive", "${FINAL_ROOT}/prepared/source.tar", "--output", "${FINAL_ROOT}/F2/debugging-verdict.json"]
       },
       {
         "id": "security",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F2/security-verdict.json",
-        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f2-security-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F2/workflow-verdict.json,${FINAL_ROOT}/F2/ci-release-verdict.json,${FINAL_ROOT}/F2/verify-v2-verdict.json,${FINAL_ROOT}/F2/bun-audit.json,${FINAL_ROOT}/F2/red-team-verdict.json,${FINAL_ROOT}/F2/production-scan.json", "--output", "${FINAL_ROOT}/F2/security-verdict.json"]
+        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f2-security-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F2/workflow-verdict.json,${FINAL_ROOT}/F2/ci-release-verdict.json,${FINAL_ROOT}/external-gates.json,${FINAL_ROOT}/F2/verify-v2-verdict.json,${FINAL_ROOT}/F2/bun-audit.json,${FINAL_ROOT}/F2/bun-audit-raw.json,bun.lock,${FINAL_ROOT}/F2/red-team-verdict.json,${FINAL_ROOT}/F2/red-team-raw.json,${FINAL_ROOT}/F2/production-scan.json,${BUILD_RECEIPT},${FINAL_ROOT}/prepared/source.tar,scripts/release/red-team-cases-v1.json", "--prepared-build-root", "${FINAL_ROOT}/prepared/build", "--prepared-build-receipt", "${BUILD_RECEIPT}", "--prepared-source-archive", "${FINAL_ROOT}/prepared/source.tar", "--output", "${FINAL_ROOT}/F2/security-verdict.json"]
       }
     ],
     "F3": [

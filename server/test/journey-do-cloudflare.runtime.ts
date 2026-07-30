@@ -77,22 +77,91 @@ describe("JourneyDurableObject Cloudflare runtime", () => {
     await stub.transition(commitCommand(now));
 
     // When: the status-only D1 tombstone is durable and DO deletion completes.
-    const response = await stub.deleteAfterTombstone({ durable: true, replayStatus: 204 });
+    const unfencedDelete = await runInDurableObject(stub, async (instance) => {
+      try {
+        await instance.deleteAfterTombstone({
+          deleteRequestDigest: DIGEST_B,
+          durable: true,
+          replayStatus: 204,
+        });
+        return "resolved";
+      } catch {
+        return "rejected";
+      }
+    });
+    expect(unfencedDelete).toBe("rejected");
+    await expect(
+      stub.beginDeletion({ deleteRequestDigest: DIGEST_B, expectedSequence: 0 }),
+    ).resolves.toBe("sequence_conflict");
+    await expect(
+      stub.beginDeletion({ deleteRequestDigest: DIGEST_B, expectedSequence: 1 }),
+    ).resolves.toBe("fenced");
+    await evictDurableObject(stub);
+    await expect(stub.snapshot(DIGEST_A)).resolves.toBeUndefined();
+    await expect(stub.transition(commitCommand(now))).resolves.toMatchObject({
+      kind: "sequence_conflict",
+    });
+    const wrongDelete = await runInDurableObject(stub, async (instance) => {
+      try {
+        await instance.deleteAfterTombstone({
+          deleteRequestDigest: DIGEST_C,
+          durable: true,
+          replayStatus: 204,
+        });
+        return "resolved";
+      } catch {
+        return "rejected";
+      }
+    });
+    expect(wrongDelete).toBe("rejected");
+    const response = await stub.deleteAfterTombstone({
+      deleteRequestDigest: DIGEST_B,
+      durable: true,
+      replayStatus: 204,
+    });
     const inventory = await runInDurableObject(stub, (_instance, state) => ({
       alarm: state.storage.getAlarm(),
-      tables: state.storage.sql
-        .exec<{ name: string }>(
-          "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'journey_%'",
+      gate: state.storage.sql
+        .exec<{ delete_request_digest: string }>(
+          "SELECT delete_request_digest FROM journey_deletion_gate",
         )
-        .toArray()
-        .map((row) => row.name),
+        .one(),
+      privateRows: state.storage.sql
+        .exec<{ count: number }>(
+          `SELECT
+            (SELECT COUNT(*) FROM journey_state) +
+            (SELECT COUNT(*) FROM journey_outbox) +
+            (SELECT COUNT(*) FROM journey_inbox) AS count`,
+        )
+        .one().count,
     }));
+    await evictDurableObject(stub);
+    const wrongRetry = await runInDurableObject(stub, async (instance) => {
+      try {
+        await instance.deleteAfterTombstone({
+          deleteRequestDigest: DIGEST_C,
+          durable: true,
+          replayStatus: 204,
+        });
+        return "resolved";
+      } catch {
+        return "rejected";
+      }
+    });
+    const exactRetry = await stub.deleteAfterTombstone({
+      deleteRequestDigest: DIGEST_B,
+      durable: true,
+      replayStatus: 204,
+    });
     const alarmRan = await runDurableObjectAlarm(stub);
 
-    // Then: deleteAll removed the entire private database and no late alarm can run.
+    // Then: all private rows are gone, the identity gate remains, and no late alarm can run.
     expect(response).toEqual({ status: 204 });
     expect(await inventory.alarm).toBeNull();
-    expect(inventory.tables).toEqual([]);
+    expect(inventory.gate).toEqual({ delete_request_digest: DIGEST_B });
+    expect(inventory.privateRows).toBe(0);
+    expect(wrongRetry).toBe("rejected");
+    expect(exactRetry).toEqual({ status: 204 });
     expect(alarmRan).toBe(false);
   });
 });

@@ -36,6 +36,7 @@ const fixtureSchema = z
     externalGates: z
       .object({
         cloudflareCredential: gate,
+        cloudflareProductionPitr: gate,
         githubEnvironmentProtection: gate,
         physicalIPhone: gate,
         providerRightsQuota: gate,
@@ -69,6 +70,7 @@ const workflowSchema = z
   .passthrough();
 const externalCodes = {
   cloudflareCredential: "CLOUDFLARE_CREDENTIAL_PASS",
+  cloudflareProductionPitr: "CLOUDFLARE_PRODUCTION_PITR_PASS",
   githubEnvironmentProtection: "GITHUB_ENVIRONMENT_PROTECTION_PASS",
   physicalIPhone: "PHYSICAL_IPHONE_PASS",
   providerRightsQuota: "PROVIDER_RIGHTS_QUOTA_PASS",

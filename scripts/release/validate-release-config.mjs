@@ -85,6 +85,29 @@ async function validate() {
       throw new TypeError(`unsafe reviewer profile: ${name}`);
     }
   }
+  const worker = await json(resolve(repo, "server/wrangler.jsonc"));
+  for (const environment of ["staging", "production"]) {
+    const configuration = worker.env?.[environment];
+    if (
+      JSON.stringify(configuration?.secrets?.required) !== JSON.stringify(["CANONICAL_ORIGIN"])
+      || Object.hasOwn(configuration?.vars ?? {}, "CANONICAL_ORIGIN")
+    ) {
+      throw new TypeError(`unsafe canonical origin binding: ${environment}`);
+    }
+  }
+  if (worker.secrets !== undefined || JSON.stringify(worker).includes('"CANONICAL_ORIGIN":')) {
+    throw new TypeError("canonical origin value or local secret declaration must not be committed");
+  }
+  const generatedTypes = await readFile(
+    resolve(repo, "server/src/worker-configuration.d.ts"),
+    "utf8",
+  );
+  if (
+    !generatedTypes.includes("CANONICAL_ORIGIN?: string;")
+    || (generatedTypes.match(/CANONICAL_ORIGIN: string;/g) ?? []).length !== 2
+  ) {
+    throw new TypeError("canonical origin binding types are stale");
+  }
   const commands = await json(resolve(release, "final-lane-commands-v1.json"));
   const checks = await json(resolve(release, "final-lane-checks-v1.json"));
   for (const lane of ["F1", "F2", "F3", "F4"]) {

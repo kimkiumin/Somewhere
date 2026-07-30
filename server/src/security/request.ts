@@ -1,7 +1,12 @@
-export type RequestPolicy = Readonly<{
-  canonicalHost: string;
-  canonicalOrigin: string;
-}>;
+import type { DeploymentEnvironment } from "../environment";
+
+export type RequestPolicy =
+  | Readonly<{
+      canonicalHost: string;
+      canonicalOrigin: string;
+      kind: "valid";
+    }>
+  | Readonly<{ kind: "invalid" }>;
 
 export function localLoopbackRequestPolicy(url: URL): RequestPolicy | undefined {
   const port = Number(url.port);
@@ -14,7 +19,41 @@ export function localLoopbackRequestPolicy(url: URL): RequestPolicy | undefined 
   ) {
     return undefined;
   }
-  return { canonicalHost: url.host, canonicalOrigin: url.origin };
+  return { canonicalHost: url.host, canonicalOrigin: url.origin, kind: "valid" };
+}
+
+export function requestPolicyForEnvironment(
+  url: URL,
+  environment: DeploymentEnvironment,
+  canonicalOrigin: string | undefined,
+): RequestPolicy {
+  if (environment === "local") {
+    return localLoopbackRequestPolicy(url) ?? { kind: "invalid" };
+  }
+  if (canonicalOrigin === undefined) {
+    return { kind: "invalid" };
+  }
+  try {
+    const parsed = new URL(canonicalOrigin);
+    return parsed.protocol === "https:" &&
+      parsed.username === "" &&
+      parsed.password === "" &&
+      parsed.pathname === "/" &&
+      parsed.search === "" &&
+      parsed.hash === "" &&
+      parsed.origin === canonicalOrigin
+      ? {
+          canonicalHost: parsed.host,
+          canonicalOrigin: parsed.origin,
+          kind: "valid",
+        }
+      : { kind: "invalid" };
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return { kind: "invalid" };
+    }
+    throw error;
+  }
 }
 
 export type RequestRejection =
@@ -29,6 +68,7 @@ export async function validateMutationRequest(
   bodyLimitBytes: number,
 ): Promise<Readonly<{ body: string }> | RequestRejection> {
   if (
+    policy.kind !== "valid" ||
     request.headers.get("host") !== policy.canonicalHost ||
     request.headers.get("origin") !== policy.canonicalOrigin ||
     (request.headers.has("sec-fetch-site") &&
@@ -81,7 +121,11 @@ export async function validateMutationRequest(
 }
 
 export function validateSessionRequest(request: Request, policy: RequestPolicy): boolean {
-  if (request.headers.get("host") !== policy.canonicalHost || request.method !== "GET") {
+  if (
+    policy.kind !== "valid" ||
+    request.headers.get("host") !== policy.canonicalHost ||
+    request.method !== "GET"
+  ) {
     return false;
   }
   const origin = request.headers.get("origin");

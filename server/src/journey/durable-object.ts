@@ -6,14 +6,16 @@ import { RETENTION_MS } from "../async/retention";
 import { createReadyJourney, type JourneyTransition } from "./aggregate";
 import type { OutboxRecord } from "./reconciliation";
 import {
+  beginDeletionSchema,
   inboxEventSchema,
   journeyCommandSchema,
   readyJourneyInputSchema,
+  resumeDeletionSchema,
   tombstoneReceiptSchema,
 } from "./schemas";
+import { type InternalJourneySnapshot, projectInternalJourneySnapshot } from "./snapshot";
 import { JourneySqliteStore } from "./sqlite-store";
 import { finalizeDeleteAfterTombstone } from "./tombstone";
-import type { JourneyPhase, RouteRepair } from "./types";
 
 type SafeMutationResult = Readonly<{
   kind: JourneyTransition["kind"];
@@ -23,45 +25,7 @@ type SafeMutationResult = Readonly<{
   sequence: number;
 }>;
 
-export type InternalJourneySnapshot = Readonly<{
-  activeRoute:
-    | Readonly<{
-        geometry: readonly (readonly [number, number])[];
-        originZoneRef: string;
-        routeDigest: string;
-      }>
-    | undefined;
-  expiresAt: number;
-  feedback: Readonly<{ dueAt: number }> | undefined;
-  openStop:
-    | Readonly<{
-        confirmationId: string;
-        phaseBeforePause: "ready" | "committed" | "following" | "route-recovery" | "near";
-      }>
-    | undefined;
-  phase: JourneyPhase;
-  recoveryExpiresAt?: number | undefined;
-  revealed: boolean;
-  routeRepair: RouteRepair | undefined;
-  selectedSnapshot: Readonly<{
-    createRequestDigest?: string;
-    destinationSnapshotCiphertext: string;
-    receiptDigest?: string;
-    selectionReceiptId: string;
-  }>;
-  sequence: number;
-  stopReasonState?: "required-or-skip" | "recorded" | "skipped" | undefined;
-  stopReason?:
-    | "safety-concern"
-    | "route-or-sensor"
-    | "hard-condition"
-    | "venue-situation"
-    | "changed-mind"
-    | "schedule-changed"
-    | "skip"
-    | undefined;
-  stoppedAt?: number | undefined;
-}>;
+export type { InternalJourneySnapshot } from "./snapshot";
 
 export class JourneyDurableObject extends DurableObject<Env> {
   private deleted = false;
@@ -121,24 +85,15 @@ export class JourneyDurableObject extends DurableObject<Env> {
 
   async snapshot(browserBindingDigest: string): Promise<InternalJourneySnapshot | undefined> {
     const state = this.store.readState();
-    if (state === null || state.browserBindingDigest !== browserBindingDigest || this.deleted) {
+    if (
+      state === null ||
+      state.browserBindingDigest !== browserBindingDigest ||
+      this.deleted ||
+      this.store.isDeletionFenced()
+    ) {
       return undefined;
     }
-    return {
-      activeRoute: state.activeRoute,
-      expiresAt: state.expiresAt,
-      feedback: state.feedback === undefined ? undefined : { dueAt: state.feedback.dueAt },
-      openStop: state.openStop,
-      phase: state.phase,
-      recoveryExpiresAt: state.recoveryExpiresAt,
-      revealed: state.revealed,
-      routeRepair: state.routeRepair,
-      selectedSnapshot: state.selectedSnapshot,
-      sequence: state.sequence,
-      stopReasonState: state.stopReasonState,
-      stopReason: state.stopReason,
-      stoppedAt: state.stoppedAt,
-    };
+    return projectInternalJourneySnapshot(state);
   }
 
   async transition(value: unknown): Promise<SafeMutationResult> {
@@ -151,6 +106,24 @@ export class JourneyDurableObject extends DurableObject<Env> {
       revealed: result.state.revealed,
       sequence: result.state.sequence,
     };
+  }
+
+  async beginDeletion(value: unknown): Promise<"fenced" | "sequence_conflict"> {
+    const input = beginDeletionSchema.parse(value);
+    const result = this.store.beginDeletion(input.expectedSequence, input.deleteRequestDigest);
+    if (result === "fenced") {
+      await this.ctx.storage.deleteAlarm();
+    }
+    return result;
+  }
+
+  async resumeLegacyDeletion(value: unknown): Promise<"fenced" | "sequence_conflict"> {
+    const input = resumeDeletionSchema.parse(value);
+    const result = this.store.resumeLegacyDeletion(input.deleteRequestDigest);
+    if (result === "fenced") {
+      await this.ctx.storage.deleteAlarm();
+    }
+    return result;
   }
 
   async recordInbox(value: unknown): Promise<"recorded" | "duplicate" | "stale_epoch"> {
@@ -168,13 +141,18 @@ export class JourneyDurableObject extends DurableObject<Env> {
 
   async deleteAfterTombstone(value: unknown): Promise<Readonly<{ status: 204 }>> {
     const receipt = tombstoneReceiptSchema.parse(value);
-    await finalizeDeleteAfterTombstone(this.ctx.storage, receipt);
+    if (!this.store.matchesDeletionGate(receipt.deleteRequestDigest)) {
+      throw new Error("Durable Object deletion gate does not match the D1 tombstone");
+    }
+    await finalizeDeleteAfterTombstone(this.ctx.storage, receipt, () => {
+      this.store.deleteJourneyData(receipt.deleteRequestDigest);
+    });
     this.deleted = true;
     return { status: 204 };
   }
 
   async reconcileAlarm(now: number): Promise<AlarmPlan> {
-    if (this.deleted) {
+    if (this.deleted || this.store.isDeletionFenced()) {
       return { kind: "terminal" };
     }
     const state = this.store.readState();
@@ -190,7 +168,7 @@ export class JourneyDurableObject extends DurableObject<Env> {
   }
 
   override async alarm(): Promise<void> {
-    if (this.deleted) {
+    if (this.deleted || this.store.isDeletionFenced()) {
       return;
     }
     const now = Date.now();

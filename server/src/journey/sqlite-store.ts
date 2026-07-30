@@ -1,248 +1,79 @@
-import { type AlarmPlan, planJourneyAlarm } from "../async/alarm";
-import { type JourneyCommand, type JourneyState, transitionJourney } from "./aggregate";
+import type { AlarmPlan } from "../async/alarm";
+import type { JourneyCommand, JourneyState } from "./aggregate";
 import type { InboxRecord, OutboxRecord } from "./reconciliation";
-import { journeyStateSchema, outboxRecordSchema } from "./schemas";
+import { JourneySqliteDeletionStore } from "./sqlite-deletion-store";
+import { JourneySqliteQueueStore } from "./sqlite-queue-store";
+import { initializeJourneySqliteSchema } from "./sqlite-schema";
+import { JourneySqliteStateStore } from "./sqlite-state-store";
 
-type PayloadRow = Readonly<{ payload: string }>;
-type CountRow = Readonly<{ count: number }>;
-const OUTBOX_RETRY_DELAYS_MS = [5_000, 30_000, 120_000, 600_000] as const;
-
-export class JourneyNotInitializedError extends Error {
-  override readonly name = "JourneyNotInitializedError";
-
-  constructor() {
-    super("Journey Durable Object is not initialized");
-  }
-}
+export { JourneyNotInitializedError } from "./sqlite-state-store";
 
 export class JourneySqliteStore {
-  constructor(private readonly storage: DurableObjectStorage) {
-    const sql = storage.sql;
-    sql.exec(
-      "CREATE TABLE IF NOT EXISTS journey_state (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), payload TEXT NOT NULL)",
-    );
-    sql.exec(
-      "CREATE TABLE IF NOT EXISTS journey_outbox (event_id TEXT PRIMARY KEY, payload TEXT NOT NULL, status TEXT NOT NULL, next_attempt_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)",
-    );
-    sql.exec(
-      "CREATE TABLE IF NOT EXISTS journey_inbox (event_id TEXT PRIMARY KEY, payload TEXT NOT NULL, write_epoch INTEGER NOT NULL, expires_at INTEGER NOT NULL)",
-    );
-    sql.exec(
-      "CREATE INDEX IF NOT EXISTS journey_outbox_due ON journey_outbox(status, next_attempt_at, expires_at)",
-    );
+  private readonly deletion: JourneySqliteDeletionStore;
+  private readonly queue: JourneySqliteQueueStore;
+  private readonly state: JourneySqliteStateStore;
+
+  constructor(storage: DurableObjectStorage) {
+    initializeJourneySqliteSchema(storage);
+    this.deletion = new JourneySqliteDeletionStore(storage);
+    this.state = new JourneySqliteStateStore(storage, this.deletion);
+    this.queue = new JourneySqliteQueueStore(storage, this.state, this.deletion);
   }
 
   initialize(state: JourneyState, activation?: OutboxRecord): JourneyState {
-    return this.storage.transactionSync(() => {
-      const existing = this.readState();
-      if (existing !== null) {
-        return existing;
-      }
-      this.storage.sql.exec(
-        "INSERT INTO journey_state (singleton, payload) VALUES (1, ?)",
-        JSON.stringify(state),
-      );
-      if (activation !== undefined) {
-        this.storage.sql.exec(
-          "INSERT INTO journey_outbox (event_id, payload, status, next_attempt_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-          activation.eventId,
-          JSON.stringify(activation),
-          activation.status,
-          activation.nextAttemptAt,
-          activation.expiresAt,
-        );
-      }
-      return state;
-    });
+    return this.state.initialize(state, activation);
   }
 
   readState(): JourneyState | null {
-    const rows = this.storage.sql
-      .exec<PayloadRow>("SELECT payload FROM journey_state WHERE singleton = 1")
-      .toArray();
-    const row = rows[0];
-    if (row === undefined) {
-      return null;
-    }
-    const parsed = journeyStateSchema.parse(JSON.parse(row.payload));
-    return {
-      ...parsed,
-      activeRoute: parsed.activeRoute,
-      feedback: parsed.feedback,
-      openStop: parsed.openStop,
-      routeRepair: parsed.routeRepair,
-      selectedSnapshot: {
-        destinationSnapshotCiphertext: parsed.selectedSnapshot.destinationSnapshotCiphertext,
-        disclosure: parsed.selectedSnapshot.disclosure,
-        selectionReceiptId: parsed.selectedSnapshot.selectionReceiptId,
-        ...(parsed.selectedSnapshot.createRequestDigest === undefined
-          ? {}
-          : { createRequestDigest: parsed.selectedSnapshot.createRequestDigest }),
-        ...(parsed.selectedSnapshot.receiptDigest === undefined
-          ? {}
-          : { receiptDigest: parsed.selectedSnapshot.receiptDigest }),
-      },
-    };
+    return this.state.readState();
   }
 
   transition(command: JourneyCommand) {
-    return this.storage.transactionSync(() => {
-      const state = this.readState();
-      if (state === null) {
-        throw new JourneyNotInitializedError();
-      }
-      const result = transitionJourney(state, command);
-      if (result.kind !== "applied") {
-        return result;
-      }
-      this.storage.sql.exec(
-        "UPDATE journey_state SET payload = ? WHERE singleton = 1",
-        JSON.stringify(result.state),
-      );
-      for (const event of result.outbox) {
-        this.storage.sql.exec(
-          "INSERT INTO journey_outbox (event_id, payload, status, next_attempt_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-          event.eventId,
-          JSON.stringify(event),
-          event.status,
-          event.nextAttemptAt,
-          event.expiresAt,
-        );
-      }
-      return result;
-    });
+    return this.state.transition(command);
   }
 
   recordInbox(event: InboxRecord): "recorded" | "duplicate" | "stale_epoch" {
-    return this.storage.transactionSync(() => {
-      const state = this.readState();
-      if (state === null) {
-        throw new JourneyNotInitializedError();
-      }
-      if (event.writeEpoch !== state.writeEpoch) {
-        return "stale_epoch";
-      }
-      const exists = this.storage.sql
-        .exec<CountRow>(
-          "SELECT COUNT(*) AS count FROM journey_inbox WHERE event_id = ?",
-          event.eventId,
-        )
-        .one().count;
-      if (exists > 0) {
-        return "duplicate";
-      }
-      this.storage.sql.exec(
-        "INSERT INTO journey_inbox (event_id, payload, write_epoch, expires_at) VALUES (?, ?, ?, ?)",
-        event.eventId,
-        JSON.stringify(event),
-        event.writeEpoch,
-        event.expiresAt,
-      );
-      return "recorded";
-    });
+    return this.queue.recordInbox(event);
   }
 
   leaseDue(now: number): readonly OutboxRecord[] {
-    return this.storage.transactionSync(() => {
-      const rows = this.storage.sql
-        .exec<PayloadRow>(
-          "SELECT payload FROM journey_outbox WHERE status = 'pending' AND next_attempt_at <= ? AND expires_at > ? ORDER BY next_attempt_at, event_id LIMIT 32",
-          now,
-          now,
-        )
-        .toArray();
-      return rows.map((row) => {
-        const event: unknown = JSON.parse(row.payload);
-        const parsed = outboxRecord(event);
-        const leased = {
-          ...parsed,
-          attempts: parsed.attempts + 1,
-          nextAttemptAt: now + retryDelayMs(parsed.attempts),
-        };
-        this.storage.sql.exec(
-          "UPDATE journey_outbox SET payload = ?, next_attempt_at = ? WHERE event_id = ?",
-          JSON.stringify(leased),
-          leased.nextAttemptAt,
-          leased.eventId,
-        );
-        return leased;
-      });
-    });
+    return this.queue.leaseDue(now);
   }
 
   acknowledge(eventId: string, acknowledgedAt: number): "acknowledged" | "already" | "missing" {
-    return this.storage.transactionSync(() => {
-      const rows = this.storage.sql
-        .exec<PayloadRow>("SELECT payload FROM journey_outbox WHERE event_id = ?", eventId)
-        .toArray();
-      const row = rows[0];
-      if (row === undefined) {
-        return "missing";
-      }
-      const event = outboxRecord(JSON.parse(row.payload));
-      if (event.status === "acknowledged") {
-        return "already";
-      }
-      const acknowledged: OutboxRecord = {
-        ...event,
-        nextAttemptAt: acknowledgedAt,
-        status: "acknowledged",
-      };
-      this.storage.sql.exec(
-        "UPDATE journey_outbox SET payload = ?, status = 'acknowledged', next_attempt_at = ? WHERE event_id = ?",
-        JSON.stringify(acknowledged),
-        acknowledgedAt,
-        eventId,
-      );
-      return "acknowledged";
-    });
+    return this.queue.acknowledge(eventId, acknowledgedAt);
   }
 
   markFeedbackEligible(eventId: string): void {
-    this.storage.transactionSync(() => {
-      const state = this.readState();
-      if (
-        state === null ||
-        state.feedback === undefined ||
-        state.feedback.eventId !== eventId ||
-        state.feedback.status !== "scheduled"
-      ) {
-        return;
-      }
-      this.storage.sql.exec(
-        "UPDATE journey_state SET payload = ? WHERE singleton = 1",
-        JSON.stringify({
-          ...state,
-          feedback: { ...state.feedback, status: "eligible" },
-        }),
-      );
-    });
+    this.queue.markFeedbackEligible(eventId);
   }
 
   nextAlarmAt(now: number): AlarmPlan {
-    const rows = this.storage.sql
-      .exec<{ next_attempt_at: number }>(
-        "SELECT MIN(next_attempt_at) AS next_attempt_at FROM journey_outbox WHERE status = 'pending' AND expires_at > ?",
-        now,
-      )
-      .toArray();
-    return planJourneyAlarm(this.readState(), rows[0]?.next_attempt_at ?? null);
+    return this.queue.nextAlarmAt(now);
   }
-}
 
-function outboxRecord(value: unknown): OutboxRecord {
-  return outboxRecordSchema.parse(value);
-}
+  beginDeletion(
+    expectedSequence: number,
+    deleteRequestDigest: string,
+  ): "fenced" | "sequence_conflict" {
+    return this.deletion.beginDeletion(expectedSequence, deleteRequestDigest, () =>
+      this.readState(),
+    );
+  }
 
-function retryDelayMs(attempts: number): number {
-  switch (attempts) {
-    case 0:
-      return OUTBOX_RETRY_DELAYS_MS[0];
-    case 1:
-      return OUTBOX_RETRY_DELAYS_MS[1];
-    case 2:
-      return OUTBOX_RETRY_DELAYS_MS[2];
-    default:
-      return OUTBOX_RETRY_DELAYS_MS[3];
+  isDeletionFenced(): boolean {
+    return this.deletion.isDeletionFenced();
+  }
+
+  matchesDeletionGate(deleteRequestDigest: string): boolean {
+    return this.deletion.matchesDeletionGate(deleteRequestDigest);
+  }
+
+  resumeLegacyDeletion(deleteRequestDigest: string): "fenced" | "sequence_conflict" {
+    return this.deletion.resumeLegacyDeletion(deleteRequestDigest, () => this.readState());
+  }
+
+  deleteJourneyData(deleteRequestDigest: string): void {
+    this.deletion.deleteJourneyData(deleteRequestDigest);
   }
 }

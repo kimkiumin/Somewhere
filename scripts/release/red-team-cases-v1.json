@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "cases": [
-    { "id": "session-origin-host-csrf", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/session-security-boundary-todo8.test.ts"], "expectedExit": 0 },
+    { "id": "session-origin-host-csrf", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/session-security-boundary-todo8.test.ts", "test/security-adversarial-todo8.test.ts"], "expectedExit": 0 },
     { "id": "idor-idempotency-sequence", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/idempotency-sequence-todo8.test.ts"], "expectedExit": 0 },
     { "id": "stop-reveal-race", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/lifecycle-race.test.ts"], "expectedExit": 0 },
     { "id": "feedback-capability-deletion", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/feedback-deletion.test.ts"], "expectedExit": 0 },

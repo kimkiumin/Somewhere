@@ -1,4 +1,4 @@
-import { buildAsyncMessage, parsePoisonMessage } from "../async/message";
+import { buildAsyncMessage, buildInvalidPoisonMessage, parsePoisonMessage } from "../async/message";
 import type { Database } from "../db/database";
 
 const LOCAL_DLQ = "somewhere-events-dlq-local";
@@ -21,6 +21,17 @@ export async function enqueueLocalQueueProbes(queue: QueueProducer, now: number)
   ]);
 }
 
+export async function localQueueAttemptEvidence(
+  batch: MessageBatch<unknown>,
+): Promise<readonly Readonly<{ attempt: number; originalEventDigest: string }>[]> {
+  return Promise.all(
+    batch.messages.map(async (message) => ({
+      attempt: message.attempts,
+      originalEventDigest: (await buildInvalidPoisonMessage(message.body, 1)).originalEventDigest,
+    })),
+  );
+}
+
 export async function recordLocalDlqDelivery(
   batch: MessageBatch<unknown>,
   database: Database,
@@ -30,11 +41,11 @@ export async function recordLocalDlqDelivery(
     throw new TypeError("Local DLQ receipt requires a non-empty local DLQ batch");
   }
   for (const message of batch.messages) {
-    parsePoisonMessage(message.body);
-    const receiptId = `audit_v1.${crypto.randomUUID().replaceAll("-", "")}`;
+    const poison = parsePoisonMessage(message.body);
+    const receiptId = `audit_v1.${poison.originalEventDigest}`;
     await database
       .prepare(
-        `INSERT INTO audit_events (
+        `INSERT OR IGNORE INTO audit_events (
            audit_event_id, actor_role, action_code, result_code,
            policy_digest, deploy_digest, occurred_at, expires_at
          ) VALUES (?, 'system', 'dlq-delivery', 'poison-received', NULL, NULL, ?, ?)`,

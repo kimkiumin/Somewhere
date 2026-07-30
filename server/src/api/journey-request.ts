@@ -1,4 +1,4 @@
-import { localLoopbackRequestPolicy, validateMutationRequest } from "../security/request";
+import { type RequestPolicy, validateMutationRequest } from "../security/request";
 import { parseStrictBody } from "../security/schema";
 import type { AuthenticatedSession, SessionService } from "../security/session";
 import { hmacDigest } from "../security/tokens";
@@ -24,6 +24,7 @@ export type JourneySnapshot = LifecycleSnapshot &
 export type JourneyControllerDependencies = Readonly<{
   hmacKey: CryptoKey;
   now: () => number;
+  requestPolicy: RequestPolicy;
   reserveNewWork?: (idempotencyKey: string) => Promise<NewWorkReservation | undefined>;
   sessionService: SessionService;
   writeEpoch: number;
@@ -71,13 +72,14 @@ export function authenticateMutation(
 
 export async function parseMutationBody(
   request: Request,
+  requestPolicy: RequestPolicy,
   limit: number,
   allowedKeys: ReadonlySet<string>,
 ): Promise<
   | Readonly<{ body: string; value: Readonly<Record<string, unknown>> }>
   | Readonly<{ error: SliceErrorCode }>
 > {
-  const validation = await validateMutationRequest(request, requestPolicy(request), limit);
+  const validation = await validateMutationRequest(request, requestPolicy, limit);
   if (typeof validation === "string") {
     return { error: validation };
   }
@@ -119,16 +121,4 @@ export async function deriveJourneyId(
 ): Promise<string> {
   const digest = await hmacDigest(key, `${bindingDigest}\0${idempotencyKey}`);
   return `j_v1.${Buffer.from(digest.slice(0, 32), "hex").toString("base64url")}`;
-}
-
-function requestPolicy(
-  request: Request,
-): Readonly<{ canonicalHost: string; canonicalOrigin: string }> {
-  const url = new URL(request.url);
-  return url.hostname === "127.0.0.1"
-    ? (localLoopbackRequestPolicy(url) ?? {
-        canonicalHost: "invalid.local",
-        canonicalOrigin: "http://invalid.local",
-      })
-    : { canonicalHost: url.host, canonicalOrigin: url.origin };
 }

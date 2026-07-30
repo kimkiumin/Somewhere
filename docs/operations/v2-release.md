@@ -52,6 +52,18 @@ approved HTTPS origin. The D1 target is derived from the checked-in staging
 binding; it is never accepted as workflow input. It then performs this fixed
 sequence:
 
+Before any staging or production deployment, the Cloudflare authority must set
+`CANONICAL_ORIGIN` with `wrangler secret put CANONICAL_ORIGIN --env staging` or
+`--env production`. The value is external evidence and must be the exact
+normalized public HTTPS origin: no credentials, trailing slash, path, query, or
+fragment. It is never committed or printed. Immediately before deployment,
+`cloudflare-acceptance-gates.sh deployment-secret-check <environment>` queries
+the target Worker with `wrangler secret list --format json` and aborts unless
+the exact secret name exists; Wrangler returns names and types, not values.
+The staging workflow runs this check in the deploy step. The Worker also rejects
+every session and mutation when the binding is missing or malformed. Local
+loopback development does not use this secret.
+
 1. prove the prior Durable Object lifecycle/export and current binding are
    identical;
 2. verify that the external operations authority has already closed admission;
@@ -60,7 +72,8 @@ sequence:
    protected staging recipient certificate, hash the ciphertext, and keep the
    plaintext outside the uploaded artifact directory;
 5. apply forward-only expand migrations;
-6. deploy one atomic Worker version while admission stays closed;
+6. verify the remote `CANONICAL_ORIGIN` secret and deploy one atomic Worker
+   version while admission stays closed;
 7. smoke-test same-origin static/API routing and private no-store headers;
 8. wait for the operations authority's two-sample recovery policy to reopen
    admission, then verify ready/OPEN health.
@@ -149,8 +162,8 @@ prevents cleanup PASS.
 
 All of these must be supplied by their actual authority:
 
-1. Cloudflare production account, target-specific bindings/secrets, domain,
-   migrations, deployment and rollback evidence.
+1. Cloudflare production account, target-specific bindings/secrets, exact
+   `CANONICAL_ORIGIN`, domain, migrations, deployment and rollback evidence.
 2. Place and walking-route provider rights, attribution, quota and production
    adapter approval.
 3. Independent Korean privacy/location-information review.

@@ -196,6 +196,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           RELEASE_SHA: ${{ inputs.release_sha }}
         run: |
+          bash scripts/release/cloudflare-acceptance-gates.sh \
+            deployment-secret-check staging
           node_modules/.bin/wrangler deploy \
             --config server/wrangler.jsonc --env staging --strict \
             --assets "$RUNNER_TEMP/staging-build/app/dist" \

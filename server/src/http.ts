@@ -6,7 +6,11 @@ import type { Database } from "./db/database";
 import { OPERATIONS_SCHEMA } from "./operations/health";
 import { OperationsHealthRepository } from "./operations/health-repository";
 import { OperationsRuntimeControl } from "./operations/runtime-control";
-import { localLoopbackRequestPolicy, validateSessionRequest } from "./security/request";
+import {
+  type RequestPolicy,
+  requestPolicyForEnvironment,
+  validateSessionRequest,
+} from "./security/request";
 import { InMemorySessionRepository, SessionService } from "./security/session";
 import { importHmacKey, randomBase64Url } from "./security/tokens";
 import { handleV2LocalControl, v2RuntimeNow } from "./testing/v2-local-control";
@@ -21,7 +25,8 @@ export function handleRequest(
   env?: Env,
   dependencies?: HttpBoundaryDependencies,
 ): Response | Promise<Response> {
-  const { pathname } = new URL(request.url);
+  const url = new URL(request.url);
+  const { pathname } = url;
   if (pathname === "/api/v1/health") {
     return new Response(JSON.stringify({ contractVersion: 1, status: "ok" }), {
       headers: API_HEADERS,
@@ -43,17 +48,18 @@ export function handleRequest(
       (response) => response ?? publicError("not_found"),
     );
   }
+  const requestPolicy = httpRequestPolicy(url, env);
   if (pathname === "/api/v1/session" && request.method === "GET") {
-    return handleSession(request, env, dependencies);
+    return handleSession(request, env, dependencies, requestPolicy);
   }
   if (env !== undefined && pathname === "/api/v1/session") {
     return methodNotAllowed("GET");
   }
   if (env !== undefined && pathname.startsWith("/api/v1/journeys")) {
-    return handleRuntimeJourney(request, env, dependencies);
+    return handleRuntimeJourney(request, env, dependencies, requestPolicy);
   }
   if (env !== undefined && pathname.startsWith("/api/v1/feedback")) {
-    return handleRuntimeFeedback(request, env, dependencies);
+    return handleRuntimeFeedback(request, env, dependencies, requestPolicy);
   }
   if (env !== undefined) {
     return publicError("not_found");
@@ -90,6 +96,7 @@ async function handleRuntimeFeedback(
   request: Request,
   env: Env,
   dependencies: HttpBoundaryDependencies | undefined,
+  requestPolicy: RequestPolicy,
 ): Promise<Response> {
   const now = dependencies?.now() ?? v2RuntimeNow(env.ENVIRONMENT);
   const operations = await new OperationsRuntimeControl(env.DB satisfies Database).authorize(
@@ -101,7 +108,14 @@ async function handleRuntimeFeedback(
     return publicError("service_unavailable");
   }
   const key = await loadSessionHmacKey(env.DB);
-  const response = await handleFeedbackApi(request, env, key, now, operations.writeEpoch);
+  const response = await handleFeedbackApi(
+    request,
+    env,
+    key,
+    requestPolicy,
+    now,
+    operations.writeEpoch,
+  );
   return response ?? publicError("not_found");
 }
 
@@ -109,18 +123,8 @@ async function handleSession(
   request: Request,
   env: Env | undefined,
   dependencies: HttpBoundaryDependencies | undefined,
+  requestPolicy: RequestPolicy,
 ): Promise<Response> {
-  const url = new URL(request.url);
-  const requestPolicy =
-    env?.ENVIRONMENT === "local"
-      ? (localLoopbackRequestPolicy(url) ?? {
-          canonicalHost: "invalid.local",
-          canonicalOrigin: "http://invalid.local",
-        })
-      : {
-          canonicalHost: url.host,
-          canonicalOrigin: url.origin,
-        };
   if (!validateSessionRequest(request, requestPolicy)) {
     return legacyPublicError(403, "request_forbidden");
   }
@@ -167,6 +171,7 @@ async function handleRuntimeJourney(
   request: Request,
   env: Env,
   dependencies: HttpBoundaryDependencies | undefined,
+  requestPolicy: RequestPolicy,
 ): Promise<Response> {
   const boundary = dependencies ?? (await createRuntimeDependencies(env));
   const operations = await new OperationsRuntimeControl(env.DB satisfies Database).authorize(
@@ -181,6 +186,7 @@ async function handleRuntimeJourney(
   const response = await handleJourneyApi(request, env, {
     hmacKey: key,
     now: boundary.now,
+    requestPolicy,
     ...(operations.reserveNewWork === undefined
       ? {}
       : { reserveNewWork: operations.reserveNewWork }),
@@ -188,6 +194,16 @@ async function handleRuntimeJourney(
     writeEpoch: operations.writeEpoch,
   });
   return response ?? publicError("not_found");
+}
+
+function httpRequestPolicy(url: URL, env: Env | undefined): RequestPolicy {
+  return env === undefined
+    ? {
+        canonicalHost: url.host,
+        canonicalOrigin: url.origin,
+        kind: "valid",
+      }
+    : requestPolicyForEnvironment(url, env.ENVIRONMENT, env.CANONICAL_ORIGIN);
 }
 
 async function createRuntimeDependencies(env: Env): Promise<HttpBoundaryDependencies> {

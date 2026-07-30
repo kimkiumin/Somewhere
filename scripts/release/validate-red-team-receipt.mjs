@@ -48,6 +48,7 @@ async function validate(options) {
     caseCount: expectedIds.length,
     executedIds: expectedIds,
     rawSha256: await digestFile(raw),
+    reviewBindings: [{ path: raw, sha256: await digestFile(raw) }],
   });
 }
 

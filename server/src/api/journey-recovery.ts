@@ -57,6 +57,7 @@ export async function handleRecovery(
 ): Promise<Response> {
   const parsed = await parseMutationBody(
     request,
+    dependencies.requestPolicy,
     1_024,
     action === "intent" ? INTENT_KEYS : CONFIRM_KEYS,
   );

@@ -69,10 +69,15 @@ export function checkExternalTombstoneBarrier(
 export async function finalizeDeleteAfterTombstone(
   storage: JourneyStorage,
   receipt: Readonly<{ durable: boolean; replayStatus: 204 }>,
+  deleteJourneyData?: () => void,
 ): Promise<void> {
   if (!receipt.durable) {
     throw new TombstoneNotDurableError();
   }
   await storage.deleteAlarm();
-  await storage.deleteAll();
+  if (deleteJourneyData === undefined) {
+    await storage.deleteAll();
+    return;
+  }
+  deleteJourneyData();
 }

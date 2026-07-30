@@ -12,9 +12,20 @@ import {
   writeJson,
 } from "./lib/release-core.mjs";
 import { validateVerifyV2RuntimeEvidence } from "./lib/verify-v2-runtime-evidence.mjs";
+import {
+  assertReviewerResponse,
+  parseReviewerAssessment,
+} from "./lib/reviewer-assessment.mjs";
+import { assertReviewInputBindings } from "./lib/review-input-bindings.mjs";
+import { exactRuntimeValidationContext } from "./lib/runtime-suites.mjs";
 
 const specification = {
   required: ["--profile", "--sha", "--source-tree", "--inputs", "--output"],
+  optional: [
+    "--prepared-build-root",
+    "--prepared-build-receipt",
+    "--prepared-source-archive",
+  ],
 };
 const allowedEnvironmentVariables = [
   "PATH",
@@ -46,6 +57,30 @@ async function bindInputs(inputPaths, options, snapshotRoot) {
     const snapshot = await snapshotRegularFile(path, "review input");
     return { path, sha256: snapshot.sha256, snapshot };
   }));
+  assertReviewInputBindings(explicit.map(({ path, sha256: digest, snapshot }) => ({
+    path,
+    sha256: digest,
+    data: snapshot.data,
+  })));
+  const preparedValues = [
+    options["prepared-build-root"],
+    options["prepared-build-receipt"],
+    options["prepared-source-archive"],
+  ];
+  const exactMode = preparedValues.every((value) => value !== undefined);
+  if (!exactMode && preparedValues.some((value) => value !== undefined)) {
+    throw new TypeError("exact prepared build inputs must be supplied together");
+  }
+  const exactContext = exactMode
+    ? await exactRuntimeValidationContext({
+        sha: options.sha,
+        sourceTree: options["source-tree"],
+        repo: resolve("."),
+        buildRoot: options["prepared-build-root"],
+        receipt: options["prepared-build-receipt"],
+        sourceArchive: options["prepared-source-archive"],
+      })
+    : {};
   let runtimeEvidence;
   for (const input of explicit) {
     let value;
@@ -62,6 +97,8 @@ async function bindInputs(inputPaths, options, snapshotRoot) {
       sha: options.sha,
       sourceTree: options["source-tree"],
       registry: "scripts/release/verify-v2-runtime-artifacts-v1.json",
+      runtimeSuites: exactContext.runtimeSuites,
+      preparedBuild: exactContext.preparedBuild,
     });
     if (runtimeEvidence.primarySnapshot.sha256 !== input.sha256) {
       throw new TypeError("runtime evidence primary changed while binding");
@@ -119,6 +156,7 @@ async function review(options) {
   ) {
     throw new TypeError("unsafe reviewer profile");
   }
+  const assessment = parseReviewerAssessment(profile.assessment);
   const environment = reviewerEnvironment();
   const version = await run(["codex2", "--version"], { cwd: repo, env: environment });
   const observedVersion = version.stdout.toString().trim();
@@ -135,6 +173,13 @@ async function review(options) {
     const responsePath = resolve(temporary, "response.json");
     const prompt = [
       profile.instructions,
+      ...(assessment === undefined
+        ? []
+        : [
+            `Machine assessment contract: ${JSON.stringify(assessment)}`,
+            "Judge repository readiness under that contract; preserve external release BLOCKs without converting them into repository findings.",
+            `When no local findings exist, return ${assessment.noLocalFindingsVerdict}.`,
+          ]),
       `Exact reviewed commit: ${options.sha}`,
       `Exact source tree: ${options["source-tree"]}`,
       "Bound inputs are immutable private snapshots; inspect snapshot paths, not original paths:",
@@ -161,14 +206,7 @@ async function review(options) {
       prompt,
     ], { cwd: repo, env: environment });
     if (invoked.exitCode !== 0) throw new TypeError(`reviewer runner failed: ${invoked.stderr.toString().trim()}`);
-    const response = await readJson(responsePath);
-    if (
-      !["APPROVE", "REQUEST_CHANGES", "BLOCK"].includes(response.verdict)
-      || !Array.isArray(response.findings)
-      || (response.verdict === "APPROVE" && response.findings.some((entry) => ["P0", "P1"].includes(entry.severity)))
-    ) {
-      throw new TypeError("reviewer verdict contradiction");
-    }
+    const response = assertReviewerResponse(await readJson(responsePath), assessment);
     await writeJson(resolve(options.output), {
       schemaVersion: 1,
       verdict: response.verdict,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Database, DatabaseValue, PreparedQuery } from "../src/db/database";
 
 const rowsSchema = z.array(z.record(z.string(), z.union([z.string(), z.number(), z.null()])));
+const changesSchema = z.object({ changes: z.number().int().nonnegative() });
 
 class SqliteFixtureBindingError extends Error {
   override readonly name = "SqliteFixtureBindingError";
@@ -54,10 +55,15 @@ class SqlitePreparedQuery implements PreparedQuery {
   }
 
   async run(): Promise<unknown> {
-    execFileSync("sqlite3", [this.path, bindSql(this.query, this.values)], {
-      encoding: "utf8",
-    });
-    return undefined;
+    const output = execFileSync(
+      "sqlite3",
+      ["-json", this.path, `${bindSql(this.query, this.values)}; SELECT changes() AS changes;`],
+      {
+        encoding: "utf8",
+      },
+    );
+    const rows = rowsSchema.parse(JSON.parse(output));
+    return { meta: changesSchema.parse(rows.at(-1)) };
   }
 
   render(): string {
@@ -75,11 +81,20 @@ export class SqliteDatabase implements Database {
       }
       return `${statement.render()};`;
     });
-    execFileSync("sqlite3", [this.path], {
+    const output = execFileSync("sqlite3", ["-json", this.path], {
       encoding: "utf8",
-      input: [".bail on", "BEGIN IMMEDIATE;", ...queries, "COMMIT;"].join("\n"),
+      input: [
+        ".bail on",
+        "BEGIN IMMEDIATE;",
+        ...queries.flatMap((query) => [query, "SELECT changes() AS changes;"]),
+        "COMMIT;",
+      ].join("\n"),
     });
-    return [];
+    return output
+      .trim()
+      .split("\n")
+      .filter((line) => line.length > 0)
+      .map((line) => ({ meta: changesSchema.parse(JSON.parse(line).at(0)) }));
   }
 
   prepare(query: string): PreparedQuery {

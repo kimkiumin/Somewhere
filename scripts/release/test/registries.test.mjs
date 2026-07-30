@@ -28,7 +28,9 @@ const requiredScripts = [
   "validate-ci-verdict.mjs",
   "validate-todo20-evidence.mjs",
   "build-production.mjs",
+  "write-prepared-build-reference.mjs",
   "run-verify-v2.mjs",
+  "run-bun-audit.mjs",
   "validate-verify-v2-runtime-evidence.mjs",
 ];
 const requiredSchemas = [
@@ -104,7 +106,32 @@ describe("Todo 22 release registry", () => {
       const reviewer = commands.lanes.F2.find((entry) => entry.id === id);
       const inputs = reviewer.argv[reviewer.argv.indexOf("--inputs") + 1];
       expect(inputs).toContain("${FINAL_ROOT}/F2/verify-v2-verdict.json");
+      expect(reviewer.argv).toEqual(expect.arrayContaining([
+        "--prepared-build-root",
+        "${FINAL_ROOT}/prepared/build",
+        "--prepared-build-receipt",
+        "${BUILD_RECEIPT}",
+        "--prepared-source-archive",
+        "${FINAL_ROOT}/prepared/source.tar",
+      ]));
     }
+  });
+
+  test("routes dependency audit through an exact-source receipt", async () => {
+    // Given: the canonical F2 command registry.
+    const commands = await readJson(resolve(repo, "scripts/release/final-lane-commands-v1.json"));
+
+    // When: the dependency audit command is resolved.
+    const audit = commands.lanes.F2.find((entry) => entry.id === "bun-audit");
+
+    // Then: the primary is produced by the SHA/tree and lockfile-aware wrapper.
+    expect(audit.argv.slice(0, 2)).toEqual(["bun", "scripts/release/run-bun-audit.mjs"]);
+    expect(audit.argv).toEqual(expect.arrayContaining([
+      "${FINAL_SHA}",
+      "${SOURCE_TREE}",
+      "bun.lock",
+      "${FINAL_ROOT}/F2/bun-audit-raw.json",
+    ]));
   });
 
   test("binds the standalone Wrangler dry run to the production environment", async () => {

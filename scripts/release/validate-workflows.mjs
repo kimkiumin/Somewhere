@@ -118,6 +118,10 @@ function assertStaging(workflow) {
     throw new TypeError("STAGING_RELEASE_ORDER_UNSAFE");
   }
   const commands = runText(workflow);
+  const deployStep = stageJob.steps.find((step) => step.id === "deploy");
+  const deployCommands = typeof deployStep?.run === "string" ? deployStep.run : "";
+  const secretCheckPosition = deployCommands.indexOf("deployment-secret-check staging");
+  const deployPosition = deployCommands.indexOf("node_modules/.bin/wrangler deploy");
   const inputs = workflow.on.workflow_dispatch?.inputs;
   if (
     /wrangler\s+(?:versions|rollback|deployments)\b|--percentage\b|--command\b/iu.test(commands)
@@ -140,6 +144,8 @@ function assertStaging(workflow) {
     || !commands.includes("staging-private/database.sql")
     || !commands.includes("d1 migrations apply")
     || !commands.includes("wrangler deploy")
+    || secretCheckPosition < 0
+    || deployPosition <= secretCheckPosition
     || !commands.includes("postdeploy")
   ) {
     throw new TypeError("STAGING_LIFECYCLE_OR_MIGRATION_UNSAFE");

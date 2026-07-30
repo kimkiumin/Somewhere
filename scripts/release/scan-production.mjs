@@ -45,12 +45,15 @@ async function scan(options) {
   }
   if (scanned.length === 0) throw new TypeError("no production artifacts were scanned");
   const gate = findings.length === 0 ? "PASS" : "FAIL";
+  const buildReceipt = resolve(options["build-receipt"]);
+  const buildReceiptSha256 = await digestFile(buildReceipt);
   await writeJson(resolve(options.output), {
     schemaVersion: 1,
     gate,
     scanned,
     findings,
-    buildReceiptSha256: await digestFile(resolve(options["build-receipt"])),
+    buildReceiptSha256,
+    reviewBindings: [{ path: buildReceipt, sha256: buildReceiptSha256 }],
   });
   if (gate !== "PASS") process.exitCode = 1;
 }

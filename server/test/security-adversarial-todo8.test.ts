@@ -1,21 +1,34 @@
 import { describe, expect, it } from "vitest";
 
 import { InMemoryObjectAuthorizer } from "../src/security/authorization";
-import { validateMutationRequest } from "../src/security/request";
+import {
+  requestPolicyForEnvironment,
+  validateMutationRequest,
+  validateSessionRequest,
+} from "../src/security/request";
 import { parseStrictBody } from "../src/security/schema";
 
 const POLICY = {
   canonicalHost: "example.test",
   canonicalOrigin: "https://example.test",
+  kind: "valid",
 } as const;
 
 function mutation(headers: Readonly<Record<string, string>>, body = "{}"): Request {
-  return new Request("https://example.test/api/v1/journeys", {
+  return mutationAt("https://example.test", headers, body);
+}
+
+function mutationAt(
+  origin: string,
+  headers: Readonly<Record<string, string>>,
+  body = "{}",
+): Request {
+  return new Request(`${origin}/api/v1/journeys`, {
     body,
     headers: {
       "content-type": "application/json",
-      host: "example.test",
-      origin: "https://example.test",
+      host: new URL(origin).host,
+      origin,
       "sec-fetch-site": "same-origin",
       ...headers,
     },
@@ -24,6 +37,74 @@ function mutation(headers: Readonly<Record<string, string>>, body = "{}"): Reque
 }
 
 describe("security adversarial boundary", () => {
+  it("binds deployed requests only to one normalized configured HTTPS origin", async () => {
+    // Given: one trusted deployment origin and an attacker-selected paired Host and Origin.
+    const configured = requestPolicyForEnvironment(
+      new URL("https://attacker.test/api/v1/journeys"),
+      "production",
+      "https://api.example.test",
+    );
+    const attacker = mutationAt("https://attacker.test", {});
+    const exact = mutationAt("https://api.example.test", {});
+
+    // When: both requests cross the same deployment-bound policy.
+    const [attackerResult, exactResult] = await Promise.all([
+      validateMutationRequest(attacker, configured, 4_096),
+      validateMutationRequest(exact, configured, 4_096),
+    ]);
+    const sessionHeaders = { origin: "https://api.example.test" };
+    const attackerSession = new Request("https://attacker.test/api/v1/session", {
+      headers: { host: "attacker.test", ...sessionHeaders },
+    });
+    const exactSession = new Request("https://api.example.test/api/v1/session", {
+      headers: { host: "api.example.test", ...sessionHeaders },
+    });
+
+    // Then: paired attacker headers fail while the exact configured origin succeeds.
+    expect(attackerResult).toBe("request_forbidden");
+    expect(exactResult).toEqual({ body: "{}" });
+    expect(validateSessionRequest(attackerSession, configured)).toBe(false);
+    expect(validateSessionRequest(exactSession, configured)).toBe(true);
+  });
+
+  it.each([
+    undefined,
+    "http://api.example.test",
+    "https://user@api.example.test",
+    "https://api.example.test/",
+    "https://api.example.test/path",
+    "https://api.example.test?query=1",
+    "https://api.example.test#fragment",
+  ])("fails closed for a missing or malformed deployed canonical origin: %s", async (origin) => {
+    // Given: a non-local deployment without one normalized HTTPS origin.
+    const policy = requestPolicyForEnvironment(
+      new URL("https://attacker.test/api/v1/journeys"),
+      "staging",
+      origin,
+    );
+
+    // When: an attacker pairs Host and Origin with the request URL.
+    const result = await validateMutationRequest(
+      mutationAt("https://attacker.test", {}),
+      policy,
+      4_096,
+    );
+
+    // Then: invalid deployment configuration cannot authorize any mutation.
+    expect(result).toBe("request_forbidden");
+    expect(
+      validateSessionRequest(
+        new Request("https://attacker.test/api/v1/session", {
+          headers: {
+            host: "attacker.test",
+            origin: "https://attacker.test",
+          },
+        }),
+        policy,
+      ),
+    ).toBe(false);
+  });
+
   it.each([
     ["foreign Origin", { origin: "https://attacker.test" }],
     ["null Origin", { origin: "null" }],

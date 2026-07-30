@@ -1,18 +1,20 @@
-export type DeletionStage = "pending" | "tombstoned" | "object-deleted" | "cleaned";
+export type DeletionStage = "pending" | "fenced" | "tombstoned" | "object-deleted" | "cleaned";
 
 export type DeletionSagaPorts = Readonly<{
   advance(stage: DeletionStage): Promise<void>;
-  appendAudit(): Promise<void>;
+  beginDeletion(): Promise<"fenced" | "sequence_conflict">;
   cleanupBindings(): Promise<void>;
   complete(): Promise<void>;
   deleteObject(): Promise<void>;
   inventory(): Promise<readonly string[]>;
   loadStage(): Promise<DeletionStage>;
+  finalizeCompletion(): Promise<void>;
   writeTombstone(): Promise<void>;
 }>;
 
 export type DeletionSagaResult =
   | Readonly<{ kind: "complete" }>
+  | Readonly<{ kind: "sequence-conflict" }>
   | Readonly<{ kind: "incomplete"; stage: DeletionStage }>;
 
 export async function runDeletionSaga(ports: DeletionSagaPorts): Promise<DeletionSagaResult> {
@@ -20,6 +22,20 @@ export async function runDeletionSaga(ports: DeletionSagaPorts): Promise<Deletio
   while (true) {
     switch (stage) {
       case "pending": {
+        const fence = await outcome(ports.beginDeletion);
+        if (fence === undefined) {
+          return { kind: "incomplete", stage };
+        }
+        if (fence === "sequence_conflict") {
+          return { kind: "sequence-conflict" };
+        }
+        if (!(await completes(() => ports.advance("fenced")))) {
+          return { kind: "incomplete", stage };
+        }
+        stage = "fenced";
+        break;
+      }
+      case "fenced": {
         if (!(await completes(ports.writeTombstone))) {
           return { kind: "incomplete", stage };
         }
@@ -30,6 +46,9 @@ export async function runDeletionSaga(ports: DeletionSagaPorts): Promise<Deletio
         break;
       }
       case "tombstoned": {
+        if (!(await completes(ports.writeTombstone))) {
+          return { kind: "incomplete", stage };
+        }
         if (!(await completes(ports.deleteObject))) {
           return { kind: "incomplete", stage };
         }
@@ -58,7 +77,7 @@ export async function runDeletionSaga(ports: DeletionSagaPorts): Promise<Deletio
         break;
       }
       case "cleaned":
-        if (!(await completes(ports.appendAudit)) || !(await completes(ports.complete))) {
+        if (!(await completes(ports.finalizeCompletion)) || !(await completes(ports.complete))) {
           return { kind: "incomplete", stage };
         }
         return { kind: "complete" };

@@ -11,7 +11,9 @@ type EnvironmentConfig = Readonly<{
     consumers?: readonly Binding[];
     producers?: readonly Binding[];
   }>;
+  secrets?: Readonly<{ required?: readonly string[] }>;
   services?: readonly Binding[];
+  vars?: Readonly<Record<string, unknown>>;
 }>;
 
 type WorkerConfig = EnvironmentConfig &
@@ -21,7 +23,10 @@ type WorkerConfig = EnvironmentConfig &
       not_found_handling?: string;
       run_worker_first?: readonly string[];
     }>;
-    env?: Readonly<Record<string, EnvironmentConfig>>;
+    env?: Readonly<{
+      production?: EnvironmentConfig;
+      staging?: EnvironmentConfig;
+    }>;
     exports?: Readonly<Record<string, Readonly<Record<string, string>>>>;
     migrations?: unknown;
     observability?: Readonly<{
@@ -125,5 +130,23 @@ describe("worker-config", () => {
         persist: false,
       },
     });
+  });
+
+  it("requires the deployed canonical origin as an external secret without a placeholder", async () => {
+    // Given: local, staging, and production Worker configuration.
+    const config = await readConfig();
+    const staging = config.env?.staging;
+    const production = config.env?.production;
+
+    // When: canonical-origin bindings are inspected.
+    const serialized = JSON.stringify(config);
+
+    // Then: deployed environments require the secret while no value is committed.
+    expect(config.secrets).toBeUndefined();
+    expect(staging?.secrets).toEqual({ required: ["CANONICAL_ORIGIN"] });
+    expect(production?.secrets).toEqual({ required: ["CANONICAL_ORIGIN"] });
+    expect(staging?.vars).not.toHaveProperty("CANONICAL_ORIGIN");
+    expect(production?.vars).not.toHaveProperty("CANONICAL_ORIGIN");
+    expect(serialized).not.toMatch(/CANONICAL_ORIGIN"\s*:/);
   });
 });

@@ -202,6 +202,7 @@ function migratedDatabase(): Readonly<{ database: SqliteDatabase; path: string }
     "0003_feedback_deletion.sql",
     "0004_operations_control.sql",
     "0005_operations_epoch_extensions.sql",
+    "0006_journey_deletion_fence.sql",
   ]) {
     executeSql(path, readFileSync(resolve(process.cwd(), "migrations", migration), "utf8"));
   }

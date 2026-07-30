@@ -31,7 +31,7 @@ export async function createJourney(
   env: Env,
   dependencies: JourneyControllerDependencies,
 ): Promise<Response> {
-  const parsed = await parseMutationBody(request, 4_096, CREATE_KEYS);
+  const parsed = await parseMutationBody(request, dependencies.requestPolicy, 4_096, CREATE_KEYS);
   if ("error" in parsed) {
     return publicError(parsed.error);
   }

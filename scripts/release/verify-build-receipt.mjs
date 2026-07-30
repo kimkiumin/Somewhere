@@ -9,6 +9,7 @@ import {
   sha256,
   writeJson,
 } from "./lib/release-core.mjs";
+import { validateBuildProvenance } from "./lib/build-provenance.mjs";
 
 const specification = {
   required: ["--sha", "--source-tree", "--receipt", "--final-root", "--output"],
@@ -31,6 +32,7 @@ async function verify(options) {
   ) {
     throw new TypeError("build receipt identity or artifacts invalid");
   }
+  validateBuildProvenance(receipt.provenance);
   const observed = [];
   const seen = new Set();
   for (const artifact of receipt.artifacts) {

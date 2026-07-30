@@ -93,7 +93,12 @@ async function preparation(options) {
       buildOutput,
       "--receipt",
       upstreamReceipt,
-    ], source);
+    ], source, {
+      ...process.env,
+      SOMEWHERE_SOURCE_SHA: sha,
+      SOMEWHERE_SOURCE_TREE: tree,
+    });
+    const upstreamBuild = JSON.parse(await Bun.file(upstreamReceipt).text());
     const buildCopy = resolve(prepared, "build");
     await copyBuild(buildOutput, buildCopy);
     const buildArchive = resolve(prepared, "build.tar.gz");
@@ -112,6 +117,7 @@ async function preparation(options) {
       policy: { kind: policyKind, path: relative(finalRoot, policyCopy), sha256: policyDigest },
       commands: ["bun install --frozen-lockfile", "bun run verify:release", "bun run build:production"],
       tools: { bun: Bun.version, git: await git(repo, ["--version"]) },
+      provenance: upstreamBuild.provenance,
       config: "server/wrangler.jsonc",
       entrypoint: "server/src/index.ts",
       artifacts: buildArtifacts,
@@ -119,7 +125,7 @@ async function preparation(options) {
       builtAt: new Date().toISOString(),
     });
     const external = resolve(finalRoot, "external-gates.json");
-    const externalIds = ["cloudflare-production", "provider-rights-quota", "korean-privacy-location-review", "study-a-rc", "physical-iphone", "native-distribution"];
+    const externalIds = ["cloudflare-production", "cloudflare-canonical-origin", "cloudflare-production-pitr", "provider-rights-quota", "korean-privacy-location-review", "study-a-rc", "physical-iphone", "native-distribution"];
     await writeJson(external, {
       schemaVersion: 1,
       finalSha: sha,

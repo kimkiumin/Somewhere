@@ -75,21 +75,32 @@ describe("Todo12 Durable Object alarm recovery", () => {
       sequence: 0,
       writeEpoch: 1,
     });
-    await deletedStub.deleteAfterTombstone({ durable: true, replayStatus: 204 });
+    await deletedStub.beginDeletion({ deleteRequestDigest: DIGEST_B, expectedSequence: 0 });
+    await deletedStub.deleteAfterTombstone({
+      deleteRequestDigest: DIGEST_B,
+      durable: true,
+      replayStatus: 204,
+    });
     await evictDurableObject(deletedStub);
     expect(await runDurableObjectAlarm(deletedStub)).toBe(false);
     await expect(deletedStub.reconcileAlarm(now + 1)).resolves.toEqual({ kind: "terminal" });
     expect(
-      await runInDurableObject(
-        deletedStub,
-        (_instance, state) =>
-          state.storage.sql
-            .exec<{ count: number }>(
-              "SELECT COUNT(*) AS count FROM sqlite_master WHERE name LIKE 'journey_%'",
-            )
-            .one().count,
-      ),
-    ).toBe(0);
+      await runInDurableObject(deletedStub, (_instance, state) => ({
+        gate: state.storage.sql
+          .exec<{ delete_request_digest: string }>(
+            "SELECT delete_request_digest FROM journey_deletion_gate",
+          )
+          .one().delete_request_digest,
+        privateRows: state.storage.sql
+          .exec<{ count: number }>(
+            `SELECT
+                (SELECT COUNT(*) FROM journey_state) +
+                (SELECT COUNT(*) FROM journey_outbox) +
+                (SELECT COUNT(*) FROM journey_inbox) AS count`,
+          )
+          .one().count,
+      })),
+    ).toEqual({ gate: DIGEST_B, privateRows: 0 });
   });
 
   it("runs the real Queue handler against D1 and acknowledges late tombstoned work", async () => {

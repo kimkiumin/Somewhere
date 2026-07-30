@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { access, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import { connect } from "node:net";
 import { resolve } from "node:path";
 import {
   removeTemporaryDirectory,
   temporaryDirectory,
+  waitForWorkerPid,
 } from "./release-testkit.mjs";
 
 const repo = resolve(import.meta.dir, "../../..");
@@ -48,18 +49,6 @@ async function portOpen() {
   });
 }
 
-async function waitForWorkerPid(marker) {
-  for (let attempt = 0; attempt < 1_000; attempt += 1) {
-    try {
-      return JSON.parse(await readFile(marker, "utf8"));
-    } catch (error) {
-      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
-    }
-    await Bun.sleep(10);
-  }
-  throw new TypeError("fake Worker did not publish its PID");
-}
-
 async function createFaultFixture(mode, removalFailure = false) {
   const root = await temporaryDirectory("start-cleanup");
   const fakeBin = resolve(root, "bin");
@@ -85,6 +74,13 @@ set -euo pipefail
 if [[ "\${1:-}" == wrangler && "\${2:-}" == dev ]]; then
   if [[ "$SOMEWHERE_TEST_MODE" == leader-exit ]]; then
     python3 "$SOMEWHERE_TEST_WORKER" &
+    worker_pid=$!
+    for _ in {1..400}; do
+      [[ -s "$SOMEWHERE_TEST_WORKER_MARKER" ]] && break
+      kill -0 "$worker_pid" 2>/dev/null || wait "$worker_pid"
+      /bin/sleep 0.005
+    done
+    [[ -s "$SOMEWHERE_TEST_WORKER_MARKER" ]] || exit 32
     exit 31
   fi
   exec python3 "$SOMEWHERE_TEST_WORKER"
@@ -146,26 +142,26 @@ while True:
   };
 }
 
-async function runStart(environment) {
+function runStart(environment) {
   const child = Bun.spawn(["bash", startScript], {
     cwd: repo,
     env: environment,
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [exitCode, stdout, stderr] = await Promise.all([
+  const result = Promise.all([
     child.exited,
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
-  ]);
-  return { exitCode, stdout, stderr };
+  ]).then(([exitCode, stdout, stderr]) => ({ exitCode, stdout, stderr }));
+  return { child, result };
 }
 
 describe("local hidden slice startup cleanup", () => {
   test("removes the allocated run directory when preparation fails", async () => {
     const fixture = await createFaultFixture("preparation-failure");
     try {
-      const result = await runStart(fixture.environment);
+      const result = await runStart(fixture.environment).result;
 
       expect(result.exitCode, result.stderr).toBe(23);
       expect(await pathAbsent(fixture.runDir)).toBe(true);
@@ -177,13 +173,47 @@ describe("local hidden slice startup cleanup", () => {
     }
   });
 
+  test("stops waiting when startup exits before worker PID", async () => {
+    // Given: startup preparation exits before the fake Worker can publish its marker.
+    const fixture = await createFaultFixture("preparation-failure");
+    try {
+      const running = runStart(fixture.environment);
+
+      // When: the harness waits for a Worker PID tied to that startup child.
+      const waiting = waitForWorkerPid(fixture.workerMarker, running.child);
+
+      // Then: child exit interrupts the marker wait instead of reaching the test timeout.
+      await expect(waiting).rejects.toBeInstanceOf(TypeError);
+      await running.result;
+    } finally {
+      await rm(fixture.runDir, { recursive: true, force: true });
+      await removeTemporaryDirectory(fixture.root);
+    }
+  });
+
+  test("waits through a partially written worker PID marker", async () => {
+    const root = await temporaryDirectory("partial-worker-marker");
+    const marker = resolve(root, "worker.pid");
+    const child = { exited: new Promise(() => {}) };
+    try {
+      await writeFile(marker, '{"pid":');
+      const waiting = waitForWorkerPid(marker, child);
+      await Bun.sleep(20);
+      await writeFile(marker, '{"pid":123,"processGroupId":456}');
+
+      expect(await waiting).toEqual({ pid: 123, processGroupId: 456 });
+    } finally {
+      await removeTemporaryDirectory(root);
+    }
+  });
+
   test("kills and verifies a TERM-resistant worker after readiness timeout", async () => {
     const fixture = await createFaultFixture("readiness-failure");
     let worker;
     try {
       const running = runStart(fixture.environment);
-      worker = await waitForWorkerPid(fixture.workerMarker);
-      const result = await running;
+      worker = await waitForWorkerPid(fixture.workerMarker, running.child);
+      const result = await running.result;
 
       expect(result.exitCode, result.stderr).toBe(1);
       expect(processGroupAlive(worker.processGroupId)).toBe(false);
@@ -204,8 +234,8 @@ describe("local hidden slice startup cleanup", () => {
     let worker;
     try {
       const running = runStart(fixture.environment);
-      worker = await waitForWorkerPid(fixture.workerMarker);
-      const result = await running;
+      worker = await waitForWorkerPid(fixture.workerMarker, running.child);
+      const result = await running.result;
 
       expect(result.exitCode, result.stderr).toBe(1);
       expect(processGroupAlive(worker.processGroupId)).toBe(false);
@@ -223,7 +253,7 @@ describe("local hidden slice startup cleanup", () => {
   test("preserves the startup exit while reporting a cleanup failure", async () => {
     const fixture = await createFaultFixture("preparation-failure", true);
     try {
-      const result = await runStart(fixture.environment);
+      const result = await runStart(fixture.environment).result;
 
       expect(result.exitCode, result.stderr).toBe(23);
       expect(result.stderr).toContain("startup failed during preparation (exit 23)");

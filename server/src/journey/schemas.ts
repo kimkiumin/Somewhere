@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { createJourneyDeletionSchemas } from "./journey-deletion-schemas";
+import { createJourneyStateSchemas } from "./journey-state-schemas";
 
 const digestSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const idSchema = z.string().min(16).max(96);
@@ -149,133 +151,23 @@ export const journeyCommandSchema = z.discriminatedUnion("type", [
     .readonly(),
 ]);
 
-const storedOutcomeSchema = z
-  .object({
-    bodyDigest: digestSchema,
-    expiresAt: positiveIntegerSchema,
-    outcomeCiphertext: z.string().min(1).max(8_192),
-  })
-  .strict()
-  .readonly();
+const { inboxEventSchema, journeyStateSchema, outboxRecordSchema } = createJourneyStateSchemas({
+  digestSchema,
+  idSchema,
+  nonnegativeIntegerSchema,
+  positiveIntegerSchema,
+  routeSchema,
+  selectedSnapshotSchema,
+});
 
-const phaseSchema = z.enum([
-  "ready",
-  "committed",
-  "following",
-  "route-recovery",
-  "near",
-  "arrived",
-  "paused",
-  "stopped",
-  "completed",
-]);
+const { beginDeletionSchema, resumeDeletionSchema, tombstoneReceiptSchema } =
+  createJourneyDeletionSchemas({ digestSchema, nonnegativeIntegerSchema });
 
-export const journeyStateSchema = z
-  .object({
-    activeRoute: routeSchema.optional(),
-    browserBindingDigest: digestSchema,
-    contractVersion: z.literal(1),
-    expiresAt: positiveIntegerSchema,
-    feedback: z
-      .object({
-        dueAt: positiveIntegerSchema,
-        eventId: idSchema,
-        status: z.enum(["scheduled", "eligible", "consumed"]),
-      })
-      .strict()
-      .readonly()
-      .optional(),
-    idempotency: z.record(digestSchema, storedOutcomeSchema),
-    journeyId: idSchema,
-    openStop: z
-      .object({
-        confirmationId: idSchema,
-        pauseEpoch: positiveIntegerSchema,
-        phaseBeforePause: z.enum(["ready", "committed", "following", "route-recovery", "near"]),
-      })
-      .strict()
-      .readonly()
-      .optional(),
-    pauseEpoch: nonnegativeIntegerSchema,
-    phase: phaseSchema,
-    revealed: z.boolean(),
-    recoveryExpiresAt: positiveIntegerSchema.optional(),
-    recoveryIntent: z
-      .object({
-        expiresAt: positiveIntegerSchema,
-        intentId: z.string().regex(/^ri_v1\.[A-Za-z0-9_-]{22}$/),
-      })
-      .strict()
-      .readonly()
-      .optional(),
-    routeRepair: z
-      .union([
-        z.object({ status: z.literal("idle") }).strict(),
-        z
-          .object({
-            choice: z.enum(["recalibrate", "reroute", "cached-route"]),
-            status: z.literal("repairing"),
-          })
-          .strict(),
-        z.object({ routeVersion: z.string().min(1), status: z.literal("ready") }).strict(),
-        z.object({ status: z.literal("external-map-handed-off") }).strict(),
-        z
-          .object({
-            reason: z.enum(["route-stale", "location-poor", "heading-poor", "provider"]),
-            status: z.literal("failed"),
-          })
-          .strict(),
-      ])
-      .readonly()
-      .optional(),
-    selectedSnapshot: selectedSnapshotSchema,
-    sequence: nonnegativeIntegerSchema,
-    stopReason: z
-      .enum([
-        "safety-concern",
-        "route-or-sensor",
-        "hard-condition",
-        "venue-situation",
-        "changed-mind",
-        "schedule-changed",
-        "skip",
-      ])
-      .optional(),
-    stopReasonState: z.enum(["required-or-skip", "recorded", "skipped"]).optional(),
-    stoppedAt: positiveIntegerSchema.optional(),
-    writeEpoch: positiveIntegerSchema,
-  })
-  .strict()
-  .readonly();
-
-export const inboxEventSchema = z
-  .object({
-    eventDigest: digestSchema,
-    eventId: idSchema,
-    eventType: z.string().min(1).max(64),
-    expiresAt: positiveIntegerSchema,
-    receivedAt: positiveIntegerSchema,
-    resultCode: z.string().min(1).max(64),
-    writeEpoch: positiveIntegerSchema,
-  })
-  .strict()
-  .readonly();
-
-export const outboxRecordSchema = z
-  .object({
-    attempts: nonnegativeIntegerSchema,
-    eventDigest: digestSchema,
-    eventId: idSchema,
-    eventType: z.string().min(1).max(64),
-    expiresAt: positiveIntegerSchema,
-    nextAttemptAt: positiveIntegerSchema,
-    status: z.enum(["pending", "acknowledged"]),
-    writeEpoch: positiveIntegerSchema,
-  })
-  .strict()
-  .readonly();
-
-export const tombstoneReceiptSchema = z
-  .object({ durable: z.literal(true), replayStatus: z.literal(204) })
-  .strict()
-  .readonly();
+export {
+  beginDeletionSchema,
+  inboxEventSchema,
+  journeyStateSchema,
+  outboxRecordSchema,
+  resumeDeletionSchema,
+  tombstoneReceiptSchema,
+};

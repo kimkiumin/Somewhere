@@ -10,13 +10,14 @@ import {
   writeJson,
 } from "./lib/release-core.mjs";
 import { artifact, artifactDigest, artifactKind, files } from "./lib/artifacts.mjs";
+import { collectBuildProvenance } from "./lib/build-provenance.mjs";
 
 const specification = {
   required: ["--outdir", "--receipt"],
-  optional: ["--environment"],
+  optional: ["--environment", "--artifact-role"],
 };
 const help =
-  "build-production.mjs --outdir EXTERNAL_PATH --receipt EXTERNAL_PATH [--environment staging|production]";
+  "build-production.mjs --outdir EXTERNAL_PATH --receipt EXTERNAL_PATH [--environment staging|production] [--artifact-role release-candidate|local-diagnostic]";
 async function requireAbsent(path, label) {
   try {
     await lstat(path);
@@ -55,6 +56,10 @@ async function build(options) {
   const target = options.environment ?? "production";
   if (!["staging", "production"].includes(target)) {
     throw new TypeError("environment must be staging or production");
+  }
+  const artifactRole = options["artifact-role"] ?? "release-candidate";
+  if (!["release-candidate", "local-diagnostic"].includes(artifactRole)) {
+    throw new TypeError("unknown production artifact role");
   }
   await mkdir(dirname(resolve(options.outdir)), { recursive: true });
   await mkdir(dirname(resolve(options.receipt)), { recursive: true });
@@ -115,6 +120,7 @@ async function build(options) {
     await writeJson(receipt, {
       schemaVersion: 1,
       gate: "PASS",
+      artifactRole,
       sourceSha: sourceSha ?? null,
       sourceTree: sourceTree ?? null,
       environment: target,
@@ -126,6 +132,7 @@ async function build(options) {
         path: "server/src/index.ts",
         sha256: await digestFile(resolve(repo, "server/src/index.ts")),
       },
+      provenance: await collectBuildProvenance(repo),
       assetManifest: {
         path: assetManifest.path,
         sha256: assetManifest.sha256,

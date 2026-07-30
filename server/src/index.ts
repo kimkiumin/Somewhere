@@ -2,7 +2,11 @@ import { AsyncD1Repository } from "./async/repository";
 import { consumeQueueBatch, reconcileScheduledWork } from "./async/worker";
 import { parseDeploymentEnvironment } from "./environment";
 import { handleRequest } from "./http";
-import { enqueueLocalQueueProbes, recordLocalDlqDelivery } from "./operations/local-runtime-probe";
+import {
+  enqueueLocalQueueProbes,
+  localQueueAttemptEvidence,
+  recordLocalDlqDelivery,
+} from "./operations/local-runtime-probe";
 import {
   type OperationsAuthorityBindings,
   runOperationsAuthorityCycle,
@@ -21,6 +25,17 @@ const worker = {
     if (env.ENVIRONMENT === "local" && batch.queue === "somewhere-events-dlq-local") {
       await recordLocalDlqDelivery(batch, env.DB, Date.now());
       return;
+    }
+    if (env.ENVIRONMENT === "local") {
+      for (const attempt of await localQueueAttemptEvidence(batch)) {
+        console.log(
+          JSON.stringify({
+            schemaVersion: 1,
+            event: "local-queue-attempt",
+            ...attempt,
+          }),
+        );
+      }
     }
     const authorization = await authorizeBackgroundWork(env.DB, env.ENVIRONMENT, "drain");
     if (!authorization.allowed) {

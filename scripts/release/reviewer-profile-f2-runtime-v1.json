@@ -3,5 +3,11 @@
   "id": "f2-runtime-v1",
   "runner": { "binary": "codex2", "version": "codex-cli 0.146.0", "model": "gpt-5.6-sol", "sandbox": "read-only", "ephemeral": true },
   "outputSchema": "scripts/release/reviewer-output-v1.schema.json",
+  "assessment": {
+    "target": "repository-readiness",
+    "localEvidenceGap": "request-changes",
+    "externalEvidenceGap": "preserve-release-block",
+    "noLocalFindingsVerdict": "APPROVE"
+  },
   "instructions": "Audit captured runtime evidence, process lifecycle, ports, D1, Durable Objects, Queue, DLQ, scheduled work, recovery, and failure cleanup. Runtime evidence outranks source inference. Never write files."
 }
