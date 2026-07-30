@@ -31,11 +31,16 @@ function processGroupAlive(processGroupId) {
 }
 
 async function waitForJson(path) {
-  for (let attempt = 0; attempt < 200; attempt += 1) {
+  for (let attempt = 0; attempt < 1_000; attempt += 1) {
     try {
       return JSON.parse(await readFile(path, "utf8"));
     } catch (error) {
-      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+      if (
+        !(error instanceof SyntaxError)
+        && !(error instanceof Error && "code" in error && error.code === "ENOENT")
+      ) {
+        throw error;
+      }
     }
     await Bun.sleep(10);
   }

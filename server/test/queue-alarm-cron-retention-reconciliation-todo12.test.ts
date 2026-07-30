@@ -21,8 +21,10 @@ function databaseFixture(): Readonly<{
   const root = mkdtempSync(join(tmpdir(), "somewhere-todo12-d1-"));
   tempRoots.push(root);
   const path = join(root, "async.sqlite");
-  const migration = readFileSync(join(process.cwd(), "migrations/0001_v2.sql"), "utf8");
-  execFileSync("sqlite3", [path], { encoding: "utf8", input: migration });
+  for (const migrationName of ["0001_v2.sql", "0002_http_sessions.sql"]) {
+    const migration = readFileSync(join(process.cwd(), `migrations/${migrationName}`), "utf8");
+    execFileSync("sqlite3", [path], { encoding: "utf8", input: migration });
+  }
   return { path, repository: new AsyncD1Repository(new SqliteDatabase(path)) };
 }
 
@@ -208,6 +210,7 @@ describe("Todo12 D1 async reconciliation", () => {
       auditEvents: 1,
       budgetReservations: 1,
       feedbackEligibility: 1,
+      httpSessions: 1,
       inboxEvents: 1,
       journeyTombstones: 1,
       outboxEvents: 1,
@@ -221,6 +224,7 @@ describe("Todo12 D1 async reconciliation", () => {
       "audit_events",
       "budget_reservations",
       "feedback_eligibility",
+      "http_sessions",
       "inbox_events",
       "journey_tombstones",
       "outbox_events",
@@ -252,6 +256,8 @@ function seedRetentionRows(path: string, expiredAt: number, aliveAt: number): vo
       INSERT INTO selection_receipts VALUES ('receipt_todo12_sealed_live','pool_todo12_0000000001','${DIGEST_A}','${DIGEST_B}','${DIGEST_C}','activated','${DIGEST_B}',1,${now - 1000},${now},${aliveAt});
       INSERT INTO browser_session_guards VALUES ('${DIGEST_A}',1,NULL,NULL,NULL,NULL,NULL,NULL,${expiredAt});
       INSERT INTO browser_session_guards VALUES ('${DIGEST_B}',1,NULL,NULL,NULL,NULL,NULL,NULL,${aliveAt});
+      INSERT INTO http_sessions VALUES ('${DIGEST_A}','${DIGEST_B}',${expiredAt},${expiredAt});
+      INSERT INTO http_sessions VALUES ('${DIGEST_B}','${DIGEST_C}',${aliveAt},${aliveAt});
       INSERT INTO feedback_eligibility VALUES ('feedback_todo12_dead_001','${DIGEST_A}','${DIGEST_B}','expired',${now},${expiredAt},NULL);
       INSERT INTO feedback_eligibility VALUES ('feedback_todo12_live_001','${DIGEST_B}','${DIGEST_C}','eligible',${now},${aliveAt},NULL);
       INSERT INTO place_reactions VALUES ('reaction_todo12_dead_001','neutral',1,'${DIGEST_A}',${now},${expiredAt});

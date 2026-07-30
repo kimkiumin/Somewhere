@@ -23,6 +23,7 @@ export type RetentionCleanupCounts = Readonly<{
   auditEvents: number;
   budgetReservations: number;
   feedbackEligibility: number;
+  httpSessions: number;
   inboxEvents: number;
   journeyTombstones: number;
   outboxEvents: number;
@@ -61,6 +62,7 @@ export async function cleanupRetention(
     auditEvents: await deleteExpired(database, "audit_events", now),
     budgetReservations: await deleteExpired(database, "budget_reservations", now),
     feedbackEligibility: await deleteExpired(database, "feedback_eligibility", now),
+    httpSessions: await deleteExpired(database, "http_sessions", now),
     inboxEvents: await deleteExpired(database, "inbox_events", now),
     journeyTombstones: await deleteExpired(database, "journey_tombstones", now),
     outboxEvents: await deleteExpired(database, "outbox_events", now),

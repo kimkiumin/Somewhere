@@ -77,7 +77,7 @@ async function validate() {
     if (
       profile.schemaVersion !== 1
       || profile.runner?.binary !== "codex2"
-      || profile.runner?.version !== "codex-cli 0.145.0"
+      || profile.runner?.version !== "codex-cli 0.146.0"
       || profile.runner?.sandbox !== "read-only"
       || profile.runner?.ephemeral !== true
       || profile.runner?.model !== "gpt-5.6-sol"

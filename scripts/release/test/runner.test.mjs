@@ -289,7 +289,7 @@ function processGroupAlive(pid) {
 }
 
 describe("Bound reviewer environment", () => {
-  test("derives reviewer HOME from CODEX_HOME without leaking Cloudflare credentials", async () => {
+  test("derives reviewer HOME from CODEX_HOME without leaking ambient credentials", async () => {
     const root = await temporaryDirectory("bound-review-home");
     try {
       const fixtureRepo = resolve(root, "repository");
@@ -300,18 +300,24 @@ describe("Bound reviewer environment", () => {
       const codexHome = resolve(root, "reviewer-home", ".codex2");
       const ambientHome = resolve(root, "ambient-home");
       const homeCapture = resolve(root, "reviewer-home.txt");
+      const snapshotCapture = resolve(root, "reviewer-snapshot.txt");
       await mkdir(fakeBin, { recursive: true });
       const fakeCodex = resolve(fakeBin, "codex2");
       await writeFile(fakeCodex, `#!/usr/bin/env bash
 set -euo pipefail
-printf '%s' "$HOME" > "$FAKE_HOME_CAPTURE"
+printf '%s' "$HOME" > ${JSON.stringify(homeCapture)}
 test -z "\${CLOUDFLARE_API_TOKEN:-}"
+test -z "\${OPENAI_API_KEY:-}"
+test -z "\${GITHUB_TOKEN:-}"
+test -z "\${SSH_AUTH_SOCK:-}"
 if test "\${1:-}" = "--version"; then
-  printf '%s\\n' 'codex-cli 0.145.0'
+  printf '%s\\n' 'codex-cli 0.146.0'
   exit 0
 fi
 response=""
+prompt=""
 while test "$#" -gt 0; do
+  prompt="$1"
   if test "$1" = "--output-last-message"; then
     shift
     response="\${1:?missing response path}"
@@ -319,6 +325,10 @@ while test "$#" -gt 0; do
   shift
 done
 test -n "$response"
+printf '%s\\n' '{"gate":"MUTATED"}' > ${JSON.stringify(resolve(root, "input.json"))}
+snapshot="$(printf '%s\\n' "$prompt" | sed -n 's/.* snapshot=\\([^ ]*\\) sha256:.*/\\1/p' | head -n 1)"
+test -n "$snapshot"
+cat "$snapshot" > ${JSON.stringify(snapshotCapture)}
 printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
 `);
       await chmod(fakeCodex, 0o755);
@@ -331,7 +341,7 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
         instructions: "Review the bound fixture.",
         runner: {
           binary: "codex2",
-          version: "codex-cli 0.145.0",
+          version: "codex-cli 0.146.0",
           model: "fixture-model",
           sandbox: "read-only",
           ephemeral: true,
@@ -346,8 +356,10 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
         `HOME=${ambientHome}`,
         `CODEX_HOME=${codexHome}`,
         `PATH=${fakeBin}:${process.env.PATH}`,
-        `FAKE_HOME_CAPTURE=${homeCapture}`,
         "CLOUDFLARE_API_TOKEN=must-not-reach-reviewer",
+        "OPENAI_API_KEY=must-not-reach-reviewer",
+        "GITHUB_TOKEN=must-not-reach-reviewer",
+        "SSH_AUTH_SOCK=/tmp/must-not-reach-reviewer.sock",
         "bun",
         resolve(repo, "scripts/release/run-bound-review.mjs"),
         "--profile",
@@ -363,6 +375,7 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
       ]);
       expect(result.exitCode).toBe(0);
       expect(await readFile(homeCapture, "utf8")).toBe(dirname(codexHome));
+      expect(await readFile(snapshotCapture, "utf8")).toBe('{\n  "gate": "PASS"\n}\n');
       expect(await readJson(output)).toMatchObject({
         verdict: "APPROVE",
         reviewedSha: fixture.sha,

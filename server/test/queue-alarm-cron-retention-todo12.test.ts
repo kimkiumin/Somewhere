@@ -125,6 +125,7 @@ describe("Todo12 Queue and Cron orchestration", () => {
           auditEvents: 0,
           budgetReservations: 0,
           feedbackEligibility: 0,
+          httpSessions: 0,
           inboxEvents: 0,
           journeyTombstones: 0,
           outboxEvents: 0,

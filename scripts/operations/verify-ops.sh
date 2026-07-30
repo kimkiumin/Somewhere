@@ -37,12 +37,16 @@ cd "$REPO_ROOT"
 
 bun scripts/operations/verify-legal.ts | tee "$EVIDENCE_DIR/legal-gates.json"
 bun run test:server -- task14 | tee "$EVIDENCE_DIR/task14-tests.txt"
+bun test \
+  scripts/release/test/local-hidden-slice-startup.test.mjs \
+  scripts/release/test/local-hidden-slice-stop.test.mjs \
+  2>&1 | tee "$EVIDENCE_DIR/live-failure-cleanup-tests.txt"
 bun run --cwd server typecheck | tee "$EVIDENCE_DIR/typecheck.txt"
 bun run build:production -- \
   --outdir "$TASK_ROOT/production" \
   --receipt "$EVIDENCE_DIR/production-build.json" \
   | tee "$EVIDENCE_DIR/app-build.txt"
-node_modules/.bin/wrangler deploy --dry-run --env="" --config server/wrangler.jsonc \
+node_modules/.bin/wrangler deploy --dry-run --env=production --config server/wrangler.jsonc \
   --assets "$TASK_ROOT/production/app/dist" \
   --outdir "$TASK_ROOT/dry-run" | tee "$EVIDENCE_DIR/wrangler-dry-run.txt"
 

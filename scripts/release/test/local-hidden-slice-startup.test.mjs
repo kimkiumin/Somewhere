@@ -49,7 +49,7 @@ async function portOpen() {
 }
 
 async function waitForWorkerPid(marker) {
-  for (let attempt = 0; attempt < 200; attempt += 1) {
+  for (let attempt = 0; attempt < 1_000; attempt += 1) {
     try {
       return JSON.parse(await readFile(marker, "utf8"));
     } catch (error) {

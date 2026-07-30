@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "f4-scope-v1",
-  "runner": { "binary": "codex2", "version": "codex-cli 0.145.0", "model": "gpt-5.6-sol", "sandbox": "read-only", "ephemeral": true },
+  "runner": { "binary": "codex2", "version": "codex-cli 0.146.0", "model": "gpt-5.6-sol", "sandbox": "read-only", "ephemeral": true },
   "outputSchema": "scripts/release/reviewer-output-v1.schema.json",
   "instructions": "Compare the exact build, contracts, canonical docs, and authority receipt with all nine approved blueprint blobs. Reject candidate browsing, active Reroll, direct bearing, map-first, desktop/tablet product expansion, identity leaks, or false release claims. Never write files."
 }

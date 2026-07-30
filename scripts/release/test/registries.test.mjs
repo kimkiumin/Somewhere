@@ -28,6 +28,8 @@ const requiredScripts = [
   "validate-ci-verdict.mjs",
   "validate-todo20-evidence.mjs",
   "build-production.mjs",
+  "run-verify-v2.mjs",
+  "validate-verify-v2-runtime-evidence.mjs",
 ];
 const requiredSchemas = [
   "exact-tree-receipt-v1.schema.json",
@@ -56,6 +58,7 @@ const requiredRegistries = [
   "reviewer-profile-f2-security-v1.json",
   "reviewer-profile-f3-visual-v1.json",
   "reviewer-profile-f4-scope-v1.json",
+  "verify-v2-runtime-artifacts-v1.json",
 ];
 
 describe("Todo 22 release registry", () => {
@@ -85,6 +88,29 @@ describe("Todo 22 release registry", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout.toString()).toContain("--evidence-root");
     expect(result.stdout.toString()).toContain("--plan-sha256");
+  });
+
+  test("routes verify-v2 and every bound F2 reviewer through the runtime manifest", async () => {
+    const commands = await readJson(resolve(repo, "scripts/release/final-lane-commands-v1.json"));
+    const verify = commands.lanes.F2.find((entry) => entry.id === "verify-v2");
+    expect(verify.argv.slice(0, 2)).toEqual([
+      "bun",
+      "scripts/release/run-verify-v2.mjs",
+    ]);
+    expect(verify.argv).toContain("${FINAL_SHA}");
+    expect(verify.argv).toContain("${SOURCE_TREE}");
+    expect(verify.argv).toContain("${FINAL_ROOT}/F2/verify-ops");
+    for (const id of ["review-work", "debugging", "security"]) {
+      const reviewer = commands.lanes.F2.find((entry) => entry.id === id);
+      const inputs = reviewer.argv[reviewer.argv.indexOf("--inputs") + 1];
+      expect(inputs).toContain("${FINAL_ROOT}/F2/verify-v2-verdict.json");
+    }
+  });
+
+  test("binds the standalone Wrangler dry run to the production environment", async () => {
+    const script = await readFile(resolve(repo, "scripts/operations/verify-ops.sh"), "utf8");
+    expect(script).toContain("wrangler deploy --dry-run --env=production");
+    expect(script).not.toContain("--env=\"\"");
   });
 
   test("curl contract exposes the final-lane base URL and JSON output boundary", () => {
