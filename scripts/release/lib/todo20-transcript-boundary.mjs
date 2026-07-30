@@ -73,12 +73,25 @@ export async function validateTodo20Provenance(receipt, root, entries) {
       "PASS: gate harness and Wrangler 4.115.0",
       "PASS: Wrangler configuration contract",
       "13 pass",
-      "166 passed",
-      "--dry-run: exiting now.",
-      `PASS: ${environment} compile, binding types, tests, build, and deploy dry-run`,
     ];
     let offset = 0;
     for (const marker of ordered) {
+      const next = transcript.indexOf(marker, offset);
+      if (next < 0) fail(`${environment} transcript is missing ordered marker: ${marker}`);
+      offset = next + marker.length;
+    }
+    const passingTests = /\bTests\s+([1-9]\d*) passed\s+\(\1\)/u.exec(
+      transcript.slice(offset),
+    );
+    if (passingTests === null) {
+      fail(`${environment} transcript is missing a passing server test summary`);
+    }
+    offset += passingTests.index + passingTests[0].length;
+    ordered.push(
+      "--dry-run: exiting now.",
+      `PASS: ${environment} compile, binding types, tests, build, and deploy dry-run`,
+    );
+    for (const marker of ordered.slice(3)) {
       const next = transcript.indexOf(marker, offset);
       if (next < 0) fail(`${environment} transcript is missing ordered marker: ${marker}`);
       offset = next + marker.length;
