@@ -134,6 +134,14 @@ describe("Todo 22 release registry", () => {
     ]));
   });
 
+  test("binds the F4 scope reviewer to the prepared build receipt", async () => {
+    const commands = await readJson(resolve(repo, "scripts/release/final-lane-commands-v1.json"));
+    const reviewer = commands.lanes.F4.find((entry) => entry.id === "reviewer-verdict");
+    const inputs = reviewer.argv[reviewer.argv.indexOf("--inputs") + 1].split(",");
+
+    expect(inputs).toContain("${BUILD_RECEIPT}");
+  });
+
   test("binds the standalone Wrangler dry run to the production environment", async () => {
     const script = await readFile(resolve(repo, "scripts/operations/verify-ops.sh"), "utf8");
     expect(script).toContain("wrangler deploy --dry-run --env=production");

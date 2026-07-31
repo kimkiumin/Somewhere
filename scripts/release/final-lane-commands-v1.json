@@ -170,7 +170,7 @@
         "id": "reviewer-verdict",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F4/reviewer-verdict.json",
-        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f4-scope-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F4/blueprint-receipt.json,${FINAL_ROOT}/F4/build-receipt-verdict.json,${FINAL_ROOT}/F4/scope-verdict.json,${FINAL_ROOT}/F4/production-marker-verdict.json", "--output", "${FINAL_ROOT}/F4/reviewer-verdict.json"]
+        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f4-scope-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F4/blueprint-receipt.json,${FINAL_ROOT}/F4/build-receipt-verdict.json,${FINAL_ROOT}/F4/scope-verdict.json,${FINAL_ROOT}/F4/production-marker-verdict.json,${BUILD_RECEIPT}", "--output", "${FINAL_ROOT}/F4/reviewer-verdict.json"]
       }
     ]
   }
