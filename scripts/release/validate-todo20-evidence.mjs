@@ -121,8 +121,10 @@ async function readBoundJson(root, entry) {
 
 async function validate(options) {
   const root = await realpath(options["evidence-root"]);
+  const receiptPath = resolve(options.receipt);
+  const registryPath = resolve(options.registry);
   const registry = registrySchema.parse(await readJson(resolve(options.registry)));
-  const receipt = receiptSchema.parse(await readJson(resolve(options.receipt)));
+  const receipt = receiptSchema.parse(await readJson(receiptPath));
   if (
     registry.schemaVersion !== 1
     || !Array.isArray(registry.artifacts)
@@ -240,6 +242,10 @@ async function validate(options) {
     }
   }
   await validateTodo20Provenance(receipt, root, entries);
+  const [receiptSnapshot, registrySnapshot] = await Promise.all([
+    snapshotRegularFile(receiptPath, "Todo20 exact-tree receipt"),
+    snapshotRegularFile(registryPath, "Todo20 artifact registry"),
+  ]);
   await writeJson(resolve(options.output), {
     schemaVersion: 1,
     gate: "PASS",
@@ -248,6 +254,14 @@ async function validate(options) {
     networkPolicy: receipt.network.policy,
     transcriptsValidated: true,
     externalWrites: 0,
+    reviewBindings: [
+      { path: receiptPath, sha256: receiptSnapshot.sha256 },
+      { path: registryPath, sha256: registrySnapshot.sha256 },
+      ...registry.artifacts.map((path) => ({
+        path: safePath(root, path),
+        sha256: `sha256:${entries.get(path).sha256}`,
+      })),
+    ],
   });
 }
 

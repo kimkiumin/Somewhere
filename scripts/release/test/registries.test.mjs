@@ -142,6 +142,16 @@ describe("Todo 22 release registry", () => {
     expect(inputs).toContain("${BUILD_RECEIPT}");
   });
 
+  test("expands F1 machine-bound evidence only from the shared evidence root", async () => {
+    const commands = await readJson(resolve(repo, "scripts/release/final-lane-commands-v1.json"));
+    const reviewer = commands.lanes.F1.find((entry) => entry.id === "reviewer-verdict");
+
+    expect(reviewer.argv).toEqual(expect.arrayContaining([
+      "--review-root",
+      "${SHARED_EVIDENCE_ROOT}",
+    ]));
+  });
+
   test("binds the standalone Wrangler dry run to the production environment", async () => {
     const script = await readFile(resolve(repo, "scripts/operations/verify-ops.sh"), "utf8");
     expect(script).toContain("wrangler deploy --dry-run --env=production");

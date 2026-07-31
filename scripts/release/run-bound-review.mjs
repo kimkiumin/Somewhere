@@ -1,10 +1,12 @@
 import { dirname, resolve } from "node:path";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import {
   digestFile,
   git,
+  isInside,
   mainBoundary,
+  normalizeDigest,
   parseArguments,
   readJson,
   run,
@@ -25,6 +27,7 @@ const specification = {
     "--prepared-build-root",
     "--prepared-build-receipt",
     "--prepared-source-archive",
+    "--review-root",
   ],
 };
 const allowedEnvironmentVariables = [
@@ -57,7 +60,63 @@ async function bindInputs(inputPaths, options, snapshotRoot) {
     const snapshot = await snapshotRegularFile(path, "review input");
     return { path, sha256: snapshot.sha256, snapshot };
   }));
-  assertReviewInputBindings(explicit.map(({ path, sha256: digest, snapshot }) => ({
+  const repo = await realpath(resolve("."));
+  const reviewRoot = options["review-root"] === undefined
+    ? undefined
+    : await realpath(options["review-root"]);
+  const expanded = [...explicit];
+  if (reviewRoot !== undefined) {
+    const byPath = new Map(expanded.map((entry) => [entry.path, entry.sha256]));
+    for (const input of explicit) {
+      let value;
+      try {
+        value = JSON.parse(input.snapshot.data.toString());
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        continue;
+      }
+      if (value?.reviewBindings === undefined) continue;
+      if (!Array.isArray(value.reviewBindings) || value.reviewBindings.length > 128) {
+        throw new TypeError("review bindings must be a bounded array");
+      }
+      for (const binding of value.reviewBindings) {
+        if (
+          binding === null
+          || typeof binding !== "object"
+          || Array.isArray(binding)
+          || JSON.stringify(Object.keys(binding).sort()) !== JSON.stringify(["path", "sha256"])
+          || typeof binding.path !== "string"
+          || binding.path === ""
+        ) {
+          throw new TypeError("invalid review binding");
+        }
+        const lexicalPath = resolve(binding.path);
+        const path = await realpath(lexicalPath);
+        if (path !== lexicalPath) {
+          throw new TypeError("review binding path is not canonical");
+        }
+        if (!isInside(repo, path) && !isInside(reviewRoot, path)) {
+          throw new TypeError("review binding escapes approved roots");
+        }
+        const expectedDigest = normalizeDigest(binding.sha256, "review binding digest");
+        const existingDigest = byPath.get(path);
+        if (existingDigest !== undefined) {
+          if (existingDigest !== expectedDigest) {
+            throw new TypeError("duplicate review binding digest mismatch");
+          }
+          continue;
+        }
+        const snapshot = await snapshotRegularFile(path, "expanded review input");
+        if (snapshot.sha256 !== expectedDigest) {
+          throw new TypeError("expanded review input digest mismatch");
+        }
+        const entry = { path, sha256: snapshot.sha256, snapshot };
+        expanded.push(entry);
+        byPath.set(path, snapshot.sha256);
+      }
+    }
+  }
+  assertReviewInputBindings(expanded.map(({ path, sha256: digest, snapshot }) => ({
     path,
     sha256: digest,
     data: snapshot.data,
@@ -112,7 +171,7 @@ async function bindInputs(inputPaths, options, snapshotRoot) {
       data: entry.data,
     }));
   const records = [
-    ...explicit.map(({ path, sha256: digest, snapshot }) => ({
+    ...expanded.map(({ path, sha256: digest, snapshot }) => ({
       path,
       sha256: digest,
       data: snapshot.data,

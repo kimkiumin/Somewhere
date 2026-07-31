@@ -1,5 +1,4 @@
 import { resolve } from "node:path";
-import { access } from "node:fs/promises";
 import {
   digestFile,
   git,
@@ -7,6 +6,7 @@ import {
   normalizeDigest,
   parseArguments,
   readJson,
+  snapshotRegularFile,
   writeJson,
 } from "./lib/release-core.mjs";
 
@@ -24,12 +24,12 @@ const specification = {
   ],
 };
 
-async function exists(path) {
+async function snapshotIfPresent(path) {
   try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
+    return await snapshotRegularFile(path, "plan evidence");
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+    throw error;
   }
 }
 
@@ -55,20 +55,89 @@ async function validate(options) {
   if (JSON.stringify(observedIds) !== JSON.stringify(expectedIds) || options["require-todos"] !== "1-22") {
     throw new TypeError("criteria must contain exact ordered Todos 1-22");
   }
+  for (const todo of criteria.todos) {
+    if (
+      !Array.isArray(todo.dependsOn)
+      || new Set(todo.dependsOn).size !== todo.dependsOn.length
+      || todo.dependsOn.some((id) => !expectedIds.includes(id) || id === todo.id)
+    ) {
+      throw new TypeError(`invalid dependency registry for Todo ${todo.id}`);
+    }
+  }
   const planText = await Bun.file(planPath).text();
   const planIds = [...planText.matchAll(/^- \[ \] ([0-9]+)\./gm)].map((match) => Number(match[1]));
   if (JSON.stringify(planIds) !== JSON.stringify(expectedIds)) throw new TypeError("plan Todo set mismatch");
-  const subjects = new Set((await git(repo, ["log", "--format=%s", options.sha])).split("\n"));
+  const history = (await git(repo, [
+    "log",
+    "--reverse",
+    "--format=%H%x09%s",
+    options.sha,
+  ])).split("\n").filter(Boolean).map((line, index) => {
+    const separator = line.indexOf("\t");
+    return {
+      sha: line.slice(0, separator),
+      subject: line.slice(separator + 1),
+      index,
+    };
+  });
   const evidenceRoot = resolve(options.evidence);
   const missing = [];
+  const todos = [];
+  const landedById = new Map(criteria.todos.map((todo) => [
+    todo.id,
+    history.find((entry) => entry.subject === todo.subject),
+  ]));
+  const [planSnapshot, criteriaSnapshot] = await Promise.all([
+    snapshotRegularFile(planPath, "reviewed plan"),
+    snapshotRegularFile(resolve(options.criteria), "plan criteria"),
+  ]);
+  const reviewBindings = [
+    { path: planPath, sha256: planSnapshot.sha256 },
+    { path: resolve(options.criteria), sha256: criteriaSnapshot.sha256 },
+  ];
   for (const todo of criteria.todos) {
-    if (!subjects.has(todo.subject)) {
+    const landed = landedById.get(todo.id);
+    if (landed === undefined) {
       missing.push({ id: todo.id, reason: "COMMIT_SUBJECT_ABSENT" });
       continue;
     }
-    const candidates = todo.evidenceAny.map((path) => [resolve(evidenceRoot, path), resolve(repo, path)]).flat();
-    if (!(await Promise.all(candidates.map(exists))).some(Boolean)) {
+    if (todo.dependsOn.some((id) => {
+      const dependency = landedById.get(id);
+      return dependency === undefined || dependency.index >= landed.index;
+    })) {
+      missing.push({ id: todo.id, reason: "DEPENDENCY_ORDER_INVALID" });
+      continue;
+    }
+    let evidence;
+    for (const relativePath of todo.evidenceAny) {
+      for (const root of [evidenceRoot, repo]) {
+        const path = resolve(root, relativePath);
+        const snapshot = await snapshotIfPresent(path);
+        if (snapshot !== undefined) {
+          evidence = {
+            path,
+            sha256: snapshot.sha256,
+            bytes: snapshot.bytes,
+          };
+          break;
+        }
+      }
+      if (evidence !== undefined) break;
+    }
+    if (evidence === undefined) {
       missing.push({ id: todo.id, reason: "EVIDENCE_ABSENT" });
+      continue;
+    }
+    todos.push({
+      id: todo.id,
+      subject: todo.subject,
+      dependsOn: todo.dependsOn,
+      landedCommitSha: landed.sha,
+      historyIndex: landed.index,
+      evidence,
+    });
+    if (!reviewBindings.some((entry) => entry.path === evidence.path)) {
+      reviewBindings.push({ path: evidence.path, sha256: evidence.sha256 });
     }
   }
   const gate = missing.length === 0 ? "PASS" : "BLOCK";
@@ -80,6 +149,9 @@ async function validate(options) {
     reviewedPlanSha256: normalizeDigest(options["plan-sha256"]),
     policySha256: normalizeDigest(options["policy-sha256"]),
     todoCount: criteria.todos.length,
+    dependencyOrderVerified: gate === "PASS",
+    todos,
+    reviewBindings,
     missing,
   });
   if (gate === "BLOCK") process.exitCode = 2;

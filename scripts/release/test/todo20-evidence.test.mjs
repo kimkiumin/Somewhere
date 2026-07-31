@@ -203,6 +203,15 @@ describe("Todo 20 exact-tree evidence", () => {
         networkPolicy: "deny",
         transcriptsValidated: true,
       });
+      const verdict = await readJson(output);
+      expect(verdict.reviewBindings).toHaveLength(19);
+      expect(verdict.reviewBindings.map((entry) => entry.path)).toContain(receipt);
+      for (const artifact of artifacts) {
+        expect(verdict.reviewBindings).toContainEqual({
+          path: resolve(root, artifact.path),
+          sha256: `sha256:${artifact.sha256}`,
+        });
+      }
     } finally {
       await removeTemporaryDirectory(root);
     }

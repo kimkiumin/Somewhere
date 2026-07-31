@@ -18,7 +18,7 @@
         "id": "reviewer-verdict",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F1/reviewer-verdict.json",
-        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f1-plan-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F1/machine-verdict.json,${FINAL_ROOT}/F1/todo20-evidence-verdict.json", "--output", "${FINAL_ROOT}/F1/reviewer-verdict.json"]
+        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f1-plan-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F1/machine-verdict.json,${FINAL_ROOT}/F1/todo20-evidence-verdict.json", "--review-root", "${SHARED_EVIDENCE_ROOT}", "--output", "${FINAL_ROOT}/F1/reviewer-verdict.json"]
       },
       {
         "id": "manifest-check",

@@ -301,7 +301,10 @@ describe("Bound reviewer environment", () => {
       const ambientHome = resolve(root, "ambient-home");
       const homeCapture = resolve(root, "reviewer-home.txt");
       const snapshotCapture = resolve(root, "reviewer-snapshot.txt");
+      const relatedCapture = resolve(root, "reviewer-related-snapshot.txt");
+      const reviewRoot = resolve(root, "review-evidence");
       await mkdir(fakeBin, { recursive: true });
+      await mkdir(reviewRoot, { recursive: true });
       const fakeCodex = resolve(fakeBin, "codex2");
       await writeFile(fakeCodex, `#!/usr/bin/env bash
 set -euo pipefail
@@ -329,6 +332,9 @@ printf '%s\\n' '{"gate":"MUTATED"}' > ${JSON.stringify(resolve(root, "input.json
 snapshot="$(printf '%s\\n' "$prompt" | sed -n 's/.* snapshot=\\([^ ]*\\) sha256:.*/\\1/p' | head -n 1)"
 test -n "$snapshot"
 cat "$snapshot" > ${JSON.stringify(snapshotCapture)}
+related="$(printf '%s\\n' "$prompt" | sed -n 's/.* snapshot=\\([^ ]*\\) sha256:.*/\\1/p' | tail -n 1)"
+test -n "$related"
+cat "$related" > ${JSON.stringify(relatedCapture)}
 printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
 `);
       await chmod(fakeCodex, 0o755);
@@ -349,7 +355,15 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
         outputSchema: schema,
       });
       const input = resolve(root, "input.json");
-      await writeJson(input, { gate: "PASS" });
+      const related = resolve(reviewRoot, "raw-evidence.txt");
+      await writeFile(related, "bound raw evidence\n");
+      const relatedDigest = new Bun.CryptoHasher("sha256")
+        .update(await readFile(related))
+        .digest("hex");
+      await writeJson(input, {
+        gate: "PASS",
+        reviewBindings: [{ path: related, sha256: `sha256:${relatedDigest}` }],
+      });
       const output = resolve(root, "review.json");
       const result = run(fixture.repo, [
         "env",
@@ -370,16 +384,23 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
         fixture.tree,
         "--inputs",
         input,
+        "--review-root",
+        reviewRoot,
         "--output",
         output,
       ]);
       expect(result.exitCode).toBe(0);
       expect(await readFile(homeCapture, "utf8")).toBe(dirname(codexHome));
-      expect(await readFile(snapshotCapture, "utf8")).toBe('{\n  "gate": "PASS"\n}\n');
+      expect(await readFile(snapshotCapture, "utf8")).toContain('"reviewBindings"');
+      expect(await readFile(relatedCapture, "utf8")).toBe("bound raw evidence\n");
       expect(await readJson(output)).toMatchObject({
         verdict: "APPROVE",
         reviewedSha: fixture.sha,
         sourceTree: fixture.tree,
+        inputs: [
+          { path: input },
+          { path: related, sha256: `sha256:${relatedDigest}` },
+        ],
       });
     } finally {
       await removeTemporaryDirectory(root);
