@@ -16,6 +16,7 @@ struct RootView: View {
             }
             .padding(24)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("Somewhere 여정")
         .overlay(alignment: .top) {
             if let error = store.presentedError {

@@ -105,6 +105,7 @@ describe("native iOS field journey gate", () => {
     expect(compass).toContain('Button("선택 취소")')
     expect(compass).toContain("reading.remainingM")
     expect(root).toContain("applicationDidEnterBackground()")
+    expect(root).toContain(".accessibilityElement(children: .contain)")
     expect(location).toContain("case .arrived, .stopped, .completed, .expired:")
   });
 
