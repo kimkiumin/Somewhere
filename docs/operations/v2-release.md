@@ -226,6 +226,12 @@ session 24h, CSRF 30m, prepared receipt 1h, sealed selection 180d, inbox/outbox
 audit 180d, Queue/DLQ 24h, Worker logs 3d, D1 Time Travel 7d, Durable Object
 PITR 30d, and tombstone 48h.
 
+The protected staging workflow keeps its governed receipt bundle, including the
+CMS-encrypted portable D1 restore point, for an explicit 30 days rather than the
+GitHub repository default. The raw SQL and recipient certificate stay in the
+runner-private directory and are deleted before upload; decrypting the retained
+artifact still requires the separately controlled recipient private key.
+
 ## 9. Optimization disposition
 
 Todo 22 extracted lane lifecycle/process cleanup from the runner after

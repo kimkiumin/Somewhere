@@ -160,6 +160,28 @@ describe("Todo 20 CI and staging gates", () => {
     }
   });
 
+  test("rejects governed staging artifacts without the explicit 30-day retention boundary", async () => {
+    const root = await temporaryDirectory("staging-artifact-retention");
+    try {
+      const original = await readFile(resolve(repo, ".github/workflows/v2-staging.yml"), "utf8");
+      expect(original).toContain("          retention-days: 30\n");
+      const staging = resolve(root, "staging.yml");
+      await writeFile(staging, original.replace("          retention-days: 30\n", ""));
+      const result = run(repo, [
+        "bun", "scripts/release/validate-workflows.mjs",
+        "--ci", ".github/workflows/v2-ci.yml",
+        "--staging", staging,
+        "--wrangler", "server/wrangler.jsonc",
+        "--output", resolve(root, "workflow.json"),
+      ]);
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr.toString()).toContain("STAGING_LIFECYCLE_OR_MIGRATION_UNSAFE");
+    } finally {
+      await removeTemporaryDirectory(root);
+    }
+  });
+
   test("aborts the staging release before deploy when CANONICAL_ORIGIN is absent", async () => {
     const root = await temporaryDirectory("deployment-secret-check");
     try {

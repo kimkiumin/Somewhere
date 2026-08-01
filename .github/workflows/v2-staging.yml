@@ -281,4 +281,5 @@ jobs:
         with:
           name: somewhere-v2-staging-${{ github.run_id }}
           if-no-files-found: error
+          retention-days: 30
           path: ${{ runner.temp }}/staging-backup

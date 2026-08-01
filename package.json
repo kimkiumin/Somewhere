@@ -28,7 +28,7 @@
     "verify:blueprint-status": "bun scripts/completion/validate-blueprint-completion.mjs",
     "verify:blueprint": "bun run verify:studies && bun test scripts/completion/*.test.mjs && bun run verify:blueprint-status && bun run verify:ios-source && bun run verify:native-evidence",
     "verify:studies": "bun test research/study-a/*.test.mjs research/study-b/*.test.mjs",
-    "verify:ios-source": "bun test scripts/ios/validate-ios-source.test.mjs scripts/ios/validate-ios-field-flow.test.mjs && bun scripts/ios/validate-ios-source.mjs && bun scripts/ios/validate-ios-field-flow.mjs",
+    "verify:ios-source": "bun test scripts/ios/validate-ios-source.test.mjs scripts/ios/validate-ios-field-flow.test.mjs scripts/ios/validate-macos-handoff.test.mjs && bun scripts/ios/validate-ios-source.mjs && bun scripts/ios/validate-ios-field-flow.mjs",
     "verify:native-evidence": "bun test scripts/ios/verify-native-evidence.test.mjs && bun scripts/ios/verify-native-evidence.mjs --help",
     "verify:release-authority": "bun test scripts/public-release/*.test.mjs && bun scripts/public-release/verify-public-release.mjs --help",
     "build:production": "bun scripts/release/build-production.mjs",

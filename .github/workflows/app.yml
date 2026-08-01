@@ -44,7 +44,7 @@ jobs:
         run: bun audit
 
       - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium webkit
+        run: bunx --no-install playwright install --with-deps chromium webkit
 
       - name: Verify app and frozen prototype
         run: bun run verify

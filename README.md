@@ -67,7 +67,7 @@ Bun 1.3.14와 Node 24가 기준입니다.
 
 ```bash
 bun install --frozen-lockfile
-bunx playwright install --with-deps chromium webkit
+(cd app && bunx --no-install playwright install --with-deps chromium webkit)
 bun run verify:release
 ```
 

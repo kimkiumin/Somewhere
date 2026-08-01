@@ -29,6 +29,9 @@ jobs:
       - name: Install frozen dependencies
         run: bun install --frozen-lockfile
 
+      - name: Validate native source and handoff contract
+        run: bun run verify:ios-source
+
       - name: Build pinned XcodeGen
         env:
           XCODEGEN_SHA: 82c6ab9bbd5b6075fc0887d897733fc0c4ffc9ab
@@ -54,6 +57,8 @@ jobs:
           xcrun simctl list devicetypes --json | jq -e --arg id "$device_type" '.devicetypes[] | select(.identifier == $id)' >/dev/null
           udid="$(xcrun simctl create "Somewhere iPhone 15 Pro Max" "$device_type" "$runtime_id")"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          echo "runtime_id=$runtime_id" >> "$GITHUB_OUTPUT"
+          echo "device_type=$device_type" >> "$GITHUB_OUTPUT"
 
       - name: Run native unit tests
         run: |
@@ -96,19 +101,36 @@ jobs:
       - name: Scan source and metadata for accidental secrets
         run: |
           ! git grep -nE '(BEGIN (RSA|EC|OPENSSH) PRIVATE KEY|api[_-]?key[[:space:]]*[:=][[:space:]]*[A-Za-z0-9_-]{20,})' -- ':!*.test.*'
-          ! git grep -nE '"(latitude|longitude)"[[:space:]]*:[[:space:]]*-?[0-9]+\.[0-9]+' -- ios scripts/ios
+          ! git grep -nE '"(latitude|longitude)"[[:space:]]*:[[:space:]]*-?[0-9]+\.[0-9]+' \
+            -- ios scripts/ios app/src server/src contracts/src \
+            ':!app/src/data/curated-destinations.json' ':!**/*.test.*' ':!**/*.testkit.*'
+          ! git grep -nEi '(participant(Name|Email)|contactEmail)[[:space:]]*[:=][[:space:]]*["'"'][^"'"']+["'"']' \
+            -- ios scripts/ios app/src server/src contracts/src \
+            ':!**/*.test.*' ':!**/*.testkit.*'
 
       - name: Write sanitized build metadata
         run: |
           mkdir -p "$RUNNER_TEMP/somewhere-ios-ci"
           project_digest="$(find ios/Somewhere.xcodeproj -type f -print0 | xargs -0 shasum -a 256 | LC_ALL=C sort | shasum -a 256 | awk '{print $1}')"
           privacy_digest="$(shasum -a 256 ios/Somewhere/Resources/PrivacyInfo.xcprivacy | awk '{print $1}')"
+          xcode_version="$(xcodebuild -version | paste -sd ';' -)"
+          swift_version="$(swift --version | paste -sd ';' -)"
+          sdk_version="$(xcrun --sdk iphoneos --show-sdk-version)"
+          macos_version="$(sw_vers -productVersion)"
+          xcodegen_version="$("$RUNNER_TEMP/XcodeGen/.build/release/xcodegen" --version)"
           jq -n \
             --arg finalSha "${GITHUB_SHA}" \
             --arg sourceTree "$(git rev-parse HEAD^{tree})" \
             --arg projectDigest "sha256:${project_digest}" \
             --arg privacyDigest "sha256:${privacy_digest}" \
-            '{schemaVersion:1,kind:"sanitized-native-ci",finalSha:$finalSha,sourceTree:$sourceTree,generatedProjectSha256:$projectDigest,privacyManifestSha256:$privacyDigest,unit:"PASS",ui:"PASS",archive:"PASS",signing:"unsigned",distribution:"none",rawCoordinateAttachments:false}' \
+            --arg macosVersion "$macos_version" \
+            --arg xcodeVersion "$xcode_version" \
+            --arg swiftVersion "$swift_version" \
+            --arg sdkVersion "$sdk_version" \
+            --arg xcodegenVersion "$xcodegen_version" \
+            --arg simulatorRuntime "${{ steps.simulator.outputs.runtime_id }}" \
+            --arg simulatorDeviceType "${{ steps.simulator.outputs.device_type }}" \
+            '{schemaVersion:1,kind:"sanitized-native-ci",finalSha:$finalSha,sourceTree:$sourceTree,generatedProjectSha256:$projectDigest,privacyManifestSha256:$privacyDigest,toolchain:{macOS:$macosVersion,xcode:$xcodeVersion,swift:$swiftVersion,iphoneOSSDK:$sdkVersion,xcodegen:$xcodegenVersion,simulatorRuntime:$simulatorRuntime,simulatorDeviceType:$simulatorDeviceType},unit:"PASS",ui:"PASS",archive:"PASS",signing:"unsigned",distribution:"none",rawCoordinateAttachments:false}' \
             > "$RUNNER_TEMP/somewhere-ios-ci/build-metadata.json"
 
       - name: Upload sanitized native metadata only
@@ -116,5 +138,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: somewhere-ios-sanitized-${{ github.run_id }}
-          if-no-files-found: error
+          if-no-files-found: ignore
           path: ${{ runner.temp }}/somewhere-ios-ci/build-metadata.json

@@ -38,7 +38,15 @@ DerivedData/
 *.mobileprovision
 *.p12
 *.p8
+*.pem
+*.key
+*.cer
+*.crt
+*.jks
+*.keystore
 
 # Environment files
 .env
-.env.local
+.env.*
+!.env.example
+!.env.*.example

@@ -130,6 +130,11 @@ function assertStaging(workflow) {
   }
   const commands = runText(workflow);
   const deployStep = stageJob.steps.find((step) => step.id === "deploy");
+  const governedArtifactStep = stageJob.steps.find((step) =>
+    typeof step.uses === "string"
+    && step.uses.startsWith("actions/upload-artifact@")
+    && step.with?.name === "somewhere-v2-staging-${{ github.run_id }}"
+  );
   const deployCommands = typeof deployStep?.run === "string" ? deployStep.run : "";
   const secretCheckPosition = deployCommands.indexOf("deployment-secret-check staging");
   const deployPosition = deployCommands.indexOf("node_modules/.bin/wrangler deploy");
@@ -164,6 +169,7 @@ function assertStaging(workflow) {
     || !commands.includes("openssl cms -encrypt")
     || !commands.includes("database.sql.cms")
     || !commands.includes("staging-private/database.sql")
+    || governedArtifactStep?.with?.["retention-days"] !== 30
     || !commands.includes("d1 migrations apply")
     || !commands.includes("wrangler deploy")
     || secretCheckPosition < 0
