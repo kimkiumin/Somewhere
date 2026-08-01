@@ -84,6 +84,8 @@ bun run verify:release
 로컬 백엔드와 현장 QA 절차는
 [V2 파일럿 백엔드](docs/operations/v2-pilot-backend.md)와
 [V2 릴리스 런북](docs/operations/v2-release.md)을 사용하십시오.
+맥에서 네이티브 iOS 작업을 이어갈 때는 비정본 운영 문서인
+[macOS iOS 인수인계](docs/operations/macos-ios-handoff.md)를 먼저 사용하십시오.
 
 ## 비용 원칙
 

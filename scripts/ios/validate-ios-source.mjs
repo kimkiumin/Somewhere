@@ -89,8 +89,18 @@ export async function validateIOSSource(repositoryRoot, options = {}) {
 
   const project = parse(contents.get("ios/project.yml"));
   const appTarget = project?.targets?.Somewhere;
+  const appScheme = project?.schemes?.Somewhere;
   const deploymentTarget = Number(appTarget?.deploymentTarget);
   const bundleIdentifier = appTarget?.settings?.base?.PRODUCT_BUNDLE_IDENTIFIER;
+  assert(appScheme && typeof appScheme === "object", "shared Somewhere scheme is missing");
+  assert(appScheme?.build?.targets?.Somewhere === "all", "Somewhere scheme must build the app target");
+  const schemeTestTargets = Array.isArray(appScheme?.test?.targets)
+    ? appScheme.test.targets.map((target) => (typeof target === "string" ? target : target?.name))
+    : [];
+  assert(
+    schemeTestTargets.includes("SomewhereTests") && schemeTestTargets.includes("SomewhereUITests"),
+    "Somewhere scheme must include unit and UI test targets",
+  );
   assert(deploymentTarget >= 17, "Somewhere deploymentTarget must be iOS 17 or newer");
   assert(
     typeof bundleIdentifier === "string" && /^example\./.test(bundleIdentifier),

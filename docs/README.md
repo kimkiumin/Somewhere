@@ -44,6 +44,15 @@ explicit stop confirmation, and a guarded new recommendation only after the
 journey has ended. Reroll requirements in older files apply only to their
 historical version.
 
+## Operational handoffs (non-authoritative)
+
+Use the [macOS iOS development handoff](operations/macos-ios-handoff.md) to
+continue the native client on a Mac without loading historical prompt packs as
+current requirements. It is an operational index only and cannot override the
+authority order above. In particular, `codex_handoff_agents.md`,
+`repo_setup_guide.md`, `codex_first_prompt.md`, and `combined_source_pack.md`
+remain working or historical material, not V2 onboarding authority.
+
 ## Historical v0.2 application
 
 To understand the preserved v0.2 `/app` behavior, use the following historical

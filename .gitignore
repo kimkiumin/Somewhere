@@ -29,6 +29,16 @@ build/
 .vitest/
 .wrangler/
 
+# Native iOS generated output and private signing material
+ios/Somewhere.xcodeproj/
+DerivedData/
+.local-artifacts/
+*.xcresult
+*.xcarchive
+*.mobileprovision
+*.p12
+*.p8
+
 # Environment files
 .env
 .env.local

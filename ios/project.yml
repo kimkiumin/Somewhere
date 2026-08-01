@@ -7,6 +7,24 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
+schemes:
+  Somewhere:
+    build:
+      targets:
+        Somewhere: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - SomewhereTests
+        - SomewhereUITests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
 targets:
   Somewhere:
     type: application

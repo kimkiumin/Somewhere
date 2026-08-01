@@ -21,7 +21,31 @@ On an authorized macOS host with XcodeGen and Xcode:
 
 ```sh
 xcodegen generate --spec ios/project.yml
-xcodebuild test -project ios/Somewhere.xcodeproj -scheme Somewhere -destination 'platform=iOS Simulator,name=iPhone 15 Pro Max'
+xcodebuild -list -project ios/Somewhere.xcodeproj
+xcodebuild test \
+  -project ios/Somewhere.xcodeproj \
+  -scheme Somewhere \
+  -destination 'platform=iOS Simulator,name=iPhone 15 Pro Max' \
+  -only-testing:SomewhereTests \
+  CODE_SIGNING_ALLOWED=NO
+xcodebuild test \
+  -project ios/Somewhere.xcodeproj \
+  -scheme Somewhere \
+  -destination 'platform=iOS Simulator,name=iPhone 15 Pro Max' \
+  -only-testing:SomewhereUITests \
+  CODE_SIGNING_ALLOWED=NO
+xcodebuild archive \
+  -project ios/Somewhere.xcodeproj \
+  -scheme Somewhere \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -archivePath "$PWD/.local-artifacts/Somewhere.xcarchive" \
+  CODE_SIGNING_ALLOWED=NO
 ```
 
 Until the macOS command and later exact-device scenarios produce authority-bound receipts, the native blueprint track remains `BLOCK`.
+
+For a clean Mac checkout and context-loading order, use the
+[non-authoritative macOS handoff](../docs/operations/macos-ios-handoff.md). For
+signing, TestFlight, and physical iPhone evidence, use the
+[native field and distribution runbook](../docs/operations/ios-field-release.md).

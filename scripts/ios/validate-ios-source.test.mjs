@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { parse, stringify } from "yaml";
 import { contractDocumentV1 } from "../../contracts/src/index.ts";
 import {
   IOS_SOURCE_REQUIREMENTS,
@@ -62,6 +63,63 @@ describe("native iOS source gate", () => {
           sourceOverrides: new Map([["ios/Somewhere/App/SomewhereApp.swift", join(scratch, "SomewhereApp.swift")]]),
         }),
       ).rejects.toThrow("forbidden native source token");
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects an XcodeGen project that cannot generate the shared Somewhere scheme", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "somewhere-ios-project-"));
+    const source = resolve(repositoryRoot, "ios/project.yml");
+    const project = parse(await readFile(source, "utf8"));
+    delete project.schemes;
+
+    try {
+      const invalidProject = join(scratch, "project.yml");
+      await writeFile(invalidProject, stringify(project), "utf8");
+      await expect(
+        validateIOSSource(repositoryRoot, {
+          sourceOverrides: new Map([["ios/project.yml", invalidProject]]),
+        }),
+      ).rejects.toThrow("shared Somewhere scheme is missing");
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects a Somewhere scheme that omits either native test bundle", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "somewhere-ios-scheme-"));
+    const source = resolve(repositoryRoot, "ios/project.yml");
+    const project = parse(await readFile(source, "utf8"));
+    project.schemes.Somewhere.test.targets = ["SomewhereTests"];
+
+    try {
+      const invalidProject = join(scratch, "project.yml");
+      await writeFile(invalidProject, stringify(project), "utf8");
+      await expect(
+        validateIOSSource(repositoryRoot, {
+          sourceOverrides: new Map([["ios/project.yml", invalidProject]]),
+        }),
+      ).rejects.toThrow("Somewhere scheme must include unit and UI test targets");
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects a Somewhere scheme that cannot build and archive the app", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "somewhere-ios-build-scheme-"));
+    const source = resolve(repositoryRoot, "ios/project.yml");
+    const project = parse(await readFile(source, "utf8"));
+    project.schemes.Somewhere.build.targets = {};
+
+    try {
+      const invalidProject = join(scratch, "project.yml");
+      await writeFile(invalidProject, stringify(project), "utf8");
+      await expect(
+        validateIOSSource(repositoryRoot, {
+          sourceOverrides: new Map([["ios/project.yml", invalidProject]]),
+        }),
+      ).rejects.toThrow("Somewhere scheme must build the app target");
     } finally {
       await rm(scratch, { recursive: true, force: true });
     }
