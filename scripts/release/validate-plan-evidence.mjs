@@ -61,8 +61,18 @@ async function validate(options) {
       !Array.isArray(todo.dependsOn)
       || new Set(todo.dependsOn).size !== todo.dependsOn.length
       || todo.dependsOn.some((id) => !expectedIds.includes(id) || id === todo.id)
+      || (todo.reviewEvidence !== undefined && (
+        !Array.isArray(todo.reviewEvidence)
+        || new Set(todo.reviewEvidence).size !== todo.reviewEvidence.length
+        || todo.reviewEvidence.some((path) =>
+          typeof path !== "string"
+          || path === ""
+          || path.startsWith("/")
+          || path.split("/").includes("..")
+        )
+      ))
     ) {
-      throw new TypeError(`invalid dependency registry for Todo ${todo.id}`);
+      throw new TypeError(`invalid plan criteria registry for Todo ${todo.id}`);
     }
   }
   const planText = await Bun.file(planPath).text();
@@ -136,13 +146,36 @@ async function validate(options) {
       landedCommitSha: landed.sha,
       historyIndex: landed.index,
       evidence,
+      reviewEvidence: [],
     });
     if (!reviewBindings.some((entry) => entry.path === evidence.path)) {
       reviewBindings.push({ path: evidence.path, sha256: evidence.sha256 });
     }
+    for (const relativePath of todo.reviewEvidence ?? []) {
+      let reviewEvidence;
+      for (const root of [evidenceRoot, repo]) {
+        const path = resolve(root, relativePath);
+        const snapshot = await snapshotIfPresent(path);
+        if (snapshot !== undefined) {
+          reviewEvidence = { path, sha256: snapshot.sha256, bytes: snapshot.bytes };
+          break;
+        }
+      }
+      if (reviewEvidence === undefined) {
+        missing.push({ id: todo.id, reason: "REVIEW_EVIDENCE_ABSENT", path: relativePath });
+        continue;
+      }
+      todos.at(-1).reviewEvidence.push(reviewEvidence);
+      if (!reviewBindings.some((entry) => entry.path === reviewEvidence.path)) {
+        reviewBindings.push({ path: reviewEvidence.path, sha256: reviewEvidence.sha256 });
+      }
+    }
   }
   const expandedBindings = await collectPlanReviewBindings({
-    anchors: todos.map((todo) => todo.evidence.path),
+    anchors: todos.flatMap((todo) => [
+      todo.evidence.path,
+      ...todo.reviewEvidence.map((evidence) => evidence.path),
+    ]),
     evidenceRoot,
     repo,
   });
