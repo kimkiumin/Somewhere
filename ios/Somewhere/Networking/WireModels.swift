@@ -42,3 +42,18 @@ struct PublicErrorEnvelope: Decodable, Sendable {
 }
 
 struct EmptyRequestBody: Encodable, Sendable {}
+
+struct FeedbackPromptResponse: Decodable, Sendable {
+    let contractVersion: Int
+    let feedbackId: String
+    let promptVersion: String
+    let dueAt: Int64
+    let expiresAt: Int64
+    let actions: [String]
+}
+
+struct ReactionRecordedResponse: Decodable, Sendable {
+    let contractVersion: Int
+    let feedbackId: String
+    let recorded: Bool
+}

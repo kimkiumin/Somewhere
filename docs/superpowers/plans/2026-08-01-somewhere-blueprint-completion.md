@@ -195,25 +195,27 @@ research/study-b/                              comparison protocol and analysis 
 - Consumes: Task 3 API/domain types and iOS Core Location/notification callbacks.
 - Produces: the native field-test flow from constraint entry through delayed feedback with no map-first UI.
 
-- [ ] **Step 1: Write store transition tests**
+- [x] **Step 1: Write store transition tests**
 
   Test ready/commit/follow/near/arrive/reveal, immediate pause, cancel stop, confirm stop, skippable reason, guarded recovery, route recovery, expired session, and server sequence conflicts. Assert no active reroll and no destination leak before Reveal.
 
-- [ ] **Step 2: Implement Core Location fail-closed behavior**
+- [x] **Step 2: Implement Core Location fail-closed behavior**
 
   Request when-in-use location in context, start true-heading updates only while guidance is active, stop both streams after confirmed stop/expiry, suppress the arrow for invalid accuracy/staleness/interference, and recompute after foreground/recovery before pointing.
 
-- [ ] **Step 3: Implement the minimal SwiftUI surface**
+- [x] **Step 3: Implement the minimal SwiftUI surface**
 
   Keep one phone canvas with distance, arrow/confidence, representative category text, and price band. Use explicit accessibility labels, 44-point controls, Dynamic Type, reduced motion, Korean copy, and distinct pointing/error/pause states.
 
-- [ ] **Step 4: Implement contextual notification permission**
+- [x] **Step 4: Implement contextual notification permission**
 
   Ask only before the first delayed feedback notification, schedule at server-provided `dueAt`, and fall back to an in-app prompt on next launch when denied.
 
 - [ ] **Step 5: Verify and commit**
 
   Run the Task 3 macOS command plus `xcodebuild test -project ios/Somewhere.xcodeproj -scheme SomewhereUITests -destination 'platform=iOS Simulator,name=iPhone 15 Pro Max'`.
+
+  Ubuntu source/contract verification is complete. The macOS/Xcode command remains an explicit environment `BLOCK` until Task 5 authority evidence is available.
 
   Commit: `Build the native Somewhere field journey`
 

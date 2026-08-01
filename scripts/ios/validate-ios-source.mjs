@@ -150,6 +150,16 @@ export async function validateIOSSource(repositoryRoot, options = {}) {
   const apiSource = contents.get("ios/Somewhere/Networking/APIClient.swift");
   assert(apiSource.includes("protocol APIClientProtocol"), "APIClientProtocol is missing");
   assert(!/print\s*\(|debugPrint\s*\(|NSLog\s*\(/.test(apiSource), "API client must not log raw responses");
+  const tokenAuthority = await readFile(resolve(root, "contracts/src/journey.ts"), "utf8");
+  const feedbackCapability = tokenAuthority.match(
+    /FeedbackCapabilitySchema\s*=\s*canonicalBase64Url\("([^"]+)",\s*(\d+),\s*(\d+)\)/,
+  );
+  assert(feedbackCapability !== null, "TypeScript feedback capability authority is missing");
+  const [, feedbackPrefix, feedbackEncodedLength] = feedbackCapability;
+  assert(
+    apiSource.includes(`#"^${feedbackPrefix}\\.[A-Za-z0-9_-]{${feedbackEncodedLength}}$"#`),
+    "Swift feedback capability pattern differs from TypeScript authority",
+  );
 
   return {
     gate: "PASS",

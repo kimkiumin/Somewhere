@@ -100,4 +100,22 @@ describe("native iOS source gate", () => {
     expect(guidanceSource).toContain("now >= heading.capturedAt");
     expect(guidanceSource).not.toContain("best!");
   });
+
+  test("binds Swift purpose-scoped capability patterns to the TypeScript authority", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "somewhere-ios-capability-"));
+    const source = resolve(repositoryRoot, "ios/Somewhere/Networking/APIClient.swift");
+    const original = await readFile(source, "utf8");
+
+    try {
+      const changed = original.replace('{43}$"#, options', '{44}$"#, options');
+      await writeFile(join(scratch, "APIClient.swift"), changed, "utf8");
+      await expect(
+        validateIOSSource(repositoryRoot, {
+          sourceOverrides: new Map([["ios/Somewhere/Networking/APIClient.swift", join(scratch, "APIClient.swift")]]),
+        }),
+      ).rejects.toThrow("Swift feedback capability pattern differs from TypeScript authority");
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
 });

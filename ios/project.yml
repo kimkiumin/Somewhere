@@ -17,8 +17,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: example.somewhere.field
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_FILE: Somewhere/Resources/Info.plist
+        SOMEWHERE_API_ORIGIN: https://example.invalid
         CODE_SIGN_STYLE: Automatic
   SomewhereTests:
     type: bundle.unit-test
@@ -31,4 +31,16 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: example.somewhere.field.tests
+        GENERATE_INFOPLIST_FILE: YES
+  SomewhereUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - SomewhereUITests
+    dependencies:
+      - target: Somewhere
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: example.somewhere.field.uitests
         GENERATE_INFOPLIST_FILE: YES

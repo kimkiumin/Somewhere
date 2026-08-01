@@ -4,6 +4,8 @@ This directory is the contract-driven iOS 17+ client required by the approved bl
 
 The checked-in bundle identifiers are intentionally non-production examples. Linux verification proves source/contract consistency only. It does **not** prove Xcode compilation, signing, simulator behavior, TestFlight distribution, or physical iPhone behavior.
 
+`SOMEWHERE_API_ORIGIN` is deliberately `https://example.invalid` in the checked-in project. An authorized field build must override it with the canonical HTTPS service origin; source code rejects credentials, paths, query strings, fragments, non-HTTPS origins, and non-loopback HTTP.
+
 ## Verification
 
 On Ubuntu:
@@ -11,6 +13,8 @@ On Ubuntu:
 ```sh
 bun test scripts/ios/validate-ios-source.test.mjs
 bun scripts/ios/validate-ios-source.mjs
+bun test scripts/ios/validate-ios-field-flow.test.mjs
+bun scripts/ios/validate-ios-field-flow.mjs
 ```
 
 On an authorized macOS host with XcodeGen and Xcode:
