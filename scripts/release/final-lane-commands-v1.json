@@ -6,7 +6,7 @@
         "id": "plan-evidence",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F1/machine-verdict.json",
-        "argv": ["bun", "scripts/release/validate-plan-evidence.mjs", "--plan", "${PLAN}", "--plan-sha256", "${PLAN_SHA}", "--criteria", "scripts/release/plan-criteria-v1.json", "--evidence", "${SHARED_EVIDENCE_ROOT}", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--policy-sha256", "${POLICY_SHA}", "--require-todos", "1-22", "--output", "${FINAL_ROOT}/F1/machine-verdict.json"]
+        "argv": ["bun", "scripts/release/validate-plan-evidence.mjs", "--plan", "${PLAN}", "--plan-sha256", "${PLAN_SHA}", "--criteria", "scripts/release/plan-criteria-v1.json", "--evidence", "${SHARED_EVIDENCE_ROOT}", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--policy", "${POLICY}", "--policy-sha256", "${POLICY_SHA}", "--require-todos", "1-22", "--output", "${FINAL_ROOT}/F1/machine-verdict.json"]
       },
       {
         "id": "todo20-evidence",

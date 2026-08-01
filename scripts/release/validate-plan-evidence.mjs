@@ -19,6 +19,7 @@ const specification = {
     "--evidence",
     "--sha",
     "--source-tree",
+    "--policy",
     "--policy-sha256",
     "--require-todos",
     "--output",
@@ -46,7 +47,11 @@ async function validate(options) {
   ) {
     throw new TypeError("plan evidence source identity mismatch");
   }
-  normalizeDigest(options["policy-sha256"]);
+  const policyPath = resolve(options.policy);
+  const policySnapshot = await snapshotRegularFile(policyPath, "selected navigation policy");
+  if (policySnapshot.sha256 !== normalizeDigest(options["policy-sha256"])) {
+    throw new TypeError("selected navigation policy digest mismatch");
+  }
   const criteria = await readJson(resolve(options.criteria));
   if (criteria.schemaVersion !== 1 || !Array.isArray(criteria.todos)) {
     throw new TypeError("invalid plan criteria registry");
@@ -105,6 +110,7 @@ async function validate(options) {
   const reviewBindings = [
     { path: planPath, sha256: planSnapshot.sha256 },
     { path: resolve(options.criteria), sha256: criteriaSnapshot.sha256 },
+    { path: policyPath, sha256: policySnapshot.sha256 },
   ];
   for (const todo of criteria.todos) {
     const landed = landedById.get(todo.id);
@@ -194,6 +200,11 @@ async function validate(options) {
     sourceTree: options["source-tree"],
     reviewedPlanSha256: normalizeDigest(options["plan-sha256"]),
     policySha256: normalizeDigest(options["policy-sha256"]),
+    policy: {
+      path: policyPath,
+      sha256: policySnapshot.sha256,
+      bytes: policySnapshot.bytes,
+    },
     todoCount: criteria.todos.length,
     dependencyOrderVerified: gate === "PASS",
     rawReviewBindingCount: reviewBindings.length,

@@ -120,6 +120,17 @@ describe("Todo 22 release registry", () => {
     }
   });
 
+  test("binds the selected navigation policy as an inspectable F1 input", async () => {
+    const commands = await readJson(resolve(repo, "scripts/release/final-lane-commands-v1.json"));
+    const planEvidence = commands.lanes.F1.find((entry) => entry.id === "plan-evidence");
+    expect(planEvidence.argv).toEqual(expect.arrayContaining([
+      "--policy",
+      "${POLICY}",
+      "--policy-sha256",
+      "${POLICY_SHA}",
+    ]));
+  });
+
   test("routes dependency audit through an exact-source receipt", async () => {
     // Given: the canonical F2 command registry.
     const commands = await readJson(resolve(repo, "scripts/release/final-lane-commands-v1.json"));
