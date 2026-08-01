@@ -43,6 +43,12 @@ xcodebuild archive \
   CODE_SIGNING_ALLOWED=NO
 ```
 
+If Xcode reports that the named destination does not exist, create an
+`iPhone 15 Pro Max` simulator once in **Xcode → Window → Devices and
+Simulators** with an installed iOS runtime, then rerun the commands. Hosted CI
+does this automatically and addresses the created simulator by UDID, so it does
+not depend on the runner's preinstalled device list.
+
 Until the macOS command and later exact-device scenarios produce authority-bound receipts, the native blueprint track remains `BLOCK`.
 
 For a clean Mac checkout and context-loading order, use the

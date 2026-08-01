@@ -29,6 +29,10 @@ jobs:
       - name: Install frozen dependencies
         run: bun install --frozen-lockfile
 
+      - name: Install Playwright browsers
+        working-directory: app
+        run: bunx --no-install playwright install --with-deps chromium webkit
+
       - name: Create sanitized evidence directory
         run: mkdir -p "$RUNNER_TEMP/somewhere-v2-ci"
 

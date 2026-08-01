@@ -82,6 +82,15 @@ function assertCi(workflow) {
   ) {
     throw new TypeError("CI_EVENT_PERMISSION_OR_PIN_UNSAFE");
   }
+  const pinnedPlaywrightInstall = Object.values(workflow.jobs)
+    .flatMap((job) => job.steps)
+    .some((step) =>
+      step["working-directory"] === "app"
+      && step.run?.trim() === "bunx --no-install playwright install --with-deps chromium webkit"
+    );
+  if (!pinnedPlaywrightInstall) {
+    throw new TypeError("CI_GATE_MISSING:playwright install --with-deps chromium webkit");
+  }
   for (const required of [
     "verify:v2",
     "validate-evidence.mjs",

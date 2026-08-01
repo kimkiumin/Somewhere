@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { repo, writeFakeWrangler } from "./ci-staging.fixture.mjs";
 import {
@@ -61,6 +61,39 @@ describe("Todo 20 CI and staging gates", () => {
         externalWriteInLocalMode: false, lifecycleGradualRollbackAllowed: false,
         historicalPagesFrozen: true,
       });
+    } finally {
+      await removeTemporaryDirectory(root);
+    }
+  });
+
+  test("rejects a V2 CI workflow that verifies the browser app without installing browsers", async () => {
+    const root = await temporaryDirectory("ci-browser-install");
+    try {
+      const original = await readFile(resolve(repo, ".github/workflows/v2-ci.yml"), "utf8");
+      const installStep = [
+        "      - name: Install Playwright browsers",
+        "        working-directory: app",
+        "        run: bunx --no-install playwright install --with-deps chromium webkit",
+        "",
+      ].join("\n");
+      const workflows = resolve(root, ".github/workflows");
+      await mkdir(workflows, { recursive: true });
+      const ci = resolve(workflows, "v2-ci.yml");
+      await writeFile(ci, original.replace(installStep, ""));
+      await writeFile(
+        resolve(workflows, "app.yml"),
+        await readFile(resolve(repo, ".github/workflows/app.yml"), "utf8"),
+      );
+      const result = run(repo, [
+        "bun", "scripts/release/validate-workflows.mjs",
+        "--ci", ci,
+        "--staging", ".github/workflows/v2-staging.yml",
+        "--wrangler", "server/wrangler.jsonc",
+        "--output", resolve(root, "workflow.json"),
+      ]);
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr.toString()).toContain("CI_GATE_MISSING:playwright install --with-deps chromium webkit");
     } finally {
       await removeTemporaryDirectory(root);
     }

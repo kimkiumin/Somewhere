@@ -163,6 +163,14 @@ describe("native iOS evidence gate", () => {
     expect(workflow).toContain("PrivacyInfo.xcprivacy");
   });
 
+  test("creates the exact simulator instead of assuming hosted runner inventory", async () => {
+    const workflow = await readFile(resolve(import.meta.dir, "../../.github/workflows/ios-ci.yml"), "utf8");
+    expect(workflow).toContain("xcrun simctl create");
+    expect(workflow).toContain("com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro-Max");
+    expect(workflow.match(/steps\.simulator\.outputs\.udid/g)).toHaveLength(2);
+    expect(workflow).not.toContain("name=iPhone 15 Pro Max");
+  });
+
   test("accepts one exact build and four signed exact-device scenarios", async () => {
     const result = verify();
     expect(result).toMatchObject({ nativeBuild: "PASS", nativeField: "PASS", nativeIOS: "PASS" });
