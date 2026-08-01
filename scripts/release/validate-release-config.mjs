@@ -76,7 +76,7 @@ async function validate() {
     const profile = await json(resolve(release, name));
     if (
       profile.schemaVersion !== 1
-      || profile.runner?.binary !== "codex2"
+      || profile.runner?.binary !== "codex"
       || profile.runner?.version !== "codex-cli 0.146.0"
       || profile.runner?.sandbox !== "read-only"
       || profile.runner?.ephemeral !== true

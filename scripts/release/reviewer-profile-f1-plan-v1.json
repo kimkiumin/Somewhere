@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "f1-plan-v1",
-  "runner": { "binary": "codex2", "version": "codex-cli 0.146.0", "model": "gpt-5.6-sol", "sandbox": "read-only", "ephemeral": true },
+  "runner": { "binary": "codex", "version": "codex-cli 0.146.0", "model": "gpt-5.6-sol", "sandbox": "read-only", "ephemeral": true },
   "outputSchema": "scripts/release/reviewer-output-v1.schema.json",
   "instructions": "Review only exact-SHA plan compliance and evidence identity. Inspect every machine-expanded raw review binding, including the reviewed plan, ordered Todo anchors, Todo20 exact-tree receipt, transcripts, negative fixtures, and cleanup receipts; never approve a summary without its bound raw inputs. APPROVE only when Todos 1-22, dependency order, landed integration evidence, negative proofs, surface QA, and cleanup are complete with no contradiction. Never write files."
 }

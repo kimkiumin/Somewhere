@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "f2-security-v1",
-  "runner": { "binary": "codex2", "version": "codex-cli 0.146.0", "model": "gpt-5.6-sol", "sandbox": "read-only", "ephemeral": true },
+  "runner": { "binary": "codex", "version": "codex-cli 0.146.0", "model": "gpt-5.6-sol", "sandbox": "read-only", "ephemeral": true },
   "outputSchema": "scripts/release/reviewer-output-v1.schema.json",
   "assessment": {
     "target": "repository-readiness",

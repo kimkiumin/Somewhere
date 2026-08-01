@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "f3-visual-v1",
-  "runner": { "binary": "codex2", "version": "codex-cli 0.146.0", "model": "gpt-5.6-sol", "sandbox": "read-only", "ephemeral": true },
+  "runner": { "binary": "codex", "version": "codex-cli 0.146.0", "model": "gpt-5.6-sol", "sandbox": "read-only", "ephemeral": true },
   "outputSchema": "scripts/release/reviewer-output-v1.schema.json",
   "instructions": "Inspect every bound screenshot and browser report for a calm phone-only field instrument, hidden identity, no Reroll/map/desktop product surface, no overflow at 320/390/430, wide centered containment, 200% text, focus, and reduced motion. Never claim physical iPhone proof. Never write files."
 }

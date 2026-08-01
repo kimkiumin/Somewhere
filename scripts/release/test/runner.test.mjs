@@ -306,7 +306,7 @@ describe("Bound reviewer environment", () => {
       const reviewRoot = resolve(root, "review-evidence");
       await mkdir(fakeBin, { recursive: true });
       await mkdir(reviewRoot, { recursive: true });
-      const fakeCodex = resolve(fakeBin, "codex2");
+      const fakeCodex = resolve(fakeBin, "codex");
       await writeFile(fakeCodex, `#!/usr/bin/env bash
 set -euo pipefail
 printf '%s' "$HOME" > ${JSON.stringify(homeCapture)}
@@ -350,7 +350,7 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
         id: "fixture-review",
         instructions: "Review the bound fixture.",
         runner: {
-          binary: "codex2",
+          binary: "codex",
           version: "codex-cli 0.146.0",
           model: "fixture-model",
           sandbox: "read-only",
@@ -410,6 +410,12 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
         verdict: "APPROVE",
         reviewedSha: fixture.sha,
         sourceTree: fixture.tree,
+        runner: {
+          binary: "codex",
+          version: "codex-cli 0.146.0",
+          model: "fixture-model",
+          sandbox: "read-only",
+        },
         inputs: [
           { path: input },
           { path: related, sha256: `sha256:${relatedDigest}` },

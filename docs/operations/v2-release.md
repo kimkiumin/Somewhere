@@ -8,7 +8,7 @@ deploys, writes a secret, promotes a policy, or manufactures external evidence.
 Use the order in [`../README.md`](../README.md) and
 [`../authority-map-v2.json`](../authority-map-v2.json). Run from a clean,
 committed Git tree with Bun 1.3.14, Node 24, Git, tar, OpenSSL, curl, Wrangler,
-Playwright, and the pinned read-only `codex2` reviewer available.
+Playwright, and the pinned read-only official `codex` reviewer available.
 
 The reviewed plan is external to the product tree and is bound by SHA-256. The
 evidence root must also be outside the repository. Never place credentials,

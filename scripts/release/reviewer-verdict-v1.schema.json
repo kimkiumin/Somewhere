@@ -11,7 +11,7 @@
     "sourceTree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
     "profileId": { "type": "string" },
     "profileSha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-    "runner": { "type": "object", "additionalProperties": false, "required": ["binary", "version", "model", "sandbox"], "properties": { "binary": { "const": "codex2" }, "version": { "type": "string" }, "model": { "type": "string" }, "sandbox": { "const": "read-only" } } },
+    "runner": { "type": "object", "additionalProperties": false, "required": ["binary", "version", "model", "sandbox"], "properties": { "binary": { "const": "codex" }, "version": { "type": "string" }, "model": { "type": "string" }, "sandbox": { "const": "read-only" } } },
     "inputs": {
       "type": "array",
       "items": {

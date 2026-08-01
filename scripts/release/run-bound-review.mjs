@@ -214,7 +214,7 @@ async function review(options) {
   const profile = await readJson(profilePath);
   if (
     profile.schemaVersion !== 1
-    || profile.runner.binary !== "codex2"
+    || profile.runner.binary !== "codex"
     || profile.runner.sandbox !== "read-only"
     || profile.runner.ephemeral !== true
   ) {
@@ -222,7 +222,8 @@ async function review(options) {
   }
   const assessment = parseReviewerAssessment(profile.assessment);
   const environment = reviewerEnvironment();
-  const version = await run(["codex2", "--version"], { cwd: repo, env: environment });
+  const reviewerBinary = profile.runner.binary;
+  const version = await run([reviewerBinary, "--version"], { cwd: repo, env: environment });
   const observedVersion = version.stdout.toString().trim();
   if (version.exitCode !== 0 || observedVersion !== profile.runner.version) {
     throw new TypeError("reviewer runner version mismatch");
@@ -253,7 +254,7 @@ async function review(options) {
       "Return only the output-schema JSON. APPROVE is allowed only with zero P0/P1 findings.",
     ].join("\n");
     const invoked = await run([
-      "codex2",
+      reviewerBinary,
       "exec",
       "--ephemeral",
       "--ignore-user-config",
@@ -279,7 +280,7 @@ async function review(options) {
       profileId: profile.id,
       profileSha256: await digestFile(profilePath),
       runner: {
-        binary: "codex2",
+        binary: reviewerBinary,
         version: observedVersion,
         model: profile.runner.model,
         sandbox: "read-only",
