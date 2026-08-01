@@ -38,6 +38,7 @@ struct RecoveryView: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("여정 종료와 복구")
     }
 }

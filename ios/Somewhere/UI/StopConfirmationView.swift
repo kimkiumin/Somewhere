@@ -17,6 +17,7 @@ struct StopConfirmationView: View {
                 .accessibilityLabel("여정 종료 확인")
         }
         .padding(28)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("멈춤 확인")
     }
 }

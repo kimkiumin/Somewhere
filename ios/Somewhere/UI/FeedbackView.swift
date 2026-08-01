@@ -12,6 +12,7 @@ struct FeedbackView: View {
                     .accessibilityLabel("피드백 \(label)")
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("도착지 피드백")
     }
 }

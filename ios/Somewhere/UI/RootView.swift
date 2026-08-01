@@ -29,6 +29,7 @@ struct RootView: View {
                 .padding(.horizontal, 16)
                 .background(.regularMaterial, in: Capsule())
                 .padding(.top, 8)
+                .accessibilityElement(children: .contain)
                 .accessibilityLabel("여정 오류: \(errorMessage(error))")
             }
         }

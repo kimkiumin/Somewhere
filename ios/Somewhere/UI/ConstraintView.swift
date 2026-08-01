@@ -31,6 +31,7 @@ struct ConstraintView: View {
             .accessibilityLabel("숨은 목적지 여정 시작")
             Spacer()
         }
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("여정 조건 선택")
     }
 }

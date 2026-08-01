@@ -54,6 +54,7 @@ struct CompassView: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("경로 나침반 안내")
     }
 

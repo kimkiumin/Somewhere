@@ -133,5 +133,16 @@ describe("native iOS field journey gate", () => {
     expect(plist).not.toContain("NSLocationAlways")
     expect(ui.join("\n")).toContain(".frame(minHeight: 44)")
     expect(ui.join("\n")).toContain("accessibilityLabel")
+    for (const path of [
+      "ios/Somewhere/UI/ConstraintView.swift",
+      "ios/Somewhere/UI/CompassView.swift",
+      "ios/Somewhere/UI/StopConfirmationView.swift",
+      "ios/Somewhere/UI/RecoveryView.swift",
+      "ios/Somewhere/UI/FeedbackView.swift",
+    ]) {
+      expect(await readFile(resolve(repositoryRoot, path), "utf8")).toContain(
+        ".accessibilityElement(children: .contain)",
+      )
+    }
   });
 });
