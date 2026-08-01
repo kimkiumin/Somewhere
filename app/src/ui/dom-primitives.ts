@@ -62,7 +62,9 @@ export function compass(
     needle.setAttribute("aria-hidden", "true");
     stage.append(needle);
   }
-  stage.append(element("span", "compass-hub"));
+  if (variant !== "idle") {
+    stage.append(element("span", "compass-hub"));
+  }
   const readout = element("div", "compass-readout");
   readout.append(
     element("strong", "distance", distanceText),

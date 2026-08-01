@@ -93,6 +93,32 @@ describe("Command and evidence receipts", () => {
     }
   });
 
+  test("captures an expected external binding block without failing the harness", async () => {
+    const root = await temporaryDirectory("capture-binding-block");
+    try {
+      const fixture = await initializeSourceRepository(root);
+      const primary = resolve(root, "evidence/device.json");
+      const receipt = resolve(root, "evidence/command.json");
+      const argv = [
+        "bun",
+        "-e",
+        `await Bun.write(${JSON.stringify(primary)}, JSON.stringify({schemaVersion:1,bindingGate:"BLOCK",reason:"RC_ABSENT"})+"\\n");process.exitCode=2`,
+      ];
+      const result = run(repo, captureArguments({
+        lane: "F3",
+        checkId: "device-verdict",
+        ...fixture,
+        primary,
+        receipt,
+        argv,
+      }));
+      expect(result.exitCode).toBe(0);
+      expect(await readJson(receipt)).toMatchObject({ gate: "BLOCK", exitCode: 2 });
+    } finally {
+      await removeTemporaryDirectory(root);
+    }
+  });
+
   test("rejects a symlink emitted as a command primary", async () => {
     const root = await temporaryDirectory("capture-symlink");
     try {

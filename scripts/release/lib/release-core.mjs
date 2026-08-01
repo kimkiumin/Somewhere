@@ -202,7 +202,7 @@ export async function removeGuardedTemporary(path, prefix) {
 
 export function resultGate(value) {
   if (typeof value !== "object" || value === null) return undefined;
-  for (const key of ["gate", "verdict", "repositoryGate", "status"]) {
+  for (const key of ["gate", "bindingGate", "verdict", "repositoryGate", "status"]) {
     const candidate = value[key];
     if (candidate === "PASS" || candidate === "BLOCK" || candidate === "FAIL") return candidate;
   }
