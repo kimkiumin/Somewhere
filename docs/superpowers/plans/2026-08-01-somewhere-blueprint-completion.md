@@ -233,15 +233,15 @@ research/study-b/                              comparison protocol and analysis 
 - Consumes: exact SHA/tree, generated Xcode project digest, xcodebuild result bundle digest, signing metadata without private key material, and four native device scenarios.
 - Produces: the `native-ios` blueprint track gate and `native-distribution` external receipt input.
 
-- [ ] **Step 1: Test fail-closed native evidence**
+- [x] **Step 1: Test fail-closed native evidence**
 
   Reject simulator-only evidence as a field pass, unsigned/archive-only evidence as TestFlight pass, mismatched bundle/SHA/policy/route/provider digests, missing privacy manifest, missing background-behavior declaration, and any raw coordinate attachment.
 
-- [ ] **Step 2: Add read-only CI**
+- [x] **Step 2: Add read-only CI**
 
   `ios-ci.yml` runs XcodeGen, unit tests, UI tests, archive without distribution signing, privacy manifest inspection, and secret scanning on `macos-15`. It uploads sanitized result metadata only.
 
-- [ ] **Step 3: Define physical native scenarios**
+- [x] **Step 3: Define physical native scenarios**
 
   Require open-sky and building-dense walks, interrupted network, heading interference/recalibration, foreground recovery, Stop/reveal, false-arrival and missed-arrival observations, each bound to exact build and RC policy.
 
@@ -250,6 +250,8 @@ research/study-b/                              comparison protocol and analysis 
   Run: `bun test scripts/ios/verify-native-evidence.test.mjs && bun scripts/ios/verify-native-evidence.mjs --evidence /private/native-evidence --output /private/native-verdict.json`
 
   Without private evidence, expected gate is `BLOCK`, not command failure.
+
+  Linux verifier coverage is complete. The macOS workflow, Apple signing, TestFlight, and exact-device receipts remain external `BLOCK` inputs until their authorities execute them.
 
   Commit: `Gate native Somewhere field evidence`
 

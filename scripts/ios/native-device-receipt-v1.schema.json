@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.invalid/schemas/native-device-receipt-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "payload", "signature"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "fieldLeadId", "issuedAt", "finalSha", "sourceTree", "bundleIdentifier", "archiveSha256", "buildReceiptSha256", "marketingName", "hardwareIdentifier", "osVersion", "navigationPolicyVersion", "navigationPolicySha256", "routeContractSha256", "providerConfigSha256", "backgroundBehaviorObserved", "scenarios", "attachments"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "const": "native-device" },
+        "fieldLeadId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" },
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "finalSha": { "$ref": "#/$defs/gitSha" },
+        "sourceTree": { "$ref": "#/$defs/gitSha" },
+        "bundleIdentifier": { "type": "string", "pattern": "^[A-Za-z0-9.-]+$" },
+        "archiveSha256": { "$ref": "#/$defs/digest" },
+        "buildReceiptSha256": { "$ref": "#/$defs/digest" },
+        "marketingName": { "const": "iPhone 15 Pro Max" },
+        "hardwareIdentifier": { "const": "iPhone16,2" },
+        "osVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$" },
+        "navigationPolicyVersion": { "type": "string", "minLength": 1 },
+        "navigationPolicySha256": { "$ref": "#/$defs/digest" },
+        "routeContractSha256": { "$ref": "#/$defs/digest" },
+        "providerConfigSha256": { "$ref": "#/$defs/digest" },
+        "backgroundBehaviorObserved": { "const": "foreground-only-no-locked-screen-guidance" },
+        "scenarios": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "result", "stopObserved", "revealObserved", "falseArrivalCount", "missedArrivalCount"],
+            "properties": {
+              "id": { "enum": ["open-sky-walk", "building-dense-walk", "interrupted-network-foreground-recovery", "heading-interference-recalibration"] },
+              "result": { "enum": ["PASS", "FAIL"] },
+              "stopObserved": { "type": "boolean" },
+              "revealObserved": { "type": "boolean" },
+              "falseArrivalCount": { "type": "integer", "minimum": 0 },
+              "missedArrivalCount": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "attachments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "sha256"],
+            "properties": { "kind": { "enum": ["sanitized-summary", "redacted-screenshot", "result-metadata"] }, "sha256": { "$ref": "#/$defs/digest" } }
+          }
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "signatureBase64", "signatureSha256"],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "signatureBase64": { "type": "string", "contentEncoding": "base64" },
+        "signatureSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

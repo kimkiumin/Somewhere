@@ -16,6 +16,7 @@ export const IOS_SOURCE_REQUIREMENTS = Object.freeze({
     "ios/Somewhere/Domain/NavigationPolicy.swift",
     "ios/Somewhere/Networking/APIClient.swift",
     "ios/Somewhere/Networking/WireModels.swift",
+    "ios/Somewhere/Resources/PrivacyInfo.xcprivacy",
     "ios/SomewhereTests/WireContractTests.swift",
     "ios/SomewhereTests/GuidanceEngineTests.swift",
     "ios/Fixtures/projection-examples-v1.json",
@@ -160,6 +161,11 @@ export async function validateIOSSource(repositoryRoot, options = {}) {
     apiSource.includes(`#"^${feedbackPrefix}\\.[A-Za-z0-9_-]{${feedbackEncodedLength}}$"#`),
     "Swift feedback capability pattern differs from TypeScript authority",
   );
+  const privacyManifest = contents.get("ios/Somewhere/Resources/PrivacyInfo.xcprivacy");
+  assert(privacyManifest.includes("NSPrivacyCollectedDataTypePreciseLocation"), "privacy manifest must disclose precise location collection");
+  assert(privacyManifest.includes("NSPrivacyAccessedAPICategoryUserDefaults"), "privacy manifest must disclose UserDefaults access");
+  assert(privacyManifest.includes("<string>CA92.1</string>"), "privacy manifest must declare the app-only UserDefaults reason");
+  assert(/<key>NSPrivacyTracking<\/key>\s*<false\/>/.test(privacyManifest), "privacy manifest must keep tracking disabled");
 
   return {
     gate: "PASS",
