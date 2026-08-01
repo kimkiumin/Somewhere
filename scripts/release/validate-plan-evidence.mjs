@@ -9,6 +9,7 @@ import {
   snapshotRegularFile,
   writeJson,
 } from "./lib/release-core.mjs";
+import { collectPlanReviewBindings } from "./lib/plan-review-bindings.mjs";
 
 const specification = {
   required: [
@@ -140,6 +141,18 @@ async function validate(options) {
       reviewBindings.push({ path: evidence.path, sha256: evidence.sha256 });
     }
   }
+  const expandedBindings = await collectPlanReviewBindings({
+    anchors: todos.map((todo) => todo.evidence.path),
+    evidenceRoot,
+    repo,
+  });
+  for (const binding of expandedBindings) {
+    const existing = reviewBindings.find((entry) => entry.path === binding.path);
+    if (existing !== undefined && existing.sha256 !== binding.sha256) {
+      throw new TypeError(`plan review binding digest mismatch: ${binding.path}`);
+    }
+    if (existing === undefined) reviewBindings.push(binding);
+  }
   const gate = missing.length === 0 ? "PASS" : "BLOCK";
   await writeJson(resolve(options.output), {
     schemaVersion: 1,
@@ -150,6 +163,7 @@ async function validate(options) {
     policySha256: normalizeDigest(options["policy-sha256"]),
     todoCount: criteria.todos.length,
     dependencyOrderVerified: gate === "PASS",
+    rawReviewBindingCount: expandedBindings.length,
     todos,
     reviewBindings,
     missing,
