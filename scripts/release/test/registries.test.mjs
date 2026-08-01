@@ -131,6 +131,17 @@ describe("Todo 22 release registry", () => {
     ]));
   });
 
+  test("uses the structured final Todo 22 envelope instead of superseded launch notes", async () => {
+    const criteria = await readJson(resolve(repo, "scripts/release/plan-criteria-v1.json"));
+    const todo22 = criteria.todos.find((entry) => entry.id === 22);
+    expect(todo22.evidenceAny).toEqual(["task-22/final-evidence.json"]);
+    expect(todo22.reviewEvidence).toEqual(expect.arrayContaining([
+      "task-22/service-smoke-final/process-start.json",
+      "task-22/service-smoke-final/curl.json",
+      "task-22/service-smoke-final/process-cleanup.json",
+    ]));
+  });
+
   test("routes dependency audit through an exact-source receipt", async () => {
     // Given: the canonical F2 command registry.
     const commands = await readJson(resolve(repo, "scripts/release/final-lane-commands-v1.json"));
