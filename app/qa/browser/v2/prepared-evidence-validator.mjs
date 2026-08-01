@@ -122,7 +122,7 @@ async function validate(options) {
     throw new TypeError("DUPLICATE_ARTIFACT");
   }
   const reviewableArtifacts = collection.artifacts.filter((artifact) =>
-    /\.(?:json|log|png)$/u.test(artifact.path)
+    /\.(?:json|log|png)$/u.test(artifact.path),
   );
   if (!Array.isArray(collection.reviewBindings)) {
     throw new TypeError("INCOMPLETE_REVIEW_BINDINGS");
