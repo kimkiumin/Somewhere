@@ -121,6 +121,37 @@ async function validate(options) {
   if (new Set(artifactPaths).size !== artifactPaths.length) {
     throw new TypeError("DUPLICATE_ARTIFACT");
   }
+  const reviewableArtifacts = collection.artifacts.filter((artifact) =>
+    /\.(?:json|log|png)$/u.test(artifact.path)
+  );
+  if (!Array.isArray(collection.reviewBindings)) {
+    throw new TypeError("INCOMPLETE_REVIEW_BINDINGS");
+  }
+  const reviewBindings = new Map();
+  for (const binding of collection.reviewBindings) {
+    if (
+      binding === null ||
+      typeof binding !== "object" ||
+      Array.isArray(binding) ||
+      JSON.stringify(Object.keys(binding).sort()) !== JSON.stringify(["path", "sha256"]) ||
+      typeof binding.path !== "string" ||
+      typeof binding.sha256 !== "string" ||
+      !path.isAbsolute(binding.path) ||
+      reviewBindings.has(binding.path)
+    ) {
+      throw new TypeError("INVALID_REVIEW_BINDING");
+    }
+    reviewBindings.set(binding.path, binding.sha256);
+  }
+  if (reviewBindings.size !== reviewableArtifacts.length) {
+    throw new TypeError("INCOMPLETE_REVIEW_BINDINGS");
+  }
+  for (const artifact of reviewableArtifacts) {
+    const absolute = relativeArtifact(options.input, artifact.path);
+    if (reviewBindings.get(absolute) !== artifact.sha256) {
+      throw new TypeError(`REVIEW_BINDING_MISMATCH:${artifact.path}`);
+    }
+  }
   const requiredVisuals = PREPARED_VISUAL_IDS.map((id) => `visual/${id}.png`);
   exactSet(
     artifactPaths.filter((item) => item.startsWith("visual/")),

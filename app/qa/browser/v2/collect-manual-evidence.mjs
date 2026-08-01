@@ -95,15 +95,22 @@ export async function collectManualPreparedEvidence(options, dependencies = {}) 
         }),
       ),
     );
+    const artifacts = [
+      ...collection.artifacts,
+      ...(await Promise.all(
+        expectedPaths.map((relative) => artifact(options.outputDir, relative)),
+      )),
+    ];
     const augmented = {
       ...collection,
       observations: { ...collection.observations, accessibility },
-      artifacts: [
-        ...collection.artifacts,
-        ...(await Promise.all(
-          expectedPaths.map((relative) => artifact(options.outputDir, relative)),
-        )),
-      ],
+      artifacts,
+      reviewBindings: artifacts
+        .filter((entry) => /\.(?:json|log|png)$/u.test(entry.path))
+        .map((entry) => ({
+          path: path.resolve(options.outputDir, entry.path),
+          sha256: entry.sha256,
+        })),
     };
     const temporary = `${options.output}.tmp-accessibility-${process.pid}`;
     await writeFile(temporary, `${JSON.stringify(augmented, null, 2)}\n`);

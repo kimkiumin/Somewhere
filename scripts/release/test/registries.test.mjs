@@ -185,6 +185,12 @@ describe("Todo 22 release registry", () => {
     ]));
   });
 
+  test("allows the F3 visual reviewer to expand only final-root artifact bindings", async () => {
+    const commands = await readJson(resolve(repo, "scripts/release/final-lane-commands-v1.json"));
+    const visual = commands.lanes.F3.find((entry) => entry.id === "visual-review");
+    expect(visual.argv).toEqual(expect.arrayContaining(["--review-root", "${FINAL_ROOT}"]));
+  });
+
   test("binds the F4 scope reviewer to the prepared build receipt", async () => {
     const commands = await readJson(resolve(repo, "scripts/release/final-lane-commands-v1.json"));
     const reviewer = commands.lanes.F4.find((entry) => entry.id === "reviewer-verdict");

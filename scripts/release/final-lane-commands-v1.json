@@ -132,7 +132,7 @@
         "id": "visual-review",
         "classification": "repository",
         "primary": "${FINAL_ROOT}/F3/visual-review-verdict.json",
-        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f3-visual-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F3/manual-browser/collection.json,${FINAL_ROOT}/F3/manual-browser-verdict.json", "--output", "${FINAL_ROOT}/F3/visual-review-verdict.json"]
+        "argv": ["bun", "scripts/release/run-bound-review.mjs", "--profile", "scripts/release/reviewer-profile-f3-visual-v1.json", "--sha", "${FINAL_SHA}", "--source-tree", "${SOURCE_TREE}", "--inputs", "${FINAL_ROOT}/F3/manual-browser/collection.json,${FINAL_ROOT}/F3/manual-browser-verdict.json", "--review-root", "${FINAL_ROOT}", "--output", "${FINAL_ROOT}/F3/visual-review-verdict.json"]
       },
       {
         "id": "device-verdict",

@@ -51,6 +51,10 @@ describe("prepared-build manual evidence collector", () => {
           artifact.path.startsWith("accessibility/"),
         ),
       ).toHaveLength(8);
+      expect(collection.reviewBindings).toHaveLength(41);
+      expect(collection.reviewBindings.every((binding) => path.isAbsolute(binding.path))).toBe(
+        true,
+      );
       expect(await readFile(path.join(item.repo, "source.ts"), "utf8")).toBe(before);
       await expect(readFile(path.join(item.repo, "app", "dist", "index.html"))).rejects.toThrow();
     } finally {
@@ -262,6 +266,9 @@ describe("prepared-build manual evidence collector", () => {
       collection.artifacts = collection.artifacts.filter(
         (artifact) => artifact.path !== "accessibility/chromium-mobile-keyboard-focus.png",
       );
+      collection.reviewBindings = collection.reviewBindings.filter(
+        (binding) => !binding.path.endsWith("accessibility/chromium-mobile-keyboard-focus.png"),
+      );
       await writeFile(item.output, `${JSON.stringify(collection, null, 2)}\n`);
 
       // When: validation consumes the incomplete artifact set.
@@ -275,6 +282,45 @@ describe("prepared-build manual evidence collector", () => {
 
       // Then: missing visual proof fails closed.
       await expect(validation).rejects.toThrow("INCOMPLETE_ACCESSIBILITY_ARTIFACTS");
+      expect(JSON.parse(await readFile(verdict, "utf8"))).toMatchObject({ gate: "FAIL" });
+    } finally {
+      await rm(item.repo, { force: true, recursive: true });
+      await rm(item.finalRoot, { force: true, recursive: true });
+    }
+  });
+
+  test("fails closed when visual review bindings are omitted", async () => {
+    const item = await createPreparedFixture();
+    const verdict = path.join(item.finalRoot, "F3", "manual-browser-verdict.json");
+    try {
+      const collection = await collectPreparedEvidence(
+        {
+          baseUrl: "https://127.0.0.1:8788/",
+          buildReceipt: item.receiptPath,
+          output: item.output,
+          outputDir: item.outputDir,
+          repo: item.repo,
+          sha: item.sha,
+          sourceTree: item.tree,
+          viewports: "320,390,430,wide",
+        },
+        {
+          fetchServed: async () => item.index,
+          runBrowser: () => fakePreparedBrowser(item.outputDir),
+        },
+      );
+      collection.reviewBindings = collection.reviewBindings.slice(1);
+      await writeFile(item.output, `${JSON.stringify(collection, null, 2)}\n`);
+
+      const validation = validatePreparedEvidence({
+        buildReceipt: item.receiptPath,
+        input: item.outputDir,
+        output: verdict,
+        repo: item.repo,
+        sha: item.sha,
+      });
+
+      await expect(validation).rejects.toThrow("INCOMPLETE_REVIEW_BINDINGS");
       expect(JSON.parse(await readFile(verdict, "utf8"))).toMatchObject({ gate: "FAIL" });
     } finally {
       await rm(item.repo, { force: true, recursive: true });
