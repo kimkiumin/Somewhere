@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.local/research/study-b/dataset-v1.schema.json",
+  "title": "Somewhere Study B counterbalanced dyad dataset v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "studyId", "protocolVersion", "analysisContractSha256",
+    "enrollmentOpenedAt", "collectionClosedAt", "primaryAnalysisUnit",
+    "primaryEndpoint", "dyads"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "studyId": { "type": "string", "pattern": "^study-b-[a-z0-9-]{8,64}$" },
+    "protocolVersion": { "const": "study-b-protocol-v1" },
+    "analysisContractSha256": { "$ref": "#/$defs/hex64" },
+    "enrollmentOpenedAt": { "type": "string", "format": "date-time" },
+    "collectionClosedAt": { "type": "string", "format": "date-time" },
+    "primaryAnalysisUnit": { "const": "dyad" },
+    "primaryEndpoint": { "const": "paired-dyad-selection-time-difference-seconds" },
+    "dyads": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 15,
+      "items": { "$ref": "#/$defs/dyad" }
+    }
+  },
+  "$defs": {
+    "hex64": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category", "areaCode", "budgetBand", "timeWindowCode", "pairCompositionCode",
+        "eligiblePoolSha256", "priorFamiliarity", "selectionTimeSeconds", "comparisonCount",
+        "destinationCommitted", "movementStarted", "selectionReopenedForPreference",
+        "externalInterruption", "recommendationOutcome", "arrivalOutcome",
+        "destinationReaction"
+      ],
+      "properties": {
+        "category": { "enum": ["restaurant", "cafe"] },
+        "areaCode": { "$ref": "#/$defs/identifier" },
+        "budgetBand": { "$ref": "#/$defs/identifier" },
+        "timeWindowCode": { "$ref": "#/$defs/identifier" },
+        "pairCompositionCode": { "$ref": "#/$defs/identifier" },
+        "eligiblePoolSha256": { "$ref": "#/$defs/hex64" },
+        "priorFamiliarity": { "enum": ["none", "area-only", "venue-known"] },
+        "selectionTimeSeconds": { "type": "integer", "minimum": 0 },
+        "comparisonCount": { "type": "integer", "minimum": 0 },
+        "destinationCommitted": { "type": "boolean" },
+        "movementStarted": { "type": "boolean" },
+        "selectionReopenedForPreference": { "type": "boolean" },
+        "externalInterruption": {
+          "enum": [
+            "none", "route-failure", "sensor-failure", "safety", "closed-venue",
+            "schedule-change", "other-external"
+          ]
+        },
+        "recommendationOutcome": { "enum": ["not-applicable", "ready", "no-fit"] },
+        "arrivalOutcome": { "enum": ["confirmed", "not-confirmed", "not-attempted"] },
+        "destinationReaction": { "enum": ["dislike", "like", "love", "did-not-visit", "missing"] }
+      }
+    },
+    "dyad": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dyadCode", "participantCount", "order", "carryover", "baseline", "somewhere"
+      ],
+      "properties": {
+        "dyadCode": { "$ref": "#/$defs/identifier" },
+        "participantCount": { "const": 2 },
+        "order": { "enum": ["somewhere-first", "baseline-first"] },
+        "carryover": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "strategy", "firstPoolSha256", "secondPoolSha256", "contaminationObserved"
+          ],
+          "properties": {
+            "strategy": { "const": "non-overlapping-pools" },
+            "firstPoolSha256": { "$ref": "#/$defs/hex64" },
+            "secondPoolSha256": { "$ref": "#/$defs/hex64" },
+            "contaminationObserved": { "const": false }
+          }
+        },
+        "baseline": { "$ref": "#/$defs/condition" },
+        "somewhere": { "$ref": "#/$defs/condition" }
+      }
+    }
+  }
+}

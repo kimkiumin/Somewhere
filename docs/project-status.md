@@ -1,6 +1,6 @@
 # Somewhere project status
 
-Status as of 2026-08-01
+Status as of 2026-08-02
 
 This page distinguishes three different claims that previously appeared close
 enough to be confused:
@@ -13,12 +13,19 @@ enough to be confused:
 
 The first row is strong evidence, but it cannot imply either later row. The
 approved [blueprint](../BLUEPRINT.md) calls the native iOS field experience and
-physical compass mockup required final outcomes. The repository now contains an
-iOS 17 Swift contract and guidance foundation whose TypeScript contract parity is
-checked on Linux. It still has no independently proven Xcode build or complete
-SwiftUI field flow, and contains no physical design package. Ubuntu cannot prove
-macOS signing, iPhone behavior, fabrication, ergonomics, participant results,
-counsel approval, provider rights, or production control-plane state.
+physical compass mockup required final outcomes. The repository now contains the
+iOS 17 Swift contract, native SwiftUI journey, Linux source/flow validators, a
+macOS CI contract, and a signed native evidence verifier. It still has no
+authority-backed Xcode archive, TestFlight distribution, or iPhone field receipt,
+and contains no selected physical design package. Ubuntu cannot prove macOS
+signing, iPhone behavior, fabrication, ergonomics, participant results, counsel
+approval, provider rights, or production control-plane state.
+
+Study A now has a signed de-identified session/aggregate contract and RC promotion
+binding. Study B now has a counterbalanced dyad protocol, strict dataset contract,
+and deterministic stratified analyzer. The Study B threshold remains deliberately
+blocked until actual Study A evidence authorizes it. None of these validators is a
+substitute for the missing participant evidence.
 
 ## Machine-readable result
 
@@ -47,12 +54,12 @@ editing it is not authority to create that evidence.
 | Track | Gate | Current evidence boundary |
 |---|---|---|
 | Service web/backend | PASS | Sealed d9605bc final verdict and manifest outside Git |
-| Native iOS | BLOCK | Contract/guidance source foundation exists; macOS build, complete field UI, signing, and native field evidence remain absent |
+| Native iOS | BLOCK | Full SwiftUI field-flow source and strict evidence gate exist; macOS build, signing, TestFlight, and real-device field receipts remain absent |
 | Physical product | BLOCK | No full-scale high-fidelity model or embodied handling/readability evidence |
-| Study A | BLOCK | No 5–8 supervised sessions or promoted navigation RC |
-| Study B | BLOCK | No 10–15 counterbalanced dyads or frozen-result analysis |
+| Study A | BLOCK | Protocol, privacy boundary, signed aggregate validator, and RC binding exist; no 5–8 supervised sessions or promoted navigation RC |
+| Study B | BLOCK | Protocol and deterministic stratified analyzer exist; Study A has not authorized the threshold and no 10–15 counterbalanced dyads exist |
 | Provider/legal | BLOCK | No authorized provider rights/quota or independent Korean review |
-| Public operations | BLOCK | No production Cloudflare, final physical-device, or Apple distribution receipts |
+| Public operations | BLOCK | Eight-purpose signed decision verifier exists; production Cloudflare, final physical-device, and Apple distribution receipts remain absent |
 
 ## Execution authority
 

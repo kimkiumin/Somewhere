@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "statusAsOf": "2026-08-01",
+  "statusAsOf": "2026-08-02",
   "tracks": [
     {
       "id": "service-web-backend",
@@ -21,9 +21,12 @@
       "evidence": [
         "tracked:ios/README.md",
         "tracked:scripts/ios/validate-ios-source.mjs",
+        "tracked:scripts/ios/validate-ios-field-flow.mjs",
+        "tracked:scripts/ios/verify-native-evidence.mjs",
+        "tracked:.github/workflows/ios-ci.yml",
         "required:macos-xcode-native-field-receipt"
       ],
-      "reason": "NATIVE_IOS_FIELD_FLOW_BUILD_AND_FIELD_EVIDENCE_MISSING"
+      "reason": "NATIVE_MACOS_BUILD_SIGNING_AND_FIELD_EVIDENCE_MISSING"
     },
     {
       "id": "physical-product",
@@ -38,7 +41,11 @@
       "requiredForBlueprint": true,
       "requiredForPublicRelease": true,
       "gate": "BLOCK",
-      "evidence": ["required:five-to-eight-supervised-study-a-sessions"],
+      "evidence": [
+        "tracked:research/study-a/protocol-v1.md",
+        "tracked:research/study-a/validate-study-a.mjs",
+        "required:five-to-eight-supervised-study-a-sessions"
+      ],
       "reason": "STUDY_A_AND_NAVIGATION_RC_EVIDENCE_MISSING"
     },
     {
@@ -46,7 +53,12 @@
       "requiredForBlueprint": true,
       "requiredForPublicRelease": true,
       "gate": "BLOCK",
-      "evidence": ["required:ten-to-fifteen-counterbalanced-dyads"],
+      "evidence": [
+        "tracked:research/study-b/protocol-v1.md",
+        "tracked:research/study-b/analyze-study-b.mjs",
+        "required:study-a-authorized-frozen-threshold",
+        "required:ten-to-fifteen-counterbalanced-dyads"
+      ],
       "reason": "STUDY_B_COMPARATIVE_VALIDATION_MISSING"
     },
     {
@@ -68,7 +80,8 @@
       "evidence": [
         "required:cloudflare-production-receipts",
         "required:physical-iphone-receipt",
-        "required:native-distribution-receipt"
+        "required:native-distribution-receipt",
+        "tracked:scripts/public-release/verify-public-release.mjs"
       ],
       "reason": "PRODUCTION_DEVICE_AND_DISTRIBUTION_AUTHORITY_EVIDENCE_MISSING"
     }

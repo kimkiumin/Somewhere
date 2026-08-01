@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "status": "BLOCK",
+  "protocolVersion": "study-b-protocol-v1",
+  "frozenAt": null,
+  "primaryAnalysisUnit": "dyad",
+  "primaryEndpoint": "paired-dyad-selection-time-difference-seconds",
+  "differenceDirection": "baseline-minus-somewhere",
+  "practicalDifferenceThresholdSeconds": null,
+  "decisionRule": "BLOCKED_PENDING_STUDY_A",
+  "strata": ["restaurant", "cafe"],
+  "minimumDyads": 10,
+  "maximumDyads": 15,
+  "conclusionScope": "stratified-bundle-only"
+}

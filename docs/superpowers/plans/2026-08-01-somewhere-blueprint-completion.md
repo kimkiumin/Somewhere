@@ -387,21 +387,26 @@ research/study-b/                              comparison protocol and analysis 
 - Consumes: 10–15 counterbalanced dyads, frozen primary endpoint and practical-difference threshold, native/physical evidence, and public-release receipts.
 - Produces: Study B result and final blueprint verdict without blending distinct failure causes.
 
-- [ ] **Step 1: Test counterbalanced analysis invariants**
+- [x] **Step 1: Test counterbalanced analysis invariants**
 
   Reject individual-level inference as the primary unit, unmatched category/area/budget/time/pair conditions, absent order/carryover fields, changed endpoint after data collection, combined restaurant/cafe conclusions, and conflation of external interruption with recommendation failure.
 
-- [ ] **Step 2: Implement deterministic analysis**
+- [x] **Step 2: Implement deterministic analysis**
 
   Report paired selection-time difference, practical-threshold decision, comparison count, departure, selection reopened, arrival, external interruption, and destination reaction. Show restaurant and cafe strata separately and identify bundle-level attribution limits.
 
-- [ ] **Step 3: Assemble the final blueprint verdict**
+- [x] **Step 3: Assemble the final blueprint verdict**
 
   Require Phase 0–5 exit evidence, native field pass, high-fidelity physical package plus handling/readability evidence, provider/legal feasibility, Study A and Study B results, risk ledger disposition, and exact public-release decision. Preserve `BLOCK` for every absent authority receipt.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify the implementation and commit**
 
   Run: `bun test research/study-b/analyze-study-b.test.mjs scripts/completion/assemble-blueprint-verdict.test.mjs`
+
+  The method, blocked pre-enrollment contract, deterministic analyzer, external
+  artifact synthesis, and independent GLM 5.2 review pass. Actual enrollment,
+  the Study A-authorized threshold, 10–15 dyads, and authority receipts remain
+  truthfully `BLOCK`.
 
   Commit: `Add comparative validation and blueprint synthesis`
 
