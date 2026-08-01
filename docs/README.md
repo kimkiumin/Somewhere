@@ -29,6 +29,12 @@ are defined in the [V2 release runbook](operations/v2-release.md). The
 [machine-readable authority map](authority-map-v2.json) is the release scope
 source of truth.
 
+The sealed repository result is not the whole approved product result. Use the
+[project status](project-status.md) and
+[blueprint completion runbook](operations/blueprint-completion.md) to keep the
+mobile-web/Cloudflare service slice, blueprint completion, and public release as
+three separate claims.
+
 V2 has no active Reroll control. Its recovery model is immediate Stop pause,
 explicit stop confirmation, and a guarded new recommendation only after the
 journey has ended. Reroll requirements in older files apply only to their

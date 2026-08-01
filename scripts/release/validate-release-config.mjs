@@ -30,6 +30,8 @@ const canonicalDocs = [
   "DESIGN.md",
   "AGENTS.md",
   "docs/README.md",
+  "docs/project-status.md",
+  "docs/operations/blueprint-completion.md",
   "docs/operations/v2-pilot-backend.md",
   "docs/operations/v2-release.md",
 ];

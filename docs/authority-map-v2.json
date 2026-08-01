@@ -15,7 +15,10 @@
     "navigationPolicy": "contracts/policy/navigation-v2-calibration-1.json",
     "operationsPolicy": "docs/architecture/operations-policy-v1.json",
     "backendRunbook": "docs/operations/v2-pilot-backend.md",
-    "releaseRunbook": "docs/operations/v2-release.md"
+    "releaseRunbook": "docs/operations/v2-release.md",
+    "projectStatus": "docs/project-status.md",
+    "blueprintCompletionRunbook": "docs/operations/blueprint-completion.md",
+    "blueprintCompletionRegistry": "scripts/completion/blueprint-completion-v1.json"
   },
   "product": {
     "mobileOnly": true,
@@ -62,6 +65,16 @@
   },
   "repositoryGate": "automatable checks must pass",
   "releaseGate": "BLOCK until Cloudflare, provider, Korean legal, Study A, four exact-build iPhone runs, and native distribution evidence pass",
+  "completionScopes": {
+    "serviceSlice": "mobile web, contracts, Cloudflare backend, operations, and repository evidence",
+    "blueprintProject": "service slice plus native iOS, physical compass, Study A, Study B, and provider/legal feasibility",
+    "publicRelease": "blueprint project plus production operations, exact-device, and distribution authority",
+    "current": {
+      "serviceSlice": "PASS",
+      "blueprintProject": "BLOCK",
+      "publicRelease": "BLOCK"
+    }
+  },
   "historical": {
     "v0.2": ["app/qa/field/README.md", "app/qa/field/evidence.schema.json"],
     "v0.1": ["prototype", "docs/project_brief.md", "docs/prototype_spec.md"],

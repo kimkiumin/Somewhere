@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "statusAsOf": "2026-08-01",
+  "tracks": [
+    {
+      "id": "service-web-backend",
+      "requiredForBlueprint": true,
+      "requiredForPublicRelease": true,
+      "gate": "PASS",
+      "evidence": [
+        "external:final/d9605bc21bc2809b9d0391f1481f7ac451e14545/verdict.json",
+        "external:final/d9605bc21bc2809b9d0391f1481f7ac451e14545/final-manifest.sha256"
+      ],
+      "reason": "D9605BC_SERVICE_REPOSITORY_SEAL_PASS"
+    },
+    {
+      "id": "native-ios",
+      "requiredForBlueprint": true,
+      "requiredForPublicRelease": true,
+      "gate": "BLOCK",
+      "evidence": ["required:macos-xcode-native-field-receipt"],
+      "reason": "NATIVE_IOS_SOURCE_BUILD_AND_FIELD_EVIDENCE_MISSING"
+    },
+    {
+      "id": "physical-product",
+      "requiredForBlueprint": true,
+      "requiredForPublicRelease": true,
+      "gate": "BLOCK",
+      "evidence": ["required:full-scale-high-fidelity-mockup-and-handling-receipt"],
+      "reason": "PHYSICAL_COMPASS_PACKAGE_AND_EMBODIED_EVIDENCE_MISSING"
+    },
+    {
+      "id": "study-a",
+      "requiredForBlueprint": true,
+      "requiredForPublicRelease": true,
+      "gate": "BLOCK",
+      "evidence": ["required:five-to-eight-supervised-study-a-sessions"],
+      "reason": "STUDY_A_AND_NAVIGATION_RC_EVIDENCE_MISSING"
+    },
+    {
+      "id": "study-b",
+      "requiredForBlueprint": true,
+      "requiredForPublicRelease": true,
+      "gate": "BLOCK",
+      "evidence": ["required:ten-to-fifteen-counterbalanced-dyads"],
+      "reason": "STUDY_B_COMPARATIVE_VALIDATION_MISSING"
+    },
+    {
+      "id": "provider-legal",
+      "requiredForBlueprint": true,
+      "requiredForPublicRelease": true,
+      "gate": "BLOCK",
+      "evidence": [
+        "required:provider-rights-quota-receipt",
+        "required:korean-privacy-location-review-receipt"
+      ],
+      "reason": "PROVIDER_RIGHTS_AND_KOREAN_LEGAL_AUTHORITY_EVIDENCE_MISSING"
+    },
+    {
+      "id": "public-operations",
+      "requiredForBlueprint": false,
+      "requiredForPublicRelease": true,
+      "gate": "BLOCK",
+      "evidence": [
+        "required:cloudflare-production-receipts",
+        "required:physical-iphone-receipt",
+        "required:native-distribution-receipt"
+      ],
+      "reason": "PRODUCTION_DEVICE_AND_DISTRIBUTION_AUTHORITY_EVIDENCE_MISSING"
+    }
+  ]
+}

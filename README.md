@@ -27,6 +27,11 @@ Study A 기반 RC 정책, 동일 빌드의 iPhone 15 Pro Max 실기기 4회,
 네이티브 배포가 필요하면 macOS/Xcode/서명 증거가 모두 있어야 합니다.
 없는 증거는 `PASS`로 추정하지 않고 `BLOCK`으로 기록합니다.
 
+이 설명의 저장소 `PASS` 범위는 V2 모바일 웹·Cloudflare 서비스
+슬라이스입니다. 승인된 청사진 전체는 네이티브 iOS 현장 경험과 고충실도
+실물 컴퍼스 목업, Study A/B까지 요구하므로 아직 `BLOCK`입니다. 세 범위를
+분리한 판정은 [프로젝트 상태](docs/project-status.md)에서 확인할 수 있습니다.
+
 ## 제품 경계
 
 - 목적지는 한 번에 하나만 선택하며 이름·주소·사진·리뷰·평점은 기본적으로
@@ -41,7 +46,8 @@ Study A 기반 RC 정책, 동일 빌드의 iPhone 15 Pro Max 실기기 4회,
 정본 우선순위와 역사 문서는 [문서 권위 인덱스](docs/README.md),
 기계 판독 기준은 [V2 권위 맵](docs/authority-map-v2.json)을 따릅니다.
 제품 청사진은 [BLUEPRINT.md](BLUEPRINT.md), 운영 방법은
-[V2 릴리스 런북](docs/operations/v2-release.md)에 있습니다.
+[V2 릴리스 런북](docs/operations/v2-release.md), 전체 제품 완료 순서는
+[청사진 완료 런북](docs/operations/blueprint-completion.md)에 있습니다.
 
 ## 저장소
 
@@ -70,6 +76,10 @@ bun run verify:release
 실패 폐쇄 동작을 더하는 상위 명령입니다. 일상 검증에는 `verify:v2`, 최종
 검증에는 `verify:release` 하나만 실행하면 됩니다. 배포는 자동으로 수행하지
 않습니다.
+
+`bun run verify:blueprint-status`는 서비스 저장소, 승인된 청사진 전체,
+공개 출시를 서로 다른 게이트로 계산합니다. 현재 정상 출력은 각각
+`PASS`, `BLOCK`, `BLOCK`입니다.
 
 로컬 백엔드와 현장 QA 절차는
 [V2 파일럿 백엔드](docs/operations/v2-pilot-backend.md)와
