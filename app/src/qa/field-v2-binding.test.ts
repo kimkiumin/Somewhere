@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cp, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import {
@@ -50,7 +50,7 @@ describe("Somewhere V2 RC-to-build binding", () => {
           schemaVersion: 1,
           gate: "BLOCK",
           reason: "RC_ABSENT",
-          finalSha: git("rev-parse", "HEAD"),
+          finalSha: sourceIdentity().sha,
           policySha256: `sha256:${sha256(await readFile(policyPath))}`,
         },
         null,
@@ -62,8 +62,8 @@ describe("Somewhere V2 RC-to-build binding", () => {
       `${JSON.stringify(
         {
           schemaVersion: 1,
-          sourceSha: git("rev-parse", "HEAD"),
-          sourceTree: git("rev-parse", "HEAD^{tree}"),
+          sourceSha: sourceIdentity().sha,
+          sourceTree: sourceIdentity().tree,
           buildDigest: `sha256:${"4".repeat(64)}`,
           builtAt: "2026-07-29T10:00:00.000Z",
           command: "bun run build:production",
@@ -176,8 +176,21 @@ async function boundSyntheticFixture(label: string) {
   const policyPath = join(root, "navigation-v2-rc-1.json");
   await writeFile(policyPath, policyBytes);
 
-  const sourceSha = git("rev-parse", "HEAD");
-  const sourceTree = git("rev-parse", "HEAD^{tree}");
+  const fixtureRepo = join(root, "repository");
+  await mkdir(join(fixtureRepo, "app/qa/field/v2"), { recursive: true });
+  await mkdir(join(fixtureRepo, "contracts/policy"), { recursive: true });
+  await cp(
+    resolve(repo, "app/qa/field/v2/authority-pins.json"),
+    join(fixtureRepo, "app/qa/field/v2/authority-pins.json"),
+  );
+  await writeFile(join(fixtureRepo, "contracts/policy/navigation-v2-rc-1.json"), policyBytes);
+  runGit(fixtureRepo, "init", "--quiet");
+  runGit(fixtureRepo, "config", "user.name", "Somewhere Test");
+  runGit(fixtureRepo, "config", "user.email", "somewhere-test@invalid.example");
+  runGit(fixtureRepo, "add", ".");
+  runGit(fixtureRepo, "commit", "--quiet", "-m", "fixture");
+  const sourceSha = runGit(fixtureRepo, "rev-parse", "HEAD");
+  const sourceTree = runGit(fixtureRepo, "rev-parse", "HEAD^{tree}");
   const promotion = {
     schemaVersion: 1,
     promotionGate: "PASS",
@@ -227,7 +240,7 @@ async function boundSyntheticFixture(label: string) {
     output,
     argumentsList: [
       "--repo",
-      repo,
+      fixtureRepo,
       "--policy",
       policyPath,
       "--promotion-receipt",
@@ -242,8 +255,20 @@ async function boundSyntheticFixture(label: string) {
   };
 }
 
-function git(...argumentsList: string[]): string {
-  const result = spawnSync("git", ["-C", repo, ...argumentsList], { encoding: "utf8" });
+function runGit(directory: string, ...argumentsList: string[]): string {
+  const result = spawnSync("git", ["-C", directory, ...argumentsList], { encoding: "utf8" });
   if (result.status !== 0) throw new Error(result.stderr);
   return result.stdout.trim();
+}
+
+function sourceIdentity(): Readonly<{ sha: string; tree: string }> {
+  const sha = process.env.SOMEWHERE_SOURCE_SHA;
+  const tree = process.env.SOMEWHERE_SOURCE_TREE;
+  if (/^[a-f0-9]{40}$/.test(sha ?? "") && /^[a-f0-9]{40}$/.test(tree ?? "")) {
+    return { sha: sha as string, tree: tree as string };
+  }
+  return {
+    sha: runGit(repo, "rev-parse", "HEAD"),
+    tree: runGit(repo, "rev-parse", "HEAD^{tree}"),
+  };
 }

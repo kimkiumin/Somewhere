@@ -81,7 +81,11 @@ async function preparation(options) {
       policySha256: policyDigest,
     });
     await command(["bun", "install", "--frozen-lockfile"], source);
-    await command(["bun", "run", "verify:release"], source);
+    await command(["bun", "run", "verify:release"], source, {
+      ...process.env,
+      SOMEWHERE_SOURCE_SHA: sha,
+      SOMEWHERE_SOURCE_TREE: tree,
+    });
     const buildOutput = resolve(temporary, "build");
     const upstreamReceipt = resolve(temporary, "production-build.json");
     await command([
