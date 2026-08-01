@@ -81,7 +81,7 @@ async function bindInputs(inputPaths, options, snapshotRoot) {
         continue;
       }
       if (value?.reviewBindings === undefined) continue;
-      if (!Array.isArray(value.reviewBindings) || value.reviewBindings.length > 128) {
+      if (!Array.isArray(value.reviewBindings) || value.reviewBindings.length > maximumReviewInputs) {
         throw new TypeError("review bindings must be a bounded array");
       }
       for (const binding of value.reviewBindings) {

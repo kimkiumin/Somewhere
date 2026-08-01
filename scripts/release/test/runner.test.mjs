@@ -330,7 +330,7 @@ while test "$#" -gt 0; do
 done
 test -n "$response"
 printf '%s\\n' '{"gate":"MUTATED"}' > ${JSON.stringify(resolve(root, "input.json"))}
-snapshot="$(printf '%s\\n' "$prompt" | sed -n 's/.* snapshot=\\([^ ]*\\) sha256:.*/\\1/p' | head -n 1)"
+snapshot="$(printf '%s\\n' "$prompt" | sed -n 's/.* snapshot=\\([^ ]*\\) sha256:.*/\\1/p' | sed -n '1p')"
 test -n "$snapshot"
 cat "$snapshot" > ${JSON.stringify(snapshotCapture)}
 related="$(printf '%s\\n' "$prompt" | sed -n 's/.* snapshot=\\([^ ]*\\) sha256:.*/\\1/p' | sed -n '2p')"
@@ -360,14 +360,17 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
       });
       const input = resolve(root, "input.json");
       const related = resolve(reviewRoot, "related-receipt.json");
-      const leaf = resolve(reviewRoot, "raw-evidence.txt");
-      await writeFile(leaf, "recursively bound raw evidence\n");
-      const leafDigest = new Bun.CryptoHasher("sha256")
-        .update(await readFile(leaf))
-        .digest("hex");
+      const leaves = await Promise.all(Array.from({ length: 129 }, async (_, index) => {
+        const leaf = resolve(reviewRoot, `raw-evidence-${String(index).padStart(3, "0")}.txt`);
+        await writeFile(leaf, `recursively bound raw evidence ${index}\n`);
+        const digest = new Bun.CryptoHasher("sha256")
+          .update(await readFile(leaf))
+          .digest("hex");
+        return { path: leaf, sha256: `sha256:${digest}` };
+      }));
       await writeJson(related, {
         gate: "PASS",
-        reviewBindings: [{ path: leaf, sha256: `sha256:${leafDigest}` }],
+        reviewBindings: leaves,
       });
       const relatedDigest = new Bun.CryptoHasher("sha256")
         .update(await readFile(related))
@@ -401,12 +404,14 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
         "--output",
         output,
       ]);
+      expect(result.stderr.toString()).toBe("");
       expect(result.exitCode).toBe(0);
       expect(await readFile(homeCapture, "utf8")).toBe(dirname(codexHome));
       expect(await readFile(snapshotCapture, "utf8")).toContain('"reviewBindings"');
       expect(await readFile(relatedCapture, "utf8")).toContain('"reviewBindings"');
-      expect(await readFile(leafCapture, "utf8")).toBe("recursively bound raw evidence\n");
-      expect(await readJson(output)).toMatchObject({
+      expect(await readFile(leafCapture, "utf8")).toBe("recursively bound raw evidence 128\n");
+      const review = await readJson(output);
+      expect(review).toMatchObject({
         verdict: "APPROVE",
         reviewedSha: fixture.sha,
         sourceTree: fixture.tree,
@@ -416,12 +421,11 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
           model: "fixture-model",
           sandbox: "read-only",
         },
-        inputs: [
-          { path: input },
-          { path: related, sha256: `sha256:${relatedDigest}` },
-          { path: leaf, sha256: `sha256:${leafDigest}` },
-        ],
       });
+      expect(review.inputs).toHaveLength(131);
+      expect(review.inputs).toContainEqual({ path: input, sha256: expect.any(String) });
+      expect(review.inputs).toContainEqual({ path: related, sha256: `sha256:${relatedDigest}` });
+      expect(review.inputs).toContainEqual(leaves[128]);
     } finally {
       await removeTemporaryDirectory(root);
     }
