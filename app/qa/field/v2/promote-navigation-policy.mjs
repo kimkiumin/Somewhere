@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { validateStudyADirectory } from "../../../../research/study-a/validate-study-a.mjs";
 import { verifyEd25519Attestation } from "./attestation.mjs";
 import { canonicalJson } from "./canonical-json.mjs";
 import { candidateEnvelopeIssues } from "./navigation-policy-envelope.mjs";
@@ -169,6 +170,33 @@ async function promote(options) {
     return;
   }
   for (const session of study.sessions) verifySupervisor(session, authority.registry);
+  let expandedStudy;
+  try {
+    expandedStudy = await validateStudyADirectory({
+      input,
+      trustedSupervisors: authority.registry,
+    });
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      await writeJsonAtomic(receipt, blockedReceipt("EXPANDED_STUDY_A_EVIDENCE_MISSING"));
+      process.exitCode = 2;
+      return;
+    }
+    throw error;
+  }
+  if (
+    expandedStudy.navigationGate !== "PASS" ||
+    expandedStudy.rcPromotionEligible !== true ||
+    expandedStudy.sessionCount !== study.sessions.length
+  ) {
+    throw new TypeError("EXPANDED_STUDY_A_NOT_PROMOTABLE");
+  }
+  if (
+    expandedStudy.bindings.navigationPolicySha256 !== candidateSha256 ||
+    expandedStudy.bindings.calibrationEvidenceSha256 !== evidenceSha256
+  ) {
+    throw new TypeError("EXPANDED_STUDY_A_BINDING_MISMATCH");
+  }
   const policy = promotedPolicy(candidate, parentSha256, evidenceSha256);
   navigationPolicySchema.parse(policy);
   const output = path.resolve(outputPolicy);
@@ -184,6 +212,14 @@ async function promote(options) {
     parentPolicySha256: parentSha256,
     candidatePolicySha256: candidateSha256,
     calibrationEvidenceSha256: evidenceSha256,
+    expandedStudyAAggregateSha256: expandedStudy.aggregateSha256,
+    nativeBuildReceiptSha256: expandedStudy.bindings.nativeBuildReceiptSha256,
+    pwaBuildReceiptSha256: expandedStudy.bindings.pwaBuildReceiptSha256,
+    routeContractSha256: expandedStudy.bindings.routeContractSha256,
+    providerConfigSha256: expandedStudy.bindings.providerConfigSha256,
+    sessionSchemaSha256: expandedStudy.bindings.sessionSchemaSha256,
+    aggregateSchemaSha256: expandedStudy.bindings.aggregateSchemaSha256,
+    physicalGate: expandedStudy.physicalGate,
     sessionCount: study.sessions.length,
     unsafeEventCount: 0,
     supervisorRegistrySha256: authority.registrySha256,

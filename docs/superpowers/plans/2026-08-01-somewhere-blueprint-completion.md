@@ -346,23 +346,28 @@ research/study-b/                              comparison protocol and analysis 
 - Consumes: 5–8 supervised sessions, exact native/PWA build, route/provider/policy digests, and physical mockup version.
 - Produces: a de-identified Study A verdict, navigation RC promotion eligibility, and physical handling findings.
 
-- [ ] **Step 1: Test evidence separation**
+- [x] **Step 1: Test evidence separation**
 
   Require dyad shared-selection sessions and individual handling sessions to be labeled separately. Reject raw coordinates, names, contact details, free-text venue identity, missing consent version, missing supervisor signature, pre-build evidence, or a visual-only animation claiming embodied pointing success.
 
-- [ ] **Step 2: Freeze measures and stop rules**
+- [x] **Step 2: Freeze measures and stop rules**
 
   Record comprehension, selection time, comparison reopening, movement start, route/sensor failure, Stop/reveal trust, false/missed arrival, display readability, one-hand use, accidental Stop, carry comfort, and state distinction. Stop a session for safety concern, consent withdrawal, unreliable route, or data-boundary breach.
 
-- [ ] **Step 3: Bind RC promotion to the expanded aggregate**
+- [x] **Step 3: Bind RC promotion to the expanded aggregate**
 
   RC promotion requires 5–8 valid sessions, no open critical safety issue, explicit accepted thresholds, exact build/route/provider/schema digests, and an approved Study A supervisor signature. Physical findings may remain `BLOCK` without falsifying navigation calibration.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify the implementation and commit**
 
   Run synthetic negative fixtures: `bun test research/study-a/validate-study-a.test.mjs`
 
   Run real private evidence: `bun research/study-a/validate-study-a.mjs --input /private/study-a --trusted-supervisors /private/authority/study-a-signers.json --output /private/study-a-verdict.json`
+
+  The validator, synthetic negative suite, RC binding, and independent GLM 5.2
+  review pass. Real participant evidence remains truthfully `BLOCK` until the
+  separately approved supervisor, consented sessions, exact builds, and private
+  authority registry exist.
 
   Commit: `Bind Study A to native and physical acceptance`
 

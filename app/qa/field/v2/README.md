@@ -18,9 +18,13 @@ uncommitted local replacement cannot establish release authority.
 
 ## Order of evidence
 
-1. Run five to eight supervised Study A calibration sessions.
-2. Put the sessions in a private `study-a-evidence.json` matching
-   `calibration-session.schema.json`. Every session must use the same
+1. Freeze and follow [`research/study-a/protocol-v1.md`](../../../../research/study-a/protocol-v1.md),
+   then run five to eight supervised Study A calibration sessions. The package
+   must include both dyad shared-selection and individual handling sessions,
+   and must bind the exact native/PWA builds, route, provider, policy, schemas,
+   and physical mockup.
+2. Put the navigation calibration records in private `study-a-evidence.json`
+   matching `calibration-session.schema.json`. Every record must use the same
    in-envelope candidate, the calibration parent, a unique trace and
    attestation, and zero unsafe events. Supervisor attestations must verify
    against a separately controlled Study A signer registry.
@@ -28,15 +32,23 @@ uncommitted local replacement cannot establish release authority.
    one coupled family, stay inside the versioned numeric envelope, cover both
    browser modes and both environments, and record all mandatory zero-safety
    counters plus reviewed misses/recoveries.
-3. Run `promote-navigation-policy.mjs`. It is the only tool allowed to create
-   `contracts/policy/navigation-v2-rc-1.json`.
-4. Commit the promoted policy, then finalize the external promotion receipt
+3. Put the separately signed expanded aggregate in `aggregate.json` and the
+   signed de-identified sessions in `sessions/*.json`. Validate them with
+   `research/study-a/validate-study-a.mjs`. Raw coordinates, participant names
+   or contacts, and free-text venue identity are forbidden.
+4. Run `promote-navigation-policy.mjs`. It is the only tool allowed to create
+   `contracts/policy/navigation-v2-rc-1.json`. It independently validates the
+   expanded package and binds its signed aggregate; a hand-edited verdict file
+   cannot authorize promotion. Physical handling may remain `BLOCK` while a
+   valid navigation result promotes, but visual-only evidence cannot claim an
+   embodied pass.
+5. Commit the promoted policy, then finalize the external promotion receipt
    with that policy-introduction commit SHA.
-5. Build and deploy a new RC after promotion. Calibration runs are not release
+6. Build and deploy a new RC after promotion. Calibration runs are not release
    runs.
-6. Execute Safari and Home Screen runs in open-sky and building-dense
+7. Execute Safari and Home Screen runs in open-sky and building-dense
    environments, each for at least 20 minutes.
-7. Validate the four private packages and bind them to the exact RC build.
+8. Validate the four private packages and bind them to the exact RC build.
 
 Do not create the RC policy when Study A evidence is absent. Do not publish raw
 traces: they contain exact location. Keep only `trace.sha256` plus the declared
@@ -94,8 +106,18 @@ bun app/qa/field/v2/validate-evidence.mjs \
 The same synthetic package in release mode exits `2` and reports `BLOCK`.
 Malformed or contradictory evidence exits `1` and reports `FAIL`.
 
-Promotion without Study A evidence exits `2`, writes a blocked receipt, and
-does not create an RC policy:
+Validate the expanded private package first:
+
+```bash
+bun research/study-a/validate-study-a.mjs \
+  --input /private/study-a \
+  --trusted-supervisors /private/authority/study-a-signers.json \
+  --output /private/evidence/study-a-verdict.json
+```
+
+Promotion without either the navigation calibration records or the expanded
+Study A package exits `2`, writes a blocked receipt, and does not create an RC
+policy:
 
 ```bash
 bun app/qa/field/v2/promote-navigation-policy.mjs \
