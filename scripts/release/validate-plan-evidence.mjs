@@ -163,7 +163,7 @@ async function validate(options) {
     policySha256: normalizeDigest(options["policy-sha256"]),
     todoCount: criteria.todos.length,
     dependencyOrderVerified: gate === "PASS",
-    rawReviewBindingCount: expandedBindings.length,
+    rawReviewBindingCount: reviewBindings.length,
     todos,
     reviewBindings,
     missing,
