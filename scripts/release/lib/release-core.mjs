@@ -166,8 +166,9 @@ export async function run(argv, options = {}) {
   const child = spawn(argv[0], argv.slice(1), {
     cwd: options.cwd,
     env: options.env,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: [options.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
   });
+  if (options.input !== undefined) child.stdin.end(options.input);
   const stdout = [];
   const stderr = [];
   child.stdout.on("data", (chunk) => stdout.push(chunk));

@@ -142,6 +142,16 @@ describe("Todo 22 release registry", () => {
     ]));
   });
 
+  test("proves the reviewed Todo 21 commit is patch-equivalent to its landed commit", async () => {
+    const criteria = await readJson(resolve(repo, "scripts/release/plan-criteria-v1.json"));
+    const todo21 = criteria.todos.find((entry) => entry.id === 21);
+
+    expect(todo21.evidenceIdentity).toEqual({
+      commitField: "headSha",
+      mode: "PATCH_EQUIVALENT",
+    });
+  });
+
   test("routes dependency audit through an exact-source receipt", async () => {
     // Given: the canonical F2 command registry.
     const commands = await readJson(resolve(repo, "scripts/release/final-lane-commands-v1.json"));
