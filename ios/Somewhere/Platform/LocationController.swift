@@ -3,7 +3,7 @@ import CoreLocation
 import Foundation
 
 @MainActor
-final class LocationController: NSObject, ObservableObject, CLLocationManagerDelegate {
+final class LocationController: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
     @Published private(set) var location: LocationSample?
     @Published private(set) var heading: HeadingSample?
     @Published private(set) var authorizationDenied = false

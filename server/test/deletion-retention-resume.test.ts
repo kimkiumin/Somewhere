@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DeletionRepository } from "../src/deletion/repository";
 import { runDeletionSaga } from "../src/deletion/saga";
@@ -13,6 +15,18 @@ describe("Todo13 feedback deletion retention", () => {
 
   afterEach(() => {
     cleanupTemporaryPaths(temporaryPaths);
+  });
+
+  it("keeps SQL numeric literals compatible with the hosted SQLite parser", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/deletion/cleanup-repository.ts"),
+      "utf8",
+    );
+    const bucketExpression = source.match(
+      /CAST\(audit\.occurred_at \/ [^ ]+ AS INTEGER\) \* [^,\n]+/u,
+    )?.[0];
+
+    expect(bucketExpression).toBe("CAST(audit.occurred_at / 3600000 AS INTEGER) * 3600000");
   });
 
   it("anchors a resumed tombstone's retention at its successful write time", async () => {

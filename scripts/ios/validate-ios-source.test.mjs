@@ -159,6 +159,15 @@ describe("native iOS source gate", () => {
     expect(guidanceSource).not.toContain("best!");
   });
 
+  test("defers Core Location delegate isolation through its legacy callback boundary", async () => {
+    const locationSource = await readFile(
+      resolve(repositoryRoot, "ios/Somewhere/Platform/LocationController.swift"),
+      "utf8",
+    );
+
+    expect(locationSource).toContain("@preconcurrency CLLocationManagerDelegate");
+  });
+
   test("binds Swift purpose-scoped capability patterns to the TypeScript authority", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "somewhere-ios-capability-"));
     const source = resolve(repositoryRoot, "ios/Somewhere/Networking/APIClient.swift");

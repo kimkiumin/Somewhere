@@ -189,7 +189,7 @@ export class DeletionCleanupRepository {
             write_epoch, replay_status, expires_at, replay_expires_at
           )
           SELECT intent.journey_hmac_digest, intent.delete_request_digest, 'deleted',
-            CAST(audit.occurred_at / 3_600_000 AS INTEGER) * 3_600_000, ?, 204,
+            CAST(audit.occurred_at / 3600000 AS INTEGER) * 3600000, ?, 204,
             audit.occurred_at + 48 * 60 * 60 * 1_000,
             audit.occurred_at + 24 * 60 * 60 * 1_000
           FROM pending_delete_intents AS intent
