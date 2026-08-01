@@ -13,6 +13,7 @@ export type ManualPreparedCollection = Record<string, unknown> & {
   observations: Record<string, unknown> & {
     accessibility: Record<string, Record<string, unknown>>;
   };
+  reviewBindings: Array<{ path: string; sha256: string }>;
 };
 
 export function collectManualPreparedEvidence(
