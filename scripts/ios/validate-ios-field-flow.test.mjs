@@ -126,6 +126,8 @@ describe("native iOS field journey gate", () => {
     const ui = await Promise.all(
       IOS_FIELD_REQUIREMENTS.uiFiles.map((path) => readFile(resolve(repositoryRoot, path), "utf8")),
     );
+    expect(plist).toContain("<key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>")
+    expect(plist).toContain("<key>CFBundlePackageType</key><string>APPL</string>")
     expect(plist).toContain("NSLocationWhenInUseUsageDescription")
     expect(plist).not.toContain("NSLocationAlways")
     expect(ui.join("\n")).toContain(".frame(minHeight: 44)")

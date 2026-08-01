@@ -78,6 +78,15 @@ export async function validateIOSFieldFlow(repositoryRoot) {
   const project = await readFile(resolve(root, "ios/project.yml"), "utf8");
   assert(project.includes("SomewhereUITests:"), "XcodeGen UI test target is missing");
   assert(project.includes("INFOPLIST_FILE: Somewhere/Resources/Info.plist"), "checked-in Info.plist is not configured");
+  const infoPlist = source.get("ios/Somewhere/Resources/Info.plist");
+  assert(
+    infoPlist.includes("<key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>"),
+    "checked-in Info.plist must declare the built app executable",
+  );
+  assert(
+    infoPlist.includes("<key>CFBundlePackageType</key><string>APPL</string>"),
+    "checked-in Info.plist must declare an application bundle",
+  );
 
   const unitTests = source.get("ios/SomewhereTests/JourneyStoreTests.swift");
   const uiTests = source.get("ios/SomewhereUITests/JourneyFlowUITests.swift");
