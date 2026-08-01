@@ -6,10 +6,10 @@ import {
   normalizeDigest,
   parseArguments,
   readJson,
-  run,
   snapshotRegularFile,
   writeJson,
 } from "./lib/release-core.mjs";
+import { verifyPatchEquivalentEvidenceIdentity } from "./lib/evidence-commit-identity.mjs";
 import { collectPlanReviewBindings } from "./lib/plan-review-bindings.mjs";
 
 const specification = {
@@ -34,30 +34,6 @@ async function snapshotIfPresent(path) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
     throw error;
   }
-}
-
-async function stablePatchId(repo, commit) {
-  const patch = await run([
-    "git",
-    "-C",
-    repo,
-    "show",
-    "--format=",
-    "--no-ext-diff",
-    "--binary",
-    commit,
-  ], { cwd: repo, env: process.env });
-  if (patch.exitCode !== 0) throw new TypeError("evidence identity commit is not readable");
-  const result = await run(["git", "patch-id", "--stable"], {
-    cwd: repo,
-    env: process.env,
-    input: patch.stdout,
-  });
-  const match = /^([a-f0-9]{40})\s/u.exec(result.stdout.toString());
-  if (result.exitCode !== 0 || match === null) {
-    throw new TypeError("evidence identity patch could not be calculated");
-  }
-  return match[1];
 }
 
 async function validate(options) {
@@ -157,11 +133,13 @@ async function validate(options) {
       continue;
     }
     let evidence;
+    let evidenceSnapshot;
     for (const relativePath of todo.evidenceAny) {
       for (const root of [evidenceRoot, repo]) {
         const path = resolve(root, relativePath);
         const snapshot = await snapshotIfPresent(path);
         if (snapshot !== undefined) {
+          evidenceSnapshot = snapshot;
           evidence = {
             path,
             sha256: snapshot.sha256,
@@ -178,37 +156,21 @@ async function validate(options) {
     }
     let evidenceIdentity;
     if (todo.evidenceIdentity !== undefined) {
-      let evidenceDocument;
       try {
-        evidenceDocument = JSON.parse((await snapshotRegularFile(evidence.path, "plan evidence identity")).data.toString());
+        evidenceIdentity = await verifyPatchEquivalentEvidenceIdentity({
+          repo,
+          evidenceSnapshot,
+          commitField: todo.evidenceIdentity.commitField,
+          landedCommitSha: landed.sha,
+        });
       } catch (error) {
-        if (!(error instanceof SyntaxError)) throw error;
-        missing.push({ id: todo.id, reason: "EVIDENCE_IDENTITY_INVALID_JSON" });
+        missing.push({
+          id: todo.id,
+          reason: "EVIDENCE_IDENTITY_INVALID",
+          detail: error instanceof Error ? error.message : String(error),
+        });
         continue;
       }
-      const reviewedCommitSha = evidenceDocument[todo.evidenceIdentity.commitField];
-      if (typeof reviewedCommitSha !== "string" || !/^[a-f0-9]{40}$/u.test(reviewedCommitSha)) {
-        missing.push({ id: todo.id, reason: "EVIDENCE_IDENTITY_COMMIT_INVALID" });
-        continue;
-      }
-      const [reviewedTree, landedTree, reviewedPatchId, landedPatchId] = await Promise.all([
-        git(repo, ["rev-parse", `${reviewedCommitSha}^{tree}`]),
-        git(repo, ["rev-parse", `${landed.sha}^{tree}`]),
-        stablePatchId(repo, reviewedCommitSha),
-        stablePatchId(repo, landed.sha),
-      ]);
-      if (reviewedPatchId !== landedPatchId) {
-        missing.push({ id: todo.id, reason: "EVIDENCE_IDENTITY_PATCH_MISMATCH" });
-        continue;
-      }
-      evidenceIdentity = {
-        mode: todo.evidenceIdentity.mode,
-        reviewedCommitSha,
-        reviewedTree,
-        landedCommitSha: landed.sha,
-        landedTree,
-        stablePatchId: reviewedPatchId,
-      };
     }
     todos.push({
       id: todo.id,

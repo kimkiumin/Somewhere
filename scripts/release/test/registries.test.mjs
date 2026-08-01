@@ -142,7 +142,7 @@ describe("Todo 22 release registry", () => {
     ]));
   });
 
-  test("proves the reviewed Todo 21 commit is patch-equivalent to its landed commit", async () => {
+  test("requires Todo 21 evidence identity verification", async () => {
     const criteria = await readJson(resolve(repo, "scripts/release/plan-criteria-v1.json"));
     const todo21 = criteria.todos.find((entry) => entry.id === 21);
 
