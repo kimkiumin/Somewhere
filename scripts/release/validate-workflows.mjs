@@ -92,6 +92,7 @@ function assertCi(workflow) {
     throw new TypeError("CI_GATE_MISSING:playwright install --with-deps chromium webkit");
   }
   for (const required of [
+    "apt-get install -y ripgrep",
     "verify:v2",
     "validate-evidence.mjs",
     "--mode schema",

@@ -177,6 +177,15 @@ describe("native iOS source gate", () => {
     expect(notificationSource).toContain("@preconcurrency import UserNotifications");
   });
 
+  test("runs XCUITest interactions on the main actor under Swift 6", async () => {
+    const uiTestSource = await readFile(
+      resolve(repositoryRoot, "ios/SomewhereUITests/JourneyFlowUITests.swift"),
+      "utf8",
+    );
+
+    expect(uiTestSource).toContain("@MainActor\nfinal class JourneyFlowUITests");
+  });
+
   test("binds Swift purpose-scoped capability patterns to the TypeScript authority", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "somewhere-ios-capability-"));
     const source = resolve(repositoryRoot, "ios/Somewhere/Networking/APIClient.swift");

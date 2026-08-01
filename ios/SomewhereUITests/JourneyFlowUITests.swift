@@ -1,5 +1,6 @@
 import XCTest
 
+@MainActor
 final class JourneyFlowUITests: XCTestCase {
     func testStartSurfaceHidesDestinationIdentity() {
         let app = XCUIApplication(); app.launch()

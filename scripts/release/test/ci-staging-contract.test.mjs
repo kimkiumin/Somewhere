@@ -99,6 +99,38 @@ describe("Todo 20 CI and staging gates", () => {
     }
   });
 
+  test("rejects a V2 CI workflow without the runtime search tool", async () => {
+    const root = await temporaryDirectory("ci-runtime-tools");
+    try {
+      const original = await readFile(resolve(repo, ".github/workflows/v2-ci.yml"), "utf8");
+      const installStep = [
+        "      - name: Install runtime tools",
+        "        run: sudo apt-get update && sudo apt-get install -y ripgrep",
+        "",
+      ].join("\n");
+      const workflows = resolve(root, ".github/workflows");
+      await mkdir(workflows, { recursive: true });
+      const ci = resolve(workflows, "v2-ci.yml");
+      await writeFile(ci, original.replace(installStep, ""));
+      await writeFile(
+        resolve(workflows, "app.yml"),
+        await readFile(resolve(repo, ".github/workflows/app.yml"), "utf8"),
+      );
+      const result = run(repo, [
+        "bun", "scripts/release/validate-workflows.mjs",
+        "--ci", ci,
+        "--staging", ".github/workflows/v2-staging.yml",
+        "--wrangler", "server/wrangler.jsonc",
+        "--output", resolve(root, "workflow.json"),
+      ]);
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr.toString()).toContain("CI_GATE_MISSING:apt-get install -y ripgrep");
+    } finally {
+      await removeTemporaryDirectory(root);
+    }
+  });
+
   test("rejects staging workflows with any repository-seal binding removed", async () => {
     const root = await temporaryDirectory("staging-seal-mutations");
     try {

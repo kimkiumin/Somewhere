@@ -29,6 +29,9 @@ jobs:
       - name: Install frozen dependencies
         run: bun install --frozen-lockfile
 
+      - name: Install runtime tools
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       - name: Install Playwright browsers
         working-directory: app
         run: bunx --no-install playwright install --with-deps chromium webkit
