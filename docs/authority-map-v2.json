@@ -19,7 +19,9 @@
     "projectStatus": "docs/project-status.md",
     "blueprintCompletionRunbook": "docs/operations/blueprint-completion.md",
     "blueprintCompletionRegistry": "scripts/completion/blueprint-completion-v1.json",
-    "publicReleaseAuthorityRunbook": "docs/operations/public-release-authority.md"
+    "publicReleaseAuthorityRunbook": "docs/operations/public-release-authority.md",
+    "nativeIOSSource": "ios/README.md",
+    "nativeIOSSourceValidator": "scripts/ios/validate-ios-source.mjs"
   },
   "product": {
     "mobileOnly": true,

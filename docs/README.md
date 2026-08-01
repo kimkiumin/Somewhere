@@ -35,6 +35,10 @@ The sealed repository result is not the whole approved product result. Use the
 mobile-web/Cloudflare service slice, blueprint completion, and public release as
 three separate claims.
 
+The native iOS source boundary and Linux contract-parity gate are documented in
+[`ios/README.md`](../ios/README.md). This source gate does not replace required
+macOS build, signing, or physical-device evidence.
+
 V2 has no active Reroll control. Its recovery model is immediate Stop pause,
 explicit stop confirmation, and a guarded new recommendation only after the
 journey has ended. Reroll requirements in older files apply only to their

@@ -13,10 +13,12 @@ enough to be confused:
 
 The first row is strong evidence, but it cannot imply either later row. The
 approved [blueprint](../BLUEPRINT.md) calls the native iOS field experience and
-physical compass mockup required final outcomes. The current repository contains
-neither a Swift/Xcode client nor a physical design package, and Ubuntu cannot
-prove macOS signing, iPhone behavior, fabrication, ergonomics, participant
-results, counsel approval, provider rights, or production control-plane state.
+physical compass mockup required final outcomes. The repository now contains an
+iOS 17 Swift contract and guidance foundation whose TypeScript contract parity is
+checked on Linux. It still has no independently proven Xcode build or complete
+SwiftUI field flow, and contains no physical design package. Ubuntu cannot prove
+macOS signing, iPhone behavior, fabrication, ergonomics, participant results,
+counsel approval, provider rights, or production control-plane state.
 
 ## Machine-readable result
 
@@ -45,7 +47,7 @@ editing it is not authority to create that evidence.
 | Track | Gate | Current evidence boundary |
 |---|---|---|
 | Service web/backend | PASS | Sealed d9605bc final verdict and manifest outside Git |
-| Native iOS | BLOCK | No Swift/Xcode source, macOS build receipt, signing, or native field evidence |
+| Native iOS | BLOCK | Contract/guidance source foundation exists; macOS build, complete field UI, signing, and native field evidence remain absent |
 | Physical product | BLOCK | No full-scale high-fidelity model or embodied handling/readability evidence |
 | Study A | BLOCK | No 5–8 supervised sessions or promoted navigation RC |
 | Study B | BLOCK | No 10–15 counterbalanced dyads or frozen-result analysis |

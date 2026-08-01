@@ -18,8 +18,12 @@
       "requiredForBlueprint": true,
       "requiredForPublicRelease": true,
       "gate": "BLOCK",
-      "evidence": ["required:macos-xcode-native-field-receipt"],
-      "reason": "NATIVE_IOS_SOURCE_BUILD_AND_FIELD_EVIDENCE_MISSING"
+      "evidence": [
+        "tracked:ios/README.md",
+        "tracked:scripts/ios/validate-ios-source.mjs",
+        "required:macos-xcode-native-field-receipt"
+      ],
+      "reason": "NATIVE_IOS_FIELD_FLOW_BUILD_AND_FIELD_EVIDENCE_MISSING"
     },
     {
       "id": "physical-product",

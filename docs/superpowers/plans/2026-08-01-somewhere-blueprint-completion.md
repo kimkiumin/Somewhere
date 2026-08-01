@@ -45,7 +45,7 @@ research/study-a/                              versioned protocol and de-identif
 research/study-b/                              comparison protocol and analysis contract
 ```
 
-### Task 1: Separate service-slice readiness from blueprint completion
+### Task 1: Separate service-slice readiness from blueprint completion ✅
 
 **Files:**
 - Create: `docs/project-status.md`
@@ -63,31 +63,31 @@ research/study-b/                              comparison protocol and analysis 
 - Consumes: the approved six roadmap phases and the existing `repositoryReady`/`releaseReady` vocabulary.
 - Produces: `bun run verify:blueprint-status` and a three-valued `serviceSlice`, `blueprintProject`, and `publicRelease` result.
 
-- [ ] **Step 1: Write failing validator tests**
+- [x] **Step 1: Write failing validator tests**
 
   Cover exact track IDs `service-web-backend`, `native-ios`, `physical-product`, `study-a`, `study-b`, `provider-legal`, and `public-operations`. Assert that a fixture with only the service track `PASS` derives `blueprintProject: BLOCK`, that any `FAIL` dominates, duplicate/unknown tracks reject, and `blueprintProject: PASS` requires every required blueprint track to pass.
 
-- [ ] **Step 2: Run the red test**
+- [x] **Step 2: Run the red test**
 
   Run: `bun test scripts/completion/validate-blueprint-completion.test.mjs`
 
   Expected: nonzero because the validator and registry do not exist.
 
-- [ ] **Step 3: Implement the strict schema, registry, and validator**
+- [x] **Step 3: Implement the strict schema, registry, and validator**
 
   Registry entries have exact keys `id`, `requiredForBlueprint`, `requiredForPublicRelease`, `gate`, `evidence`, and `reason`. Evidence is a nonempty array of tracked paths or external receipt classes; missing external evidence remains `BLOCK`. The derived gate algebra is `FAIL` first, then `BLOCK`, otherwise `PASS`.
 
-- [ ] **Step 4: Publish the truthful status**
+- [x] **Step 4: Publish the truthful status**
 
   `docs/project-status.md` must state that the d9605bc repository seal remains historical evidence for the service slice, while native source, physical design, studies, and public operations are not complete. `README.md` must link this status without weakening the existing web/backend claims.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
   Run: `bun test scripts/completion/validate-blueprint-completion.test.mjs && bun run verify:blueprint-status && bun scripts/release/validate-release-config.mjs && git diff --check`
 
   Commit: `Clarify Somewhere whole-project completion gates`
 
-### Task 2: Build the independent public-release authority verifier
+### Task 2: Build the independent public-release authority verifier ✅
 
 **Files:**
 - Create: `scripts/public-release/external-receipt-v1.schema.json`
@@ -102,31 +102,31 @@ research/study-b/                              comparison protocol and analysis 
 - Consumes: the exact final SHA/tree, terminal manifest digest, authority trust store, and one signed receipt per external gate.
 - Produces: a signed-input-derived `PublicReleaseDecisionV1` that the repository finalizer cannot manufacture.
 
-- [ ] **Step 1: Write signature and contradiction tests**
+- [x] **Step 1: Write signature and contradiction tests**
 
   Generate ephemeral Ed25519 key pairs inside the test. Accept eight valid signatures bound to one SHA/tree/manifest; reject an untrusted key, missing gate, duplicate gate, expired receipt, wrong SHA/tree, wrong manifest digest, changed payload byte, wrong authority purpose, and a receipt stored inside the repository.
 
-- [ ] **Step 2: Run the red test**
+- [x] **Step 2: Run the red test**
 
   Run: `bun test scripts/public-release/verify-public-release.test.mjs`
 
   Expected: nonzero because the verifier is absent.
 
-- [ ] **Step 3: Implement exact receipt purposes**
+- [x] **Step 3: Implement exact receipt purposes**
 
   Use exact purposes `cloudflare-production`, `cloudflare-canonical-origin`, `cloudflare-production-pitr`, `provider-rights-quota`, `korean-privacy-location-review`, `study-a-rc`, `physical-iphone`, and `native-distribution`. Each canonical signed payload includes `schemaVersion`, `purpose`, `authorityId`, `issuedAt`, `expiresAt`, `finalSha`, `sourceTree`, `terminalManifestSha256`, `decision`, `evidenceDigests`, and `conditions`.
 
-- [ ] **Step 4: Document authority ownership**
+- [x] **Step 4: Document authority ownership**
 
   Define Cloudflare operator, provider/licensing owner, qualified Korean counsel, Study A supervisor, physical-device field lead, and Apple signing owner as separate trust purposes. A single key may not satisfy incompatible purposes unless the trust store explicitly lists both.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
   Run: `bun test scripts/public-release/verify-public-release.test.mjs && bun run verify:release-authority && git diff --check`
 
   Commit: `Add authority-backed public release verification`
 
-### Task 3: Create the native iOS contract and domain foundation
+### Task 3: Create the native iOS contract and domain foundation ✅
 
 **Files:**
 - Create: `ios/project.yml`
@@ -148,23 +148,23 @@ research/study-b/                              comparison protocol and analysis 
 - Consumes: `/api/v1` endpoint rows, `JourneyProjectionV1`, encoded route geometry, and `navigation-v2-*` policy.
 - Produces: `APIClientProtocol`, `JourneyProjection`, `GuidanceEngine.update(location:heading:route:now:)`, and `ArrivalGate.advance(sample:)`.
 
-- [ ] **Step 1: Freeze cross-client fixtures**
+- [x] **Step 1: Freeze cross-client fixtures**
 
   Export every canonical projection example and policy constant from the TypeScript contracts to `ios/Fixtures`. The validator compares SHA-256 and semantic values rather than maintaining hand-written divergent examples.
 
-- [ ] **Step 2: Write failing Linux structural tests**
+- [x] **Step 2: Write failing Linux structural tests**
 
   Assert the XcodeGen target is iOS 17+, bundle identifiers are non-production examples, source files exist, forbidden WebView types are absent, destination identity fields occur only in the revealed model, and every endpoint/action enum matches the canonical contract.
 
-- [ ] **Step 3: Implement strict Swift models and API client**
+- [x] **Step 3: Implement strict Swift models and API client**
 
   Use `Codable` models with explicit `CodingKeys`, reject unknown phase/action combinations after decoding, retain cookies in the system URL session, keep CSRF and recovery capabilities in process memory, and map public server errors to typed retryability without logging raw bodies.
 
-- [ ] **Step 4: Port route and arrival math**
+- [x] **Step 4: Port route and arrival math**
 
   Match the TypeScript fixtures for polyline decoding, route projection, look-ahead bearing, true/magnetic north conversion, bounded angular smoothing, progress-jump rejection, four-sample arrival dwell, and fail-closed confidence.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
   Run on Ubuntu: `bun test scripts/ios/validate-ios-source.test.mjs && bun scripts/ios/validate-ios-source.mjs`
 
