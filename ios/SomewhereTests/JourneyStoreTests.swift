@@ -27,7 +27,10 @@ private actor SequenceConflictService: JourneyServiceProtocol {
 @MainActor
 final class JourneyStoreTests: XCTestCase {
     func testReadyProjectionRemainsHidden() throws { XCTAssertNil(try projection(phase: "ready", revealed: false).reveal) }
-    func testCommitUsesServerProjection() async throws { XCTAssertEqual(try await store(phase: "committed").projection?.phase, .committed) }
+    func testCommitUsesServerProjection() async throws {
+        let store = try await store(phase: "committed")
+        XCTAssertEqual(store.projection?.phase, .committed)
+    }
     func testFollowingStartsGuidanceState() throws { XCTAssertEqual(try projection(phase: "following", revealed: false).actions.first, .reveal) }
     func testNearPreservesHiddenIdentity() throws { XCTAssertNil(try projection(phase: "near", revealed: false).reveal) }
     func testArrivedRequiresExplicitReveal() throws { XCTAssertEqual(try projection(phase: "arrived", revealed: false).actions, [.reveal]) }
@@ -37,8 +40,14 @@ final class JourneyStoreTests: XCTestCase {
         store.requestStop()
         XCTAssertTrue(store.isGuidancePaused)
     }
-    func testCancelStopResumesSameJourney() async throws { XCTAssertEqual(try await store(phase: "following").projection?.phase, .following) }
-    func testConfirmStopEndsGuidance() async throws { XCTAssertEqual(try await store(phase: "stopped").projection?.phase, .stopped) }
+    func testCancelStopResumesSameJourney() async throws {
+        let store = try await store(phase: "following")
+        XCTAssertEqual(store.projection?.phase, .following)
+    }
+    func testConfirmStopEndsGuidance() async throws {
+        let store = try await store(phase: "stopped")
+        XCTAssertEqual(store.projection?.phase, .stopped)
+    }
     func testStopReasonCanBeSkipped() throws { XCTAssertTrue(try projection(phase: "stopped", revealed: false).actions.contains(.skipReason)) }
     func testRecoveryExistsOnlyAfterCompletion() throws { XCTAssertTrue(try projection(phase: "completed", revealed: true, recovery: true).actions.contains(.recovery)) }
     func testExpiredHasNoActions() throws { XCTAssertEqual(try projection(phase: "expired").actions, []) }

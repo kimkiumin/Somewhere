@@ -186,6 +186,15 @@ describe("native iOS source gate", () => {
     expect(uiTestSource).toContain("@MainActor\nfinal class JourneyFlowUITests");
   });
 
+  test("awaits native test values before XCTest autoclosures", async () => {
+    const journeyStoreTests = await readFile(
+      resolve(repositoryRoot, "ios/SomewhereTests/JourneyStoreTests.swift"),
+      "utf8",
+    );
+
+    expect(journeyStoreTests).not.toMatch(/XCTAssert\w*\([^\n]*\bawait\b/);
+  });
+
   test("binds Swift purpose-scoped capability patterns to the TypeScript authority", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "somewhere-ios-capability-"));
     const source = resolve(repositoryRoot, "ios/Somewhere/Networking/APIClient.swift");
