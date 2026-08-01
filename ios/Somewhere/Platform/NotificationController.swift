@@ -1,6 +1,6 @@
 import Combine
 import Foundation
-import UserNotifications
+@preconcurrency import UserNotifications
 
 @MainActor
 final class NotificationController: NSObject, ObservableObject, UNUserNotificationCenterDelegate {

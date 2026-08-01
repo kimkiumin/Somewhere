@@ -190,14 +190,14 @@ export class DeletionCleanupRepository {
           )
           SELECT intent.journey_hmac_digest, intent.delete_request_digest, 'deleted',
             CAST(audit.occurred_at / 3600000 AS INTEGER) * 3600000, ?, 204,
-            audit.occurred_at + 48 * 60 * 60 * 1_000,
-            audit.occurred_at + 24 * 60 * 60 * 1_000
+            audit.occurred_at + 48 * 60 * 60 * 1000,
+            audit.occurred_at + 24 * 60 * 60 * 1000
           FROM pending_delete_intents AS intent
           JOIN audit_events AS audit ON audit.audit_event_id = intent.audit_event_id
             AND audit.actor_role = 'system' AND audit.action_code = 'journey-delete'
             AND audit.result_code = 'complete' AND audit.policy_digest IS NULL
             AND audit.deploy_digest IS NULL
-            AND audit.expires_at = audit.occurred_at + 7 * 24 * 60 * 60 * 1_000
+            AND audit.expires_at = audit.occurred_at + 7 * 24 * 60 * 60 * 1000
           WHERE intent.journey_hmac_digest = ? AND intent.delete_request_digest = ?
             AND intent.session_binding_digest = ? AND intent.audit_event_id = ?
             AND intent.stage = 'cleaned'

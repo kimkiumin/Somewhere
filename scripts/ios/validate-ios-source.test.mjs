@@ -168,6 +168,15 @@ describe("native iOS source gate", () => {
     expect(locationSource).toContain("@preconcurrency CLLocationManagerDelegate");
   });
 
+  test("imports legacy notification types through a Swift 6 concurrency boundary", async () => {
+    const notificationSource = await readFile(
+      resolve(repositoryRoot, "ios/Somewhere/Platform/NotificationController.swift"),
+      "utf8",
+    );
+
+    expect(notificationSource).toContain("@preconcurrency import UserNotifications");
+  });
+
   test("binds Swift purpose-scoped capability patterns to the TypeScript authority", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "somewhere-ios-capability-"));
     const source = resolve(repositoryRoot, "ios/Somewhere/Networking/APIClient.swift");

@@ -22,11 +22,13 @@ describe("Todo13 feedback deletion retention", () => {
       resolve(process.cwd(), "src/deletion/cleanup-repository.ts"),
       "utf8",
     );
-    const bucketExpression = source.match(
-      /CAST\(audit\.occurred_at \/ [^ ]+ AS INTEGER\) \* [^,\n]+/u,
-    )?.[0];
+    const finalizerInsert = [...source.matchAll(/`INSERT INTO journey_tombstones[\s\S]*?`/gu)]
+      .map((match) => match[0])
+      .find((statement) => statement.includes("audit.occurred_at"));
 
-    expect(bucketExpression).toBe("CAST(audit.occurred_at / 3600000 AS INTEGER) * 3600000");
+    expect(finalizerInsert).toBeDefined();
+    expect(finalizerInsert).not.toMatch(/\d_\d/u);
+    expect(finalizerInsert).toContain("CAST(audit.occurred_at / 3600000 AS INTEGER) * 3600000");
   });
 
   it("anchors a resumed tombstone's retention at its successful write time", async () => {
