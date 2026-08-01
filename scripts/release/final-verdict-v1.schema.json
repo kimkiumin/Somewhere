@@ -3,15 +3,30 @@
   "$id": "https://somewhere.invalid/schemas/final-verdict-v1.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "finalSha", "sourceTree", "repositoryReady", "releaseReady", "lanes", "externalGate", "cleanupDigest"],
+  "required": ["schemaVersion", "finalSha", "sourceTree", "repositoryReady", "releaseReady", "lanes", "externalGate", "externalDigest", "cleanupDigest"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "finalSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
     "sourceTree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
     "repositoryReady": { "enum": ["PASS", "FAIL"] },
     "releaseReady": { "enum": ["PASS", "BLOCK", "FAIL"] },
-    "lanes": { "type": "array", "minItems": 4, "maxItems": 4 },
+    "lanes": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lane", "repositoryGate", "externalGate"],
+        "properties": {
+          "lane": { "enum": ["F1", "F2", "F3", "F4"] },
+          "repositoryGate": { "enum": ["PASS", "BLOCK", "FAIL"] },
+          "externalGate": { "enum": ["PASS", "BLOCK", "FAIL"] }
+        }
+      }
+    },
     "externalGate": { "enum": ["PASS", "BLOCK", "FAIL"] },
+    "externalDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "cleanupDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
   }
 }

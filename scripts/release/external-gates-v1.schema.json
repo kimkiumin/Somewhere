@@ -3,10 +3,11 @@
   "$id": "https://somewhere.invalid/schemas/external-gates-v1.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "finalSha", "gates", "releaseGate"],
+  "required": ["schemaVersion", "finalSha", "sourceTree", "gates", "releaseGate"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "finalSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sourceTree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
     "gates": {
       "type": "array",
       "minItems": 1,

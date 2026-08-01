@@ -85,10 +85,35 @@ async function main() {
   try {
     const policyBytes = await readFile(policyPath);
     const policy = navigationPolicySchema.parse(JSON.parse(policyBytes.toString("utf8")));
-    const promotion = promotionReceiptSchema.parse(
-      JSON.parse(await readFile(promotionPath, "utf8")),
-    );
+    const promotionBytes = await readFile(promotionPath);
+    const promotionInput = JSON.parse(promotionBytes.toString("utf8"));
     const build = buildReceiptSchema.parse(JSON.parse(await readFile(buildPath, "utf8")));
+    if (
+      policy.status === "calibration-only" &&
+      promotionInput?.gate === "BLOCK" &&
+      promotionInput?.reason === "RC_ABSENT"
+    ) {
+      const keys = Object.keys(promotionInput).sort();
+      if (
+        keys.join("\n") !==
+          ["finalSha", "gate", "policySha256", "reason", "schemaVersion"].join("\n") ||
+        promotionInput.schemaVersion !== 1 ||
+        promotionInput.finalSha !== build.sourceSha ||
+        promotionInput.policySha256 !== `sha256:${sha256(policyBytes)}`
+      ) {
+        throw new TypeError("INVALID_RC_ABSENT_RECEIPT");
+      }
+      await writeVerdict(output, {
+        schemaVersion: 1,
+        bindingGate: "BLOCK",
+        rcBuildBound: false,
+        devicePass: false,
+        reason: "RC_ABSENT",
+      });
+      process.exitCode = 2;
+      return;
+    }
+    const promotion = promotionReceiptSchema.parse(promotionInput);
     if (
       policy.policyVersion !== "navigation-v2-rc-1" ||
       policy.status !== "release-candidate" ||
@@ -98,13 +123,15 @@ async function main() {
     ) {
       throw new TypeError("FOREIGN_RC_POLICY");
     }
+    const evidence = await validateEvidencePackage(evidencePath);
+    if (evidence.errors.length > 0) throw new TypeError("EVIDENCE_INVALID_OR_TAMPERED");
     if (
       Date.parse(build.builtAt) < Date.parse(promotion.finalizedAt) ||
       evidence.releaseCandidate?.buildSha !== build.sourceSha ||
       evidence.releaseCandidate?.sourceTree !== build.sourceTree ||
       evidence.releaseCandidate?.buildDigest !== build.buildDigest ||
       evidence.releaseCandidate?.navigationPolicySha256 !== promotion.policySha256 ||
-      evidence.releaseCandidate?.promotionReceiptSha256 !== sha256(await readFile(promotionPath))
+      evidence.releaseCandidate?.promotionReceiptSha256 !== sha256(promotionBytes)
     ) {
       throw new TypeError("FOREIGN_OR_PREPROMOTION_BUILD");
     }
@@ -113,29 +140,24 @@ async function main() {
     ) {
       throw new TypeError("INVALID_ANCESTRY_RESULT");
     }
-    const committedPins = authorityPinsSchema.parse(
-      JSON.parse(
-        git(repo, [
-          "show",
-          `${build.sourceSha}:app/qa/field/v2/authority-pins.json`,
-        ]),
-      ),
-    );
-    if (
-      committedPins.status !== "ACTIVE" ||
-      promotion.supervisorRegistrySha256 !== committedPins.studyASupervisorRegistrySha256
-    ) {
-      throw new TypeError("BUILD_AUTHORITY_NOT_ACTIVE_OR_FOREIGN");
+    const committedPins = committedPinsForBuild(repo, build.sourceSha);
+    if (committedPins.status !== "ACTIVE") {
+      await writeVerdict(output, {
+        schemaVersion: 1,
+        bindingGate: "BLOCK",
+        rcBuildBound: false,
+        devicePass: false,
+        buildSha: build.sourceSha,
+        sourceTree: build.sourceTree,
+        navigationPolicySha256: promotion.policySha256,
+        reason: "FIELD_RELEASE_AUTHORITY_NOT_PINNED",
+      });
+      process.exitCode = 2;
+      return;
     }
-    const authority = await resolvePinnedRegistry(
-      options.get("--trusted-signers"),
-      "somewhere-v2-field-release",
-      committedPins,
-    );
-    const evidence = await validateEvidencePackage(evidencePath, {
-      trustedSigners: authority.state === "READY" ? authority.registry : undefined,
-    });
-    if (evidence.errors.length > 0) throw new TypeError("EVIDENCE_INVALID_OR_TAMPERED");
+    if (promotion.supervisorRegistrySha256 !== committedPins.studyASupervisorRegistrySha256) {
+      throw new TypeError("FOREIGN_STUDY_A_AUTHORITY");
+    }
     const committedPolicy = git(repo, [
       "show",
       `${build.sourceSha}:contracts/policy/navigation-v2-rc-1.json`,
@@ -143,10 +165,41 @@ async function main() {
     if (sha256(`${committedPolicy}\n`) !== promotion.policySha256) {
       throw new TypeError("RC_NOT_IMMUTABLE_IN_BUILD");
     }
+    const trustedSigners = options.get("--trusted-signers");
+    if (
+      trustedSigners === undefined ||
+      !(await allExist([path.resolve(trustedSigners)]))
+    ) {
+      await writeVerdict(output, {
+        schemaVersion: 1,
+        bindingGate: "BLOCK",
+        rcBuildBound: true,
+        devicePass: false,
+        buildSha: build.sourceSha,
+        sourceTree: build.sourceTree,
+        navigationPolicySha256: promotion.policySha256,
+        trustedSignerRegistrySha256: null,
+        supervisorRegistrySha256: promotion.supervisorRegistrySha256,
+        reason: "TRUSTED_FIELD_SIGNERS_MISSING",
+      });
+      process.exitCode = 2;
+      return;
+    }
+    const authority = await resolvePinnedRegistry(
+      trustedSigners,
+      "somewhere-v2-field-release",
+      committedPins,
+    );
+    if (authority.state !== "READY") throw new TypeError("FIELD_RELEASE_AUTHORITY_NOT_READY");
+    const attestedEvidence = await validateEvidencePackage(evidencePath, {
+      trustedSigners: authority.registry,
+    });
+    if (attestedEvidence.errors.length > 0) {
+      throw new TypeError("EVIDENCE_INVALID_OR_TAMPERED");
+    }
     const devicePass =
-      evidence.errors.length === 0 &&
-      evidence.evidenceOrigin === "physical" &&
-      evidence.physicalAttestationsVerified;
+      attestedEvidence.evidenceOrigin === "physical" &&
+      attestedEvidence.physicalAttestationsVerified;
     await writeVerdict(output, {
       schemaVersion: 1,
       bindingGate: devicePass ? "PASS" : "BLOCK",
@@ -155,14 +208,11 @@ async function main() {
       buildSha: build.sourceSha,
       sourceTree: build.sourceTree,
       navigationPolicySha256: promotion.policySha256,
-      trustedSignerRegistrySha256:
-        authority.state === "READY" ? authority.registrySha256 : null,
+      trustedSignerRegistrySha256: authority.registrySha256,
       supervisorRegistrySha256: promotion.supervisorRegistrySha256,
       reason: devicePass
         ? "EXACT_POST_PROMOTION_RC_BUILD_BOUND"
-        : authority.state === "BLOCK" && evidence.evidenceOrigin === "physical"
-          ? authority.reason
-          : "SYNTHETIC_OR_MISSING_PHYSICAL_DEVICE_EVIDENCE",
+        : "SYNTHETIC_OR_MISSING_PHYSICAL_DEVICE_EVIDENCE",
     });
     process.exitCode = devicePass ? 0 : 2;
   } catch (error) {
@@ -174,6 +224,12 @@ async function main() {
     });
     process.exitCode = 1;
   }
+}
+
+function committedPinsForBuild(repo, sourceSha) {
+  return authorityPinsSchema.parse(
+    JSON.parse(git(repo, ["show", `${sourceSha}:app/qa/field/v2/authority-pins.json`])),
+  );
 }
 
 await main();

@@ -129,6 +129,7 @@ async function preparation(options) {
     await writeJson(external, {
       schemaVersion: 1,
       finalSha: sha,
+      sourceTree: tree,
       gates: externalIds.map((id) => ({ id, gate: "BLOCK", reason: "MISSING_AUTHORIZED_EXTERNAL_EVIDENCE" })),
       releaseGate: "BLOCK",
     });

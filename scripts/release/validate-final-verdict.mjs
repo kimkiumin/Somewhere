@@ -64,6 +64,12 @@ async function aggregate(options) {
   const external = validateExternalGates(await readJson(resolve(options.external)));
   const cleanup = validateCleanup(await readJson(resolve(options.cleanup)));
   if (external.finalSha !== options.sha) throw new TypeError("external gates foreign SHA");
+  if (external.sourceTree !== options["source-tree"]) {
+    throw new TypeError("external gates foreign source tree");
+  }
+  if (external.releaseGate === "PASS") {
+    throw new TypeError("UNAUTHENTICATED_EXTERNAL_PASS");
+  }
   const repositoryReady = lanes.every((lane) => lane.repositoryGate === "PASS") && cleanup.gate === "PASS"
     ? "PASS"
     : "FAIL";
@@ -86,9 +92,10 @@ async function aggregate(options) {
       externalGate: lane.externalGate,
     })),
     externalGate: external.releaseGate,
+    externalDigest: await digestFile(resolve(options.external)),
     cleanupDigest: await digestFile(resolve(options.cleanup)),
   });
-  if (repositoryReady !== "PASS") process.exitCode = 1;
+  if (repositoryReady !== "PASS" || releaseReady === "FAIL") process.exitCode = 1;
 }
 
 const parsed = parseArguments(process.argv.slice(2), specification);

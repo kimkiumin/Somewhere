@@ -99,7 +99,9 @@ export function validateCleanup(value) {
     "tempRoots",
   ]);
   if (cleanup.schemaVersion !== 1) throw new ReleaseInputError("cleanup schemaVersion must be 1");
-  assertGate(cleanup.gate);
+  if (!["PASS", "FAIL"].includes(cleanup.gate)) {
+    throw new ReleaseInputError("cleanup gate must be PASS or FAIL");
+  }
   for (const key of ["serverCount", "browserContextCount"]) {
     if (!Number.isInteger(cleanup[key]) || cleanup[key] < 0) {
       throw new ReleaseInputError(`${key} must be a nonnegative integer`);
@@ -113,8 +115,12 @@ export function validateCleanup(value) {
 }
 
 export function validateExternalGates(value) {
-  const external = assertExactKeys(value, ["schemaVersion", "finalSha", "gates", "releaseGate"]);
-  if (external.schemaVersion !== 1 || !/^[a-f0-9]{40}$/.test(external.finalSha)) {
+  const external = assertExactKeys(value, ["schemaVersion", "finalSha", "sourceTree", "gates", "releaseGate"]);
+  if (
+    external.schemaVersion !== 1
+    || !/^[a-f0-9]{40}$/.test(external.finalSha)
+    || !/^[a-f0-9]{40}$/.test(external.sourceTree)
+  ) {
     throw new ReleaseInputError("invalid external-gates identity");
   }
   if (!Array.isArray(external.gates) || external.gates.length === 0) {
@@ -136,4 +142,46 @@ export function validateExternalGates(value) {
       : "PASS";
   if (external.releaseGate !== derived) throw new ReleaseInputError("external releaseGate contradiction");
   return external;
+}
+
+export function validateFinalVerdict(value) {
+  const verdict = assertExactKeys(value, [
+    "schemaVersion",
+    "finalSha",
+    "sourceTree",
+    "repositoryReady",
+    "releaseReady",
+    "lanes",
+    "externalGate",
+    "externalDigest",
+    "cleanupDigest",
+  ]);
+  if (
+    verdict.schemaVersion !== 1
+    || !/^[a-f0-9]{40}$/.test(verdict.finalSha)
+    || !/^[a-f0-9]{40}$/.test(verdict.sourceTree)
+  ) {
+    throw new ReleaseInputError("invalid final-verdict identity");
+  }
+  if (!["PASS", "FAIL"].includes(verdict.repositoryReady)) {
+    throw new ReleaseInputError("repositoryReady must be PASS or FAIL");
+  }
+  assertGate(verdict.releaseReady, "releaseReady");
+  assertGate(verdict.externalGate, "externalGate");
+  normalizeDigest(verdict.externalDigest, "externalDigest");
+  normalizeDigest(verdict.cleanupDigest, "cleanupDigest");
+  if (!Array.isArray(verdict.lanes) || verdict.lanes.length !== 4) {
+    throw new ReleaseInputError("final verdict requires exactly four lanes");
+  }
+  const lanes = verdict.lanes.map((value) => {
+    const lane = assertExactKeys(value, ["lane", "repositoryGate", "externalGate"]);
+    assertLane(lane.lane);
+    assertGate(lane.repositoryGate, "lane.repositoryGate");
+    assertGate(lane.externalGate, "lane.externalGate");
+    return lane.lane;
+  });
+  if (new Set(lanes).size !== 4 || lanes.some((lane, index) => lane !== `F${index + 1}`)) {
+    throw new ReleaseInputError("final verdict lanes must be ordered F1 through F4");
+  }
+  return verdict;
 }

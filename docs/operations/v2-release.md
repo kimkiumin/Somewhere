@@ -46,11 +46,20 @@ administrator bypass policy are control-plane facts; release remains `BLOCK`
 until an administrator verifies them in GitHub.
 
 The protected workflow requires an exact reviewed release SHA, an annotated
-`somewhere-v2-rc-*` tag on protected `main`, an approved prior release/config
-digest, the protected environment's external fence-receipt digest, and an
-approved HTTPS origin. The D1 target is derived from the checked-in staging
-binding; it is never accepted as workflow input. It then performs this fixed
-sequence:
+`somewhere-v2-rc-*` tag on protected `main`, the base64 repository verdict and
+terminal manifest, their approved SHA-256 digests, an approved prior
+release/config digest, the protected environment's external fence-receipt
+digest, and an approved HTTPS origin. The repository verdict and manifest are
+non-secret inputs; their digests must equal protected environment variables and
+exact lines in the annotated tag. `verify-staging-seal.mjs` then proves that the
+verdict and terminal manifest are untampered, name the checked-out SHA/tree,
+contain `repositoryReady: PASS`, and still contain `releaseReady: BLOCK`.
+Staging deliberately consumes repository readiness only: requiring public
+release readiness here would create a cycle because Study A and physical-device
+evidence are collected from the staged exact build. The RC tag must therefore
+be created only after the repository seal exists. The D1 target is derived from
+the checked-in staging binding; it is never accepted as workflow input. It then
+performs this fixed sequence:
 
 Before any staging or production deployment, the Cloudflare authority must set
 `CANONICAL_ORIGIN` with `wrangler secret put CANONICAL_ORIGIN --env staging` or
@@ -151,7 +160,14 @@ receipts are FAIL.
 Run `verify-final-cleanup.mjs` for exact lanes F1–F4 and closed ports 8787/8788,
 then `validate-final-verdict.mjs`. Only after repository readiness is PASS may
 `seal-final-manifest.mjs` write the terminal manifest. A repository PASS does
-not override an external BLOCK.
+not override an external BLOCK. The repository finalizer is intentionally
+incapable of authenticating external PASS: `external-gates.json` is bound to
+the exact SHA/tree and its digest is recorded in the verdict, but an internally
+consistent `releaseGate: PASS` is rejected as `UNAUTHENTICATED_EXTERNAL_PASS`.
+The repository seal accepts only `repositoryReady: PASS` with
+`releaseReady: BLOCK`. A later public-release authority must verify independent
+signed receipts outside the repository-writable evidence tree; editing the
+external-gates JSON is never an authorization path.
 
 Signal handlers are installed before lane allocation. HUP, INT, and TERM must
 terminate the owned process group, remove guarded temporary state, and write a
@@ -174,7 +190,9 @@ All of these must be supplied by their actual authority:
    App Store evidence.
 
 Until every required receipt passes, `releaseReady` remains `BLOCK` even when
-`repositoryReady` is `PASS`.
+`repositoryReady` is `PASS`. External PASS synthesis belongs to a separate,
+authority-backed public-release decision after staging/Study A/device evidence;
+the repository finalizer must not manufacture it.
 
 ## 8. Cost and retention
 

@@ -39,6 +39,7 @@ const allowedEnvironmentVariables = [
   "CI",
   "TMPDIR",
 ];
+const maximumReviewInputs = 512;
 
 function reviewerEnvironment() {
   const codeHome = process.env.CODEX_HOME;
@@ -67,7 +68,11 @@ async function bindInputs(inputPaths, options, snapshotRoot) {
   const expanded = [...explicit];
   if (reviewRoot !== undefined) {
     const byPath = new Map(expanded.map((entry) => [entry.path, entry.sha256]));
-    for (const input of explicit) {
+    for (let index = 0; index < expanded.length; index += 1) {
+      if (expanded.length > maximumReviewInputs) {
+        throw new TypeError("expanded review inputs exceed the bounded maximum");
+      }
+      const input = expanded[index];
       let value;
       try {
         value = JSON.parse(input.snapshot.data.toString());

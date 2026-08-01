@@ -99,13 +99,14 @@ function assertCi(workflow) {
 function assertStaging(workflow) {
   const triggers = events(workflow.on);
   const jobs = Object.values(workflow.jobs);
+  const text = workflowText(workflow);
   const stageJob = jobs.find((job) => readEnvironmentName(job) === "somewhere-v2-staging");
   if (
     triggers.size !== 1
     || !triggers.has("workflow_dispatch")
     || stageJob === undefined
     || !actionPinsValid(workflow)
-    || workflowText(workflow).includes("pull_request")
+    || text.includes("pull_request")
   ) {
     throw new TypeError("STAGING_AUTHORIZATION_BOUNDARY_UNSAFE");
   }
@@ -129,10 +130,21 @@ function assertStaging(workflow) {
     || !commands.includes("lifecycle-contract")
     || inputs?.prior_config_sha256 === undefined
     || inputs?.release_tag === undefined
+    || inputs?.repository_verdict_b64 === undefined
+    || inputs?.repository_verdict_sha256 === undefined
+    || inputs?.terminal_manifest_b64 === undefined
+    || inputs?.terminal_manifest_sha256 === undefined
     || inputs?.fence_receipt_sha256 === undefined
     || inputs?.database_name !== undefined
+    || !text.includes("vars.STAGING_REPOSITORY_VERDICT_SHA256")
+    || !text.includes("vars.STAGING_TERMINAL_MANIFEST_SHA256")
     || !commands.includes("merge-base --is-ancestor")
     || !commands.includes("refs/tags/$RELEASE_TAG")
+    || !commands.includes("git for-each-ref --format='%(contents)'")
+    || !commands.includes("verify-staging-seal.mjs")
+    || !commands.includes("validate-https-origin.mjs --origin \"$BASE_URL\"")
+    || !commands.includes("--verdict-sha256 \"$REPOSITORY_VERDICT_SHA256\"")
+    || !commands.includes("--manifest-sha256 \"$TERMINAL_MANIFEST_SHA256\"")
     || !commands.includes("build:production")
     || !commands.includes("--environment staging")
     || !commands.includes("scan-production.mjs")

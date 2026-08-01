@@ -11,6 +11,22 @@ on:
         description: Approved immutable annotated V2 RC tag
         required: true
         type: string
+      repository_verdict_b64:
+        description: Base64 exact-SHA repository verdict (non-secret)
+        required: true
+        type: string
+      repository_verdict_sha256:
+        description: SHA-256 of the approved repository verdict
+        required: true
+        type: string
+      terminal_manifest_b64:
+        description: Base64 terminal evidence manifest (non-secret)
+        required: true
+        type: string
+      terminal_manifest_sha256:
+        description: SHA-256 of the approved terminal evidence manifest
+        required: true
+        type: string
       prior_release_sha:
         description: Exact approved prior release commit
         required: true
@@ -60,9 +76,16 @@ jobs:
         env:
           RELEASE_SHA: ${{ inputs.release_sha }}
           RELEASE_TAG: ${{ inputs.release_tag }}
+          REPOSITORY_VERDICT_B64: ${{ inputs.repository_verdict_b64 }}
+          REPOSITORY_VERDICT_SHA256: ${{ inputs.repository_verdict_sha256 }}
+          TERMINAL_MANIFEST_B64: ${{ inputs.terminal_manifest_b64 }}
+          TERMINAL_MANIFEST_SHA256: ${{ inputs.terminal_manifest_sha256 }}
+          BASE_URL: ${{ inputs.base_url }}
           PRIOR_RELEASE_SHA: ${{ inputs.prior_release_sha }}
           PRIOR_CONFIG_SHA256: ${{ inputs.prior_config_sha256 }}
           FENCE_RECEIPT_SHA256: ${{ inputs.fence_receipt_sha256 }}
+          APPROVED_REPOSITORY_VERDICT_SHA256: ${{ vars.STAGING_REPOSITORY_VERDICT_SHA256 }}
+          APPROVED_TERMINAL_MANIFEST_SHA256: ${{ vars.STAGING_TERMINAL_MANIFEST_SHA256 }}
           APPROVED_FENCE_RECEIPT_SHA256: ${{ vars.STAGING_FENCE_RECEIPT_SHA256 }}
         run: |
           test "$RELEASE_SHA" = "$(git rev-parse HEAD)"
@@ -70,19 +93,41 @@ jobs:
           printf '%s' "$RELEASE_TAG" | rg '^somewhere-v2-rc-[0-9]{8}\.[0-9]+$'
           printf '%s' "$PRIOR_RELEASE_SHA" | rg '^[a-f0-9]{40}$'
           printf '%s' "$PRIOR_CONFIG_SHA256" | rg '^[a-f0-9]{64}$'
+          printf '%s' "$REPOSITORY_VERDICT_SHA256" | rg '^[a-f0-9]{64}$'
+          printf '%s' "$TERMINAL_MANIFEST_SHA256" | rg '^[a-f0-9]{64}$'
           printf '%s' "$FENCE_RECEIPT_SHA256" | rg '^[a-f0-9]{64}$'
+          test "$REPOSITORY_VERDICT_SHA256" = "$APPROVED_REPOSITORY_VERDICT_SHA256"
+          test "$TERMINAL_MANIFEST_SHA256" = "$APPROVED_TERMINAL_MANIFEST_SHA256"
           test "$FENCE_RECEIPT_SHA256" = "$APPROVED_FENCE_RECEIPT_SHA256"
+          bun scripts/release/validate-https-origin.mjs --origin "$BASE_URL"
           git show-ref --verify "refs/tags/$RELEASE_TAG"
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_SHA"
           git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          SOURCE_TREE="$(git rev-parse HEAD^{tree})"
+          mkdir -p "$RUNNER_TEMP/staging-backup"
+          printf '%s' "$REPOSITORY_VERDICT_B64" | base64 --decode \
+            > "$RUNNER_TEMP/staging-backup/final-verdict.json"
+          printf '%s' "$TERMINAL_MANIFEST_B64" | base64 --decode \
+            > "$RUNNER_TEMP/staging-backup/terminal-manifest.sha256"
+          git for-each-ref --format='%(contents)' "refs/tags/$RELEASE_TAG" \
+            > "$RUNNER_TEMP/staging-backup/release-tag-message.txt"
+          bun scripts/release/verify-staging-seal.mjs \
+            --verdict "$RUNNER_TEMP/staging-backup/final-verdict.json" \
+            --verdict-sha256 "$REPOSITORY_VERDICT_SHA256" \
+            --manifest "$RUNNER_TEMP/staging-backup/terminal-manifest.sha256" \
+            --manifest-sha256 "$TERMINAL_MANIFEST_SHA256" \
+            --sha "$RELEASE_SHA" \
+            --source-tree "$SOURCE_TREE" \
+            --tag-message "$RUNNER_TEMP/staging-backup/release-tag-message.txt" \
+            --output "$RUNNER_TEMP/staging-backup/repository-seal.json"
           git show "$PRIOR_RELEASE_SHA:server/wrangler.jsonc" \
             > "$RUNNER_TEMP/prior-wrangler.jsonc"
           test "$PRIOR_CONFIG_SHA256" = \
             "$(sha256sum "$RUNNER_TEMP/prior-wrangler.jsonc" | cut -d' ' -f1)"
           bash scripts/release/cloudflare-acceptance-gates.sh \
             lifecycle-contract "$RUNNER_TEMP/prior-wrangler.jsonc" staging
-          printf 'SOMEWHERE_SOURCE_TREE=%s\n' "$(git rev-parse HEAD^{tree})" \
+          printf 'SOMEWHERE_SOURCE_TREE=%s\n' "$SOURCE_TREE" \
             >> "$GITHUB_ENV"
 
       - name: Build and scan exact staging assets

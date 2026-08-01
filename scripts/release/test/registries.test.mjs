@@ -31,6 +31,9 @@ const requiredScripts = [
   "write-prepared-build-reference.mjs",
   "run-verify-v2.mjs",
   "run-bun-audit.mjs",
+  "verify-rc-build-binding.mjs",
+  "verify-staging-seal.mjs",
+  "validate-https-origin.mjs",
   "validate-verify-v2-runtime-evidence.mjs",
 ];
 const requiredSchemas = [
@@ -131,6 +134,32 @@ describe("Todo 22 release registry", () => {
       "${SOURCE_TREE}",
       "bun.lock",
       "${FINAL_ROOT}/F2/bun-audit-raw.json",
+    ]));
+  });
+
+  test("routes the F3 device gate through exact RC and build binding", async () => {
+    // Given: the canonical final-lane command registry.
+    const commands = await readJson(resolve(repo, "scripts/release/final-lane-commands-v1.json"));
+
+    // When: the external physical-device check is resolved.
+    const device = commands.lanes.F3.find((entry) => entry.id === "device-verdict");
+
+    // Then: it must use the verifier that binds evidence to the exact promoted policy and build.
+    expect(device.argv.slice(0, 2)).toEqual([
+      "bun",
+      "scripts/release/verify-rc-build-binding.mjs",
+    ]);
+    expect(device.argv).toEqual(expect.arrayContaining([
+      "--repo",
+      "${REPO}",
+      "--policy",
+      "${POLICY}",
+      "--promotion-receipt",
+      "${RC_PROMOTION_RECEIPT}",
+      "--build-receipt",
+      "${BUILD_RECEIPT}",
+      "--evidence",
+      "${SHARED_EVIDENCE_ROOT}/physical-iphone",
     ]));
   });
 

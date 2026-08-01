@@ -138,7 +138,7 @@
         "id": "device-verdict",
         "classification": "external",
         "primary": "${FINAL_ROOT}/F3/device-verdict.json",
-        "argv": ["bun", "app/qa/field/v2/validate-evidence.mjs", "--mode", "release", "--sha", "${FINAL_SHA}", "--policy-kind", "${POLICY_KIND}", "--policy-path", "${POLICY}", "--policy-sha256", "${POLICY_SHA}", "--promotion-receipt", "${RC_PROMOTION_RECEIPT}", "--build-receipt", "${BUILD_RECEIPT}", "--input", "${SHARED_EVIDENCE_ROOT}/physical-iphone", "--output", "${FINAL_ROOT}/F3/device-verdict.json"]
+        "argv": ["bun", "scripts/release/verify-rc-build-binding.mjs", "--repo", "${REPO}", "--policy", "${POLICY}", "--promotion-receipt", "${RC_PROMOTION_RECEIPT}", "--build-receipt", "${BUILD_RECEIPT}", "--evidence", "${SHARED_EVIDENCE_ROOT}/physical-iphone", "--trusted-signers", "${SHARED_EVIDENCE_ROOT}/authority/field-signers.json", "--output", "${FINAL_ROOT}/F3/device-verdict.json"]
       }
     ],
     "F4": [

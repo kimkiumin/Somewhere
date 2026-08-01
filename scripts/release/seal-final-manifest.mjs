@@ -27,7 +27,7 @@ async function seal(options) {
   const output = resolve(options.output);
   if (!output.startsWith(`${finalRoot}${sep}`)) throw new TypeError("terminal manifest must be inside final root");
   const verdict = await readJson(resolve(options.verdict));
-  if (verdict.repositoryReady !== "PASS" || !["PASS", "BLOCK"].includes(verdict.releaseReady)) {
+  if (verdict.repositoryReady !== "PASS" || verdict.releaseReady !== "BLOCK") {
     throw new TypeError("cannot seal failing final verdict");
   }
   const required = [

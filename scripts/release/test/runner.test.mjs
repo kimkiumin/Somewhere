@@ -302,6 +302,7 @@ describe("Bound reviewer environment", () => {
       const homeCapture = resolve(root, "reviewer-home.txt");
       const snapshotCapture = resolve(root, "reviewer-snapshot.txt");
       const relatedCapture = resolve(root, "reviewer-related-snapshot.txt");
+      const leafCapture = resolve(root, "reviewer-leaf-snapshot.txt");
       const reviewRoot = resolve(root, "review-evidence");
       await mkdir(fakeBin, { recursive: true });
       await mkdir(reviewRoot, { recursive: true });
@@ -332,9 +333,12 @@ printf '%s\\n' '{"gate":"MUTATED"}' > ${JSON.stringify(resolve(root, "input.json
 snapshot="$(printf '%s\\n' "$prompt" | sed -n 's/.* snapshot=\\([^ ]*\\) sha256:.*/\\1/p' | head -n 1)"
 test -n "$snapshot"
 cat "$snapshot" > ${JSON.stringify(snapshotCapture)}
-related="$(printf '%s\\n' "$prompt" | sed -n 's/.* snapshot=\\([^ ]*\\) sha256:.*/\\1/p' | tail -n 1)"
+related="$(printf '%s\\n' "$prompt" | sed -n 's/.* snapshot=\\([^ ]*\\) sha256:.*/\\1/p' | sed -n '2p')"
 test -n "$related"
 cat "$related" > ${JSON.stringify(relatedCapture)}
+leaf="$(printf '%s\\n' "$prompt" | sed -n 's/.* snapshot=\\([^ ]*\\) sha256:.*/\\1/p' | tail -n 1)"
+test -n "$leaf"
+cat "$leaf" > ${JSON.stringify(leafCapture)}
 printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
 `);
       await chmod(fakeCodex, 0o755);
@@ -355,8 +359,16 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
         outputSchema: schema,
       });
       const input = resolve(root, "input.json");
-      const related = resolve(reviewRoot, "raw-evidence.txt");
-      await writeFile(related, "bound raw evidence\n");
+      const related = resolve(reviewRoot, "related-receipt.json");
+      const leaf = resolve(reviewRoot, "raw-evidence.txt");
+      await writeFile(leaf, "recursively bound raw evidence\n");
+      const leafDigest = new Bun.CryptoHasher("sha256")
+        .update(await readFile(leaf))
+        .digest("hex");
+      await writeJson(related, {
+        gate: "PASS",
+        reviewBindings: [{ path: leaf, sha256: `sha256:${leafDigest}` }],
+      });
       const relatedDigest = new Bun.CryptoHasher("sha256")
         .update(await readFile(related))
         .digest("hex");
@@ -392,7 +404,8 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
       expect(result.exitCode).toBe(0);
       expect(await readFile(homeCapture, "utf8")).toBe(dirname(codexHome));
       expect(await readFile(snapshotCapture, "utf8")).toContain('"reviewBindings"');
-      expect(await readFile(relatedCapture, "utf8")).toBe("bound raw evidence\n");
+      expect(await readFile(relatedCapture, "utf8")).toContain('"reviewBindings"');
+      expect(await readFile(leafCapture, "utf8")).toBe("recursively bound raw evidence\n");
       expect(await readJson(output)).toMatchObject({
         verdict: "APPROVE",
         reviewedSha: fixture.sha,
@@ -400,6 +413,7 @@ printf '%s\\n' '{"verdict":"APPROVE","findings":[]}' > "$response"
         inputs: [
           { path: input },
           { path: related, sha256: `sha256:${relatedDigest}` },
+          { path: leaf, sha256: `sha256:${leafDigest}` },
         ],
       });
     } finally {

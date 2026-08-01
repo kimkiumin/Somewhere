@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { repo, writeFakeWrangler } from "./ci-staging.fixture.mjs";
 import {
@@ -61,6 +61,35 @@ describe("Todo 20 CI and staging gates", () => {
         externalWriteInLocalMode: false, lifecycleGradualRollbackAllowed: false,
         historicalPagesFrozen: true,
       });
+    } finally {
+      await removeTemporaryDirectory(root);
+    }
+  });
+
+  test("rejects staging workflows with any repository-seal binding removed", async () => {
+    const root = await temporaryDirectory("staging-seal-mutations");
+    try {
+      const original = await readFile(resolve(repo, ".github/workflows/v2-staging.yml"), "utf8");
+      const mutations = [
+        ["verify-staging-seal.mjs", "verify-staging-seal-missing.mjs"],
+        ["vars.STAGING_REPOSITORY_VERDICT_SHA256", "inputs.repository_verdict_sha256"],
+        ["terminal_manifest_b64:", "terminal_manifest_payload_b64:"],
+        ["repository_verdict_b64:", "repository_verdict_payload_b64:"],
+        ["validate-https-origin.mjs", "validate-https-origin-missing.mjs"],
+      ];
+      for (const [index, [needle, replacement]] of mutations.entries()) {
+        expect(original).toContain(needle);
+        const staging = resolve(root, `${index}.yml`);
+        await writeFile(staging, original.replace(needle, replacement));
+        const result = run(repo, [
+          "bun", "scripts/release/validate-workflows.mjs",
+          "--ci", ".github/workflows/v2-ci.yml",
+          "--staging", staging,
+          "--wrangler", "server/wrangler.jsonc",
+          "--output", resolve(root, "workflow.json"),
+        ]);
+        expect(result.exitCode).not.toBe(0);
+      }
     } finally {
       await removeTemporaryDirectory(root);
     }
