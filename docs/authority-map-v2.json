@@ -18,7 +18,8 @@
     "releaseRunbook": "docs/operations/v2-release.md",
     "projectStatus": "docs/project-status.md",
     "blueprintCompletionRunbook": "docs/operations/blueprint-completion.md",
-    "blueprintCompletionRegistry": "scripts/completion/blueprint-completion-v1.json"
+    "blueprintCompletionRegistry": "scripts/completion/blueprint-completion-v1.json",
+    "publicReleaseAuthorityRunbook": "docs/operations/public-release-authority.md"
   },
   "product": {
     "mobileOnly": true,

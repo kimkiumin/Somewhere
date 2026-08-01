@@ -79,4 +79,6 @@ Whole-project completion is `PASS` only when every
 [`blueprint-completion-v1.json`](../../scripts/completion/blueprint-completion-v1.json)
 has authority-backed evidence. Public release is `PASS` only when every track
 required for public release also passes through an independent signed-receipt
-decision. Repository files cannot authenticate those external signatures.
+decision described in the
+[public release authority runbook](public-release-authority.md). Repository
+files cannot authenticate those external signatures.

@@ -27,6 +27,7 @@
     "verify:release": "bun run verify:v2 && bun test scripts/release/test/*.test.mjs && bun scripts/release/validate-release-config.mjs",
     "verify:blueprint-status": "bun scripts/completion/validate-blueprint-completion.mjs",
     "verify:blueprint": "bun test scripts/completion/*.test.mjs && bun run verify:blueprint-status",
+    "verify:release-authority": "bun test scripts/public-release/*.test.mjs && bun scripts/public-release/verify-public-release.mjs --help",
     "build:production": "bun scripts/release/build-production.mjs",
     "typecheck": "bun run --cwd contracts typecheck && bun run --cwd app typecheck && bun run --cwd server typecheck",
     "lint": "bun run --cwd app lint && bun run --cwd server lint",
