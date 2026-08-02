@@ -3,6 +3,10 @@ import { randomBase64Url } from "../security/tokens";
 export const API_HEADERS = {
   "cache-control": "no-store, private",
   "content-type": "application/json; charset=utf-8",
+  "permissions-policy":
+    "geolocation=(self), gyroscope=(self), magnetometer=(self), accelerometer=(self), camera=(), microphone=(), payment=(), usb=()",
+  "referrer-policy": "no-referrer",
+  "x-content-type-options": "nosniff",
 } as const;
 
 const ERROR_STATUS = {

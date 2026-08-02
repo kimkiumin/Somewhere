@@ -30,6 +30,12 @@ materialization, signal cleanup, digest binding, and honest BLOCK behavior.
 Use `verify:v2` alone for a shorter development gate; `verify:release` already
 includes it.
 
+Static asset security headers are checked in [`app/public/_headers`](../../app/public/_headers)
+and are applied by Cloudflare Workers Static Assets at deploy time. API
+responses carry the non-sniffing, referrer, and permissions-policy headers in
+the Worker response boundary. Keep both surfaces aligned with the V2 security
+controls; a production smoke test must verify the actual deployed headers.
+
 ## 3. CI and protected staging
 
 [`v2-ci.yml`](../../.github/workflows/v2-ci.yml) runs on pushes and pull
