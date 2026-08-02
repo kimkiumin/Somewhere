@@ -4,6 +4,7 @@ const previewPort = 4399;
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "**/v2/**",
   outputDir: "../output/playwright",
   fullyParallel: true,
   forbidOnly: true,
@@ -24,7 +25,7 @@ export default defineConfig({
     },
     {
       name: "webkit-mobile",
-      testIgnore: ["**/capture.spec.ts", "**/pwa.spec.ts"],
+      testIgnore: ["**/capture.spec.ts", "**/v2/**"],
       use: {
         ...devices["iPhone 15 Pro Max"],
         browserName: "webkit",

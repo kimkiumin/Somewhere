@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "product": {
+    "activeReroll": false,
+    "directBearingFallback": false,
+    "candidateBrowsing": false,
+    "mapFirst": false,
+    "desktopProductSurface": false,
+    "backgroundNavigationPromise": false,
+    "koreaResidencyClaim": false,
+    "fixedZeroCostClaim": false
+  },
+  "productionPatterns": [
+    "Reroll",
+    "directBearingToDestination",
+    "__SOMEWHERE_E2E_SENSOR_CONTROL__",
+    "Mock destinations only",
+    "v0.1 simulated walk"
+  ]
+}

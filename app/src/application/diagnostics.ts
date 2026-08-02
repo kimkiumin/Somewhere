@@ -27,20 +27,57 @@ export type DiagnosticSessionMetadata = {
 };
 
 export interface DiagnosticTrace {
+  beginSession(): void;
+  stopRecording(): void;
   record(event: DiagnosticEvent): void;
+  eventCount(): number;
   snapshot(): readonly DiagnosticEvent[];
   exportJson(metadata: DiagnosticSessionMetadata): string;
   discard(): void;
 }
 
 const HEADING_STORAGE_INTERVAL_MS = 200;
+export const MAX_DIAGNOSTIC_EVENTS = 12_000;
 
 export function createDiagnosticTrace(options: DiagnosticTraceOptions): DiagnosticTrace {
-  let events: DiagnosticEvent[] = [];
+  const events = new Array<DiagnosticEvent | undefined>(MAX_DIAGNOSTIC_EVENTS);
+  let recording = false;
+  let startIndex = 0;
+  let count = 0;
+  let droppedEventCount = 0;
   let lastStoredHeadingAtMs: number | null = null;
 
+  function clear(): void {
+    events.fill(undefined);
+    startIndex = 0;
+    count = 0;
+    droppedEventCount = 0;
+    lastStoredHeadingAtMs = null;
+  }
+
+  function orderedEvents(): DiagnosticEvent[] {
+    const result: DiagnosticEvent[] = [];
+    for (let offset = 0; offset < count; offset += 1) {
+      const event = events[(startIndex + offset) % MAX_DIAGNOSTIC_EVENTS];
+      if (event !== undefined) {
+        result.push(event);
+      }
+    }
+    return result;
+  }
+
   return {
+    beginSession() {
+      clear();
+      recording = true;
+    },
+    stopRecording() {
+      recording = false;
+    },
     record(event) {
+      if (!recording) {
+        return;
+      }
       if (
         event.type === "heading" &&
         lastStoredHeadingAtMs !== null &&
@@ -51,27 +88,41 @@ export function createDiagnosticTrace(options: DiagnosticTraceOptions): Diagnost
       if (event.type === "heading") {
         lastStoredHeadingAtMs = event.capturedAtMs;
       }
-      events.push(event);
+      if (count < MAX_DIAGNOSTIC_EVENTS) {
+        events[(startIndex + count) % MAX_DIAGNOSTIC_EVENTS] = event;
+        count += 1;
+        return;
+      }
+      events[startIndex] = event;
+      startIndex = (startIndex + 1) % MAX_DIAGNOSTIC_EVENTS;
+      droppedEventCount += 1;
+    },
+    eventCount() {
+      return count;
     },
     snapshot() {
-      return [...events];
+      return orderedEvents();
     },
     exportJson(metadata) {
       return JSON.stringify(
         {
-          schemaVersion: 1,
+          schemaVersion: 2,
           buildSha: options.buildSha,
           policyVersion: options.policyVersion,
           session: metadata,
-          events,
+          retention: {
+            maxEvents: MAX_DIAGNOSTIC_EVENTS,
+            droppedEventCount,
+          },
+          events: orderedEvents(),
         },
         null,
         2,
       );
     },
     discard() {
-      events = [];
-      lastStoredHeadingAtMs = null;
+      recording = false;
+      clear();
     },
   };
 }

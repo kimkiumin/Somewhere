@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.local/qa/v2/manual-evidence.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sourceSha",
+    "sourceTree",
+    "buildDigest",
+    "buildReceiptDigest",
+    "collectedAt",
+    "maxAgeMinutes",
+    "observations",
+    "artifacts",
+    "verdict"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "sourceSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sourceTree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "buildDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "buildReceiptDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "collectedAt": { "type": "string", "format": "date-time" },
+    "maxAgeMinutes": { "type": "integer", "minimum": 1, "maximum": 1440 },
+    "verdict": { "const": "PASS" },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "exitCode",
+        "expectedTests",
+        "unexpectedTests",
+        "surfaces",
+        "cleanup"
+      ],
+      "properties": {
+        "command": { "const": "bun run test:e2e:v2" },
+        "exitCode": { "const": 0 },
+        "expectedTests": { "const": 5 },
+        "unexpectedTests": { "const": 0 },
+        "surfaces": { "type": "array", "minItems": 4, "items": { "type": "string" } },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["exitCode", "pid", "port", "portClosed", "stateRemoved"],
+          "properties": {
+            "exitCode": { "type": "integer" },
+            "pid": { "type": "integer", "minimum": 1 },
+            "port": { "const": 8787 },
+            "portClosed": { "const": true },
+            "stateRemoved": { "const": true }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 27,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "bytes"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(visual/[A-Za-z0-9._-]+\\.png|playwright-output/[A-Za-z0-9._/-]+/trace\\.zip|browser-run\\.log|build-receipt\\.json|playwright-results\\.json|process-(start|cleanup)\\.json|visual-metadata\\.json)$"
+          },
+          "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "bytes": { "type": "integer", "minimum": 1 },
+          "width": { "type": "integer", "minimum": 1 },
+          "height": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  }
+}

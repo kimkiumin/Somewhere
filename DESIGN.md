@@ -1,8 +1,11 @@
-# Blind Compass Discovery Design System
+# Somewhere V2 Mobile Design System
 
 ## 1. Atmosphere & Identity
 
-Blind Compass feels like a quiet field instrument: calm, analog, slightly mysterious, and safe. The signature is a low-screen compass stage where one measured direction cue carries the experience, while surrounding controls stay restrained and trustworthy.
+Somewhere feels like a quiet field instrument: calm, analog, slightly
+mysterious, and safe. One route-qualified direction cue carries the experience.
+When route or sensor confidence fails, the cue disappears instead of falling
+back to a direct destination bearing.
 
 ## 2. Color
 
@@ -21,7 +24,7 @@ Blind Compass feels like a quiet field instrument: calm, analog, slightly myster
 | Accent/primary | `--color-accent` | `#2d5b73` | `#8fbdd2` | Direction, focus, active cue |
 | Accent/warm | `--color-warm` | `#8f5233` | `#d89a73` | Arrival and reveal cue |
 | Status/safe | `--color-safe` | `#3f6b4a` | `#8cc99a` | Safety confirmation |
-| Status/caution | `--color-caution` | `#805827` | `#e0b16b` | Give up, uncertainty |
+| Status/caution | `--color-caution` | `#805827` | `#e0b16b` | Stop, uncertainty |
 
 ### Rules
 
@@ -76,8 +79,10 @@ All spacing derives from a base of 4px.
 ### Grid
 
 - Max app width: 480px for the mobile-first instrument shell.
-- Secondary desktop width: 960px, where the app shell remains focused and support panels sit beside it.
-- Breakpoints: mobile 375px, tablet 768px, desktop 1280px.
+- Wide viewports keep one centered phone canvas; no tablet or desktop product
+  layout is introduced.
+- Acceptance widths are 320px, 390px, and 430px. A wider browser is a
+  containment check, not a separate product breakpoint.
 
 ### Rules
 
@@ -85,13 +90,14 @@ All spacing derives from a base of 4px.
 - The primary action area remains reachable near the lower half of the screen.
 - Mobile frames include all four `env(safe-area-inset-*)` values.
 - Interactive targets are at least 48px high; icon-only controls are not used in the journey.
-- At 390×844 and 430×932, the compass, status, Reveal, and Give Up controls fit in the first viewport.
+- At 390×844 and 430×932, the compass, status, reveal, and Stop controls fit in
+  the first viewport.
 
 ## 5. Components
 
 ### App Shell
 - **Structure**: full-height `main` with a constrained inner `.app-frame`.
-- **Variants**: journey, revealed, abandoned.
+- **Variants**: journey, revealed, stopped.
 - **Spacing**: `--space-4` to `--space-8`.
 - **States**: default, loading, empty, error.
 - **Accessibility**: one `h1`, live state summary, landmarks.
@@ -129,21 +135,26 @@ All spacing derives from a base of 4px.
 - **Copy**: names the next safe action without exposing developer-state vocabulary.
 
 ### Safety Controls
-- **Structure**: Reveal and Give Up remain a stable two-column row during hidden, following, near, paused, and arrived states.
-- **Variants**: Reveal uses secondary emphasis; Give Up uses quiet caution.
-- **States**: never disabled because of sensor quality.
-- **Placement**: Reroll follows the safety row and may sit below the first viewport.
+- **Structure**: `목적지 확인` and immediate `Stop` remain available during
+  guidance.
+- **Variants**: reveal uses secondary emphasis; Stop uses quiet caution.
+- **States**: neither depends on sensor quality. Reveal does not end guidance.
+- **Recovery**: Stop removes direction immediately. Continue or explicit stop
+  confirmation follows the V2 lifecycle; there is no active Reroll.
 
 ### Diagnostics Drawer
-- **Structure**: capability table, subscription counts, trace controls, environment label.
-- **Variants**: closed summary and expanded details.
+- **Boundary**: available only in the separately compiled field-diagnostics
+  build; absent from production and test-harness assets.
+- **Structure**: capability table, subscription counts, trace controls,
+  environment label.
 - **Privacy**: warns that exported coordinates are sensitive; traces are memory-only until Download.
 - **States**: Download, Discard, and Close are explicit text controls.
 
-### Primitive Showcase
-- The implementation reference is `/Somewhere/showcase.html`.
-- It must display every button variant, signal state, compass state, hidden panel, safety row, and diagnostics surface before consumer screens are approved.
-- A showcase failure blocks new screen-level styling.
+### Implementation Reference
+- The executable UI and visual-evidence scenarios are the implementation
+  reference. There is no separate production showcase route.
+- Production, test-harness, and field-diagnostics boundaries are verified as
+  distinct builds.
 
 ## 6. Motion & Interaction
 
@@ -177,18 +188,18 @@ Mixed, with border-led panels and one dark tonal compass stage.
 
 Depth stays quiet. No floating decorative shapes, no map-like backgrounds, and no nested card stacks.
 
-## 8. v0.2 State Contract
+## 8. V2 State Contract
 
 | Product state | Compass | Accent | Essential controls |
 |---|---|---|---|
 | Idle | Quiet instrument preview | Deep green | Start adventure |
-| Acquiring | Dial present, arrow absent | Muted blue | Reveal, Give Up, Reroll |
-| Hidden | Destination identity absent | Deep green | Begin walk, Reveal, Give Up, Reroll |
-| Following | Live arrow and distance | Compass blue | Reveal, Give Up, Reroll |
-| Paused | Arrow absent, reason visible | Caution | Retry, Reveal, Give Up, Reroll |
-| Near | Live arrow, stronger proximity copy | Compass blue | Reveal, Give Up, Reroll |
-| Arrived | Arrow no longer required | Warm orange | Reveal, Give Up, Reroll |
+| Acquiring | Dial present, arrow absent | Muted blue | Stop |
+| Hidden ready | Destination identity absent | Deep green | Commit, reveal, Stop |
+| Following | Route-qualified arrow and distance | Compass blue | Reveal, Stop |
+| Paused | Arrow absent, reason visible | Caution | Continue, confirm stop |
+| Near | Live route-qualified arrow | Compass blue | Reveal, Stop |
+| Arrived | Arrow no longer required | Warm orange | Reveal |
 | Revealed | Destination identity visible | Warm orange | Start again |
-| Give Up | Neutral safe exit | Muted green | Start again |
+| Stopped | Neutral safe exit | Muted green | Guarded new recommendation |
 
 Developer phase labels, raw permission enums, and mock-data badges never appear in the consumer journey. Raw values live only in the explicitly opened diagnostics drawer.

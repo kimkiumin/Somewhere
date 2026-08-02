@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.local/research/study-a/session-v1.schema.json",
+  "title": "Somewhere Study A supervised session v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "sessionId", "sessionType", "participantCodes", "evidenceOrigin",
+    "supervised", "consentVersion", "startedAt", "endedAt", "buildTarget",
+    "buildCompletedAt", "buildReceiptSha256", "routeContractSha256",
+    "providerConfigSha256", "navigationPolicySha256", "sessionSchemaSha256",
+    "physicalMockupVersion", "physicalMethod", "claimsEmbodiedPointing", "measures",
+    "stop", "safety", "privacy", "supervisorKeyId", "supervisorAttestationSha256",
+    "supervisorSignatureBase64"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "sessionId": { "type": "string", "pattern": "^study-a-[a-z0-9-]{8,64}$" },
+    "sessionType": { "enum": ["dyad-shared-selection", "individual-handling"] },
+    "participantCodes": {
+      "type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" }
+    },
+    "evidenceOrigin": { "const": "physical" },
+    "supervised": { "const": true },
+    "consentVersion": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "endedAt": { "type": "string", "format": "date-time" },
+    "buildTarget": { "enum": ["native-ios", "pwa-ios"] },
+    "buildCompletedAt": { "type": "string", "format": "date-time" },
+    "buildReceiptSha256": { "$ref": "#/$defs/hex64" },
+    "routeContractSha256": { "$ref": "#/$defs/hex64" },
+    "providerConfigSha256": { "$ref": "#/$defs/hex64" },
+    "navigationPolicySha256": { "$ref": "#/$defs/hex64" },
+    "sessionSchemaSha256": { "$ref": "#/$defs/hex64" },
+    "physicalMockupVersion": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" },
+    "physicalMethod": {
+      "enum": ["embodied-wizard-of-oz", "wired-prototype", "ble-prototype", "visual-only-animation"]
+    },
+    "claimsEmbodiedPointing": { "type": "boolean" },
+    "measures": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "comprehension", "selectionTimeSeconds", "comparisonReopeningCount", "movementStarted",
+        "routeSensorFailureCount", "stopTrust", "revealTrust", "falseArrivalCount",
+        "missedArrivalCount", "displayReadability", "oneHandUse", "accidentalStopCount",
+        "carryComfort", "stateDistinction"
+      ],
+      "properties": {
+        "comprehension": { "enum": ["pass", "fail"] },
+        "selectionTimeSeconds": { "type": "integer", "minimum": 0 },
+        "comparisonReopeningCount": { "type": "integer", "minimum": 0 },
+        "movementStarted": { "type": "boolean" },
+        "routeSensorFailureCount": { "type": "integer", "minimum": 0 },
+        "stopTrust": { "$ref": "#/$defs/trust" },
+        "revealTrust": { "$ref": "#/$defs/trust" },
+        "falseArrivalCount": { "type": "integer", "minimum": 0 },
+        "missedArrivalCount": { "type": "integer", "minimum": 0 },
+        "displayReadability": { "$ref": "#/$defs/physicalResult" },
+        "oneHandUse": { "$ref": "#/$defs/physicalResult" },
+        "accidentalStopCount": { "type": "integer", "minimum": 0 },
+        "carryComfort": { "$ref": "#/$defs/physicalResult" },
+        "stateDistinction": { "$ref": "#/$defs/physicalResult" }
+      }
+    },
+    "stop": {
+      "type": "object", "additionalProperties": false, "required": ["triggered", "reason"],
+      "properties": {
+        "triggered": { "type": "boolean" },
+        "reason": {
+          "type": ["string", "null"],
+          "enum": [null, "safety-concern", "consent-withdrawal", "unreliable-route", "data-boundary-breach"]
+        }
+      }
+    },
+    "safety": {
+      "type": "object", "additionalProperties": false,
+      "required": ["openCriticalIssueCount", "issueCodes"],
+      "properties": {
+        "openCriticalIssueCount": { "type": "integer", "minimum": 0 },
+        "issueCodes": {
+          "type": "array", "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" }
+        }
+      }
+    },
+    "privacy": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "rawCoordinatesCollected", "directIdentifiersCollected",
+        "venueIdentityFreeTextCollected", "traceStoredPrivately"
+      ],
+      "properties": {
+        "rawCoordinatesCollected": { "const": false },
+        "directIdentifiersCollected": { "const": false },
+        "venueIdentityFreeTextCollected": { "const": false },
+        "traceStoredPrivately": { "const": true }
+      }
+    },
+    "supervisorKeyId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" },
+    "supervisorAttestationSha256": { "$ref": "#/$defs/hex64" },
+    "supervisorSignatureBase64": { "type": "string", "contentEncoding": "base64" }
+  },
+  "$defs": {
+    "hex64": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "trust": { "enum": ["trusted", "uncertain", "distrusted"] },
+    "physicalResult": { "enum": ["pass", "fail", "not-observed"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "sessionType": { "const": "dyad-shared-selection" } } },
+      "then": { "properties": { "participantCodes": { "minItems": 2, "maxItems": 2 } } },
+      "else": { "properties": { "participantCodes": { "minItems": 1, "maxItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "stop": { "properties": { "triggered": { "const": false } } } } },
+      "then": { "properties": { "stop": { "properties": { "reason": { "const": null } } } } }
+    }
+  ]
+}

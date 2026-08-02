@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.invalid/schemas/native-build-receipt-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "buildAuthorityId", "issuedAt", "finalSha", "sourceTree", "bundleIdentifier", "deploymentTarget", "xcodeVersion", "sdk", "configuration", "projectSpecSha256", "generatedProjectSha256", "resultBundleSha256", "archiveSha256", "navigationPolicyVersion", "navigationPolicySha256", "routeContractSha256", "providerConfigSha256", "privacyManifestSha256", "privacyManifestInBundle", "backgroundBehavior", "tests", "signing", "sanitized", "rawCoordinateAttachments", "signature"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "native-build" },
+    "buildAuthorityId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "finalSha": { "$ref": "#/$defs/gitSha" },
+    "sourceTree": { "$ref": "#/$defs/gitSha" },
+    "bundleIdentifier": { "type": "string", "pattern": "^[A-Za-z0-9.-]+$" },
+    "deploymentTarget": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+    "xcodeVersion": { "type": "string", "minLength": 1 },
+    "sdk": { "type": "string", "minLength": 1 },
+    "configuration": { "const": "Release" },
+    "projectSpecSha256": { "$ref": "#/$defs/digest" },
+    "generatedProjectSha256": { "$ref": "#/$defs/digest" },
+    "resultBundleSha256": { "$ref": "#/$defs/digest" },
+    "archiveSha256": { "$ref": "#/$defs/digest" },
+    "navigationPolicyVersion": { "type": "string", "minLength": 1 },
+    "navigationPolicySha256": { "$ref": "#/$defs/digest" },
+    "routeContractSha256": { "$ref": "#/$defs/digest" },
+    "providerConfigSha256": { "$ref": "#/$defs/digest" },
+    "privacyManifestSha256": { "$ref": "#/$defs/digest" },
+    "privacyManifestInBundle": { "type": "boolean" },
+    "backgroundBehavior": { "const": "foreground-only-no-locked-screen-guidance" },
+    "tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit", "ui", "archive"],
+      "properties": { "unit": { "enum": ["PASS", "FAIL"] }, "ui": { "enum": ["PASS", "FAIL"] }, "archive": { "enum": ["PASS", "FAIL"] } }
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "teamId", "distribution"],
+      "properties": {
+        "kind": { "enum": ["unsigned", "development", "distribution"] },
+        "teamId": { "type": ["string", "null"], "pattern": "^[A-Z0-9]{10}$" },
+        "distribution": { "enum": ["none", "testflight"] }
+      }
+    },
+    "sanitized": { "type": "boolean" },
+    "rawCoordinateAttachments": { "type": "boolean" },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "signatureBase64", "signatureSha256"],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "signatureBase64": { "type": "string", "contentEncoding": "base64" },
+        "signatureSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

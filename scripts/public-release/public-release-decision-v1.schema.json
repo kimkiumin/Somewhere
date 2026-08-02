@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.invalid/schemas/public-release-decision-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "finalSha", "sourceTree", "terminalManifestSha256", "trustStoreSha256", "decidedAt", "publicRelease", "receipts"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "finalSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sourceTree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "terminalManifestSha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "trustStoreSha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "decidedAt": { "type": "string", "format": "date-time" },
+    "publicRelease": { "enum": ["PASS", "BLOCK", "FAIL"] },
+    "receipts": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["purpose", "authorityId", "decision", "receiptSha256", "evidenceDigests"],
+        "properties": {
+          "purpose": { "type": "string", "minLength": 1 },
+          "authorityId": { "type": "string", "minLength": 1 },
+          "decision": { "enum": ["PASS", "BLOCK", "FAIL"] },
+          "receiptSha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "evidenceDigests": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" } }
+        }
+      }
+    }
+  }
+}

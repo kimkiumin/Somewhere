@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "environment": "production",
+  "reviewedReleaseDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "reviewedDataFlowDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "reviewedRetentionPolicyDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "reviewedAt": "2026-07-29T00:00:00Z",
+  "expiresAt": "2026-07-30T00:00:00Z",
+  "reviewer": {
+    "name": "UNASSIGNED",
+    "qualification": "QUALIFIED INDEPENDENT REVIEW REQUIRED",
+    "organization": "UNASSIGNED",
+    "independent": true
+  },
+  "classification": {
+    "locationInformationBusiness": "COUNSEL_DETERMINATION_REQUIRED",
+    "locationBasedServiceBusiness": "COUNSEL_DETERMINATION_REQUIRED",
+    "registrationOrReportingRequired": "UNRESOLVED",
+    "evidenceDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "crossBorder": {
+    "preciseLocationLeavesKorea": true,
+    "destinationLeavesKorea": true,
+    "countriesOrRegions": ["UNREVIEWED"],
+    "legalBasis": "UNREVIEWED",
+    "noticeAndConsentMechanism": "UNREVIEWED",
+    "processorInventoryDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "cloudflareFactsAcknowledged": {
+    "d1HasNoKoreaJurisdiction": true,
+    "d1ApacIsOnlyHint": true,
+    "doHasNoKoreaJurisdiction": true,
+    "doApacNeIsOnlyHint": true,
+    "regionalServicesDoesNotProveD1OrDoKoreaResidency": true,
+    "d1TimeTravelDays": 7,
+    "doPitrDays": 30
+  },
+  "userRights": {
+    "privacyNoticeDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "deletionRunbookDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "incidentContact": "UNASSIGNED",
+    "pitrDisclosureApproved": true
+  },
+  "openFindings": [
+    {
+      "id": "KR-REVIEW-MISSING",
+      "severity": "CRITICAL",
+      "status": "OPEN"
+    }
+  ],
+  "conditions": ["qualified-independent-review"],
+  "decision": "BLOCK",
+  "attestationDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+}

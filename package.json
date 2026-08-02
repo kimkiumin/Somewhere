@@ -1,0 +1,56 @@
+{
+  "name": "@somewhere/workspace",
+  "version": "2.0.0",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "app",
+    "contracts",
+    "server"
+  ],
+  "scripts": {
+    "db:migrate:local": "bun run --cwd server db:migrate:local",
+    "local:v2:prepare": "bash scripts/release/local-v2-prepare.sh",
+    "local:v2:serve": "bash scripts/release/local-v2-serve.sh",
+    "local:v2:start-for-qa": "bash scripts/release/local-v2-start-for-qa.sh",
+    "test:e2e:v2": "bun run --cwd app test:e2e:v2",
+    "verify": "bun run verify:baseline && bun run test:contracts",
+    "verify:baseline": "bun -e 'const child=Bun.spawn([\"bun\",\"run\",\"--cwd\",\"app\",\"verify\"],{stdout:\"inherit\",stderr:\"inherit\"});const code=await child.exited;const {rm}=await import(\"node:fs/promises\");for(const path of [\"app/dist\",\"app/dist-e2e\",\"app/test-results\",\"app/playwright-report\",\"output/playwright\"]){await rm(path,{recursive:true,force:true});}process.exit(code);'",
+    "test:contracts": "bun run --cwd contracts test",
+    "test:app": "bun run --cwd app test:unit",
+    "test:server": "bun run --cwd server test",
+    "verify:ops": "bash scripts/operations/verify-ops.sh",
+    "verify:v2": "bun run verify && bun run test:server && bun run verify:ops && bun run typecheck && bun run lint",
+    "verify:release": "bun run verify:v2 && bun test scripts/release/test/*.test.mjs && bun scripts/release/validate-release-config.mjs",
+    "verify:blueprint-status": "bun scripts/completion/validate-blueprint-completion.mjs",
+    "verify:blueprint": "bun run verify:studies && bun test scripts/completion/*.test.mjs && bun run verify:blueprint-status && bun run verify:ios-source && bun run verify:native-evidence",
+    "verify:studies": "bun test research/study-a/*.test.mjs research/study-b/*.test.mjs",
+    "verify:ios-source": "bun test scripts/ios/validate-ios-source.test.mjs scripts/ios/validate-ios-field-flow.test.mjs scripts/ios/validate-macos-handoff.test.mjs && bun scripts/ios/validate-ios-source.mjs && bun scripts/ios/validate-ios-field-flow.mjs",
+    "verify:native-evidence": "bun test scripts/ios/verify-native-evidence.test.mjs && bun scripts/ios/verify-native-evidence.mjs --help",
+    "verify:release-authority": "bun test scripts/public-release/*.test.mjs && bun scripts/public-release/verify-public-release.mjs --help",
+    "build:production": "bun scripts/release/build-production.mjs",
+    "typecheck": "bun run --cwd contracts typecheck && bun run --cwd app typecheck && bun run --cwd server typecheck",
+    "lint": "bun run --cwd app lint && bun run --cwd server lint",
+    "build": "bun run --cwd app build"
+  },
+  "overrides": {
+    "jake": "12.10.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.6",
+    "@cloudflare/vitest-pool-workers": "0.19.0",
+    "@cloudflare/workers-types": "5.20260729.1",
+    "@types/bun": "1.3.14",
+    "@vitest/coverage-v8": "4.1.10",
+    "lighthouse": "13.4.1",
+    "typescript": "7.0.2",
+    "vite": "8.1.5",
+    "vitest": "4.1.10",
+    "wrangler": "4.115.0",
+    "yaml": "2.9.0",
+    "zod": "4.4.3"
+  }
+}

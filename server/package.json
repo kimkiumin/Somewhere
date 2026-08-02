@@ -1,0 +1,22 @@
+{
+  "name": "@somewhere/server",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "bun run lint && bun run typecheck",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local --config wrangler.jsonc",
+    "hidden:start": "bash scripts/start-local-hidden-slice.sh",
+    "hidden:stop": "bash scripts/stop-local-hidden-slice.sh",
+    "hidden:curl": "bash test/curl-hidden-slice.sh",
+    "lint": "biome check src/index.ts src/http.ts src/environment.ts src/admission src/api src/async src/db src/deletion src/feedback src/journey src/observability src/operations src/privacy src/provider src/security src/testing test vitest.config.ts",
+    "test": "bun ../scripts/operations/vitest-compat.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.2"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "sourceTree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "buildDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "collectedAt": "2099-01-01T00:00:00.000Z",
+  "maxAgeMinutes": 30,
+  "artifacts": [
+    {
+      "path": "visual/foreign.png",
+      "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "bytes": 24,
+      "width": 1,
+      "height": 1
+    }
+  ],
+  "verdict": "PASS"
+}

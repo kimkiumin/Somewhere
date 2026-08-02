@@ -36,6 +36,8 @@ export function createScriptedSensorRig(initialNowMs = 1_000): ScriptedSensorRig
   let onHeadingFailure: ((failure: HeadingFailure) => void) | null = null;
   const visibilityListeners = new Set<(state: VisibilityState) => void>();
   const wakeReleaseListeners = new Set<() => void>();
+  const deadlines = new Map<number, { readonly dueAtMs: number; readonly callback: () => void }>();
+  let nextDeadlineId = 1;
 
   const location: LocationSource = {
     subscribe(onSample, onFailure): Unsubscribe {
@@ -104,6 +106,19 @@ export function createScriptedSensorRig(initialNowMs = 1_000): ScriptedSensorRig
       visibility: visibilitySource,
       wakeLock,
       clock: { nowMs: () => nowMs },
+      scheduler: {
+        schedule(delayMs, callback) {
+          const id = nextDeadlineId;
+          nextDeadlineId += 1;
+          deadlines.set(id, {
+            dueAtMs: nowMs + Math.max(0, delayMs),
+            callback,
+          });
+          return () => {
+            deadlines.delete(id);
+          };
+        },
+      },
     },
     setHeadingPermission(outcome) {
       permission = outcome;
@@ -134,6 +149,19 @@ export function createScriptedSensorRig(initialNowMs = 1_000): ScriptedSensorRig
     advanceMs(milliseconds) {
       if (Number.isFinite(milliseconds) && milliseconds >= 0) {
         nowMs += milliseconds;
+        while (true) {
+          const due = [...deadlines.entries()]
+            .filter(([, deadline]) => deadline.dueAtMs <= nowMs)
+            .sort(
+              ([firstId, first], [secondId, second]) =>
+                first.dueAtMs - second.dueAtMs || firstId - secondId,
+            )[0];
+          if (due === undefined) {
+            break;
+          }
+          deadlines.delete(due[0]);
+          due[1].callback();
+        }
       }
     },
     nowMs: () => nowMs,

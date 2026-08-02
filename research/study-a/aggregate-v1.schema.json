@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.local/research/study-a/aggregate-v1.schema.json",
+  "title": "Somewhere Study A aggregate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "studyId", "protocolVersion", "generatedAt", "bindings",
+    "acceptedThresholds", "sessionReceipts", "openCriticalSafetyIssueCount",
+    "navigationDecision", "physicalDecision", "supervisorKeyId",
+    "supervisorAttestationSha256", "supervisorSignatureBase64"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "studyId": { "type": "string", "pattern": "^study-a-[a-z0-9-]{8,64}$" },
+    "protocolVersion": { "const": "study-a-protocol-v1" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "bindings": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "nativeBuildReceiptSha256", "pwaBuildReceiptSha256", "routeContractSha256",
+        "providerConfigSha256", "navigationPolicySha256", "sessionSchemaSha256",
+        "aggregateSchemaSha256", "calibrationEvidenceSha256", "physicalMockupVersion"
+      ],
+      "properties": {
+        "nativeBuildReceiptSha256": { "$ref": "#/$defs/hex64" },
+        "pwaBuildReceiptSha256": { "$ref": "#/$defs/hex64" },
+        "routeContractSha256": { "$ref": "#/$defs/hex64" },
+        "providerConfigSha256": { "$ref": "#/$defs/hex64" },
+        "navigationPolicySha256": { "$ref": "#/$defs/hex64" },
+        "calibrationEvidenceSha256": { "$ref": "#/$defs/hex64" },
+        "sessionSchemaSha256": { "$ref": "#/$defs/hex64" },
+        "aggregateSchemaSha256": { "$ref": "#/$defs/hex64" },
+        "physicalMockupVersion": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" }
+      }
+    },
+    "acceptedThresholds": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "comprehensionPassRateMin", "movementStartRateMin", "trustedStopOrRevealRateMin",
+        "maxRouteSensorFailures", "maxFalseArrivals", "maxMissedArrivals", "physicalPassRateMin"
+      ],
+      "properties": {
+        "comprehensionPassRateMin": { "const": 0.8 },
+        "movementStartRateMin": { "const": 0.8 },
+        "trustedStopOrRevealRateMin": { "const": 0.8 },
+        "maxRouteSensorFailures": { "const": 0 },
+        "maxFalseArrivals": { "const": 0 },
+        "maxMissedArrivals": { "const": 0 },
+        "physicalPassRateMin": { "const": 0.8 }
+      }
+    },
+    "sessionReceipts": {
+      "type": "array", "minItems": 5, "maxItems": 8,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["sessionId", "sessionSha256"],
+        "properties": {
+          "sessionId": { "type": "string", "pattern": "^study-a-[a-z0-9-]{8,64}$" },
+          "sessionSha256": { "$ref": "#/$defs/hex64" }
+        }
+      }
+    },
+    "openCriticalSafetyIssueCount": { "type": "integer", "minimum": 0 },
+    "navigationDecision": { "enum": ["PASS", "FAIL"] },
+    "physicalDecision": { "enum": ["PASS", "FAIL", "BLOCK"] },
+    "supervisorKeyId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" },
+    "supervisorAttestationSha256": { "$ref": "#/$defs/hex64" },
+    "supervisorSignatureBase64": { "type": "string", "contentEncoding": "base64" }
+  },
+  "$defs": {
+    "hex64": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

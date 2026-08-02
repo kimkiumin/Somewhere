@@ -1,0 +1,104 @@
+name: Somewhere V2 repository gate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: somewhere-v2-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify V2 without release authority
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pinned Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install frozen dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install runtime tools
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Install Playwright browsers
+        working-directory: app
+        run: bunx --no-install playwright install --with-deps chromium webkit
+
+      - name: Create sanitized evidence directory
+        run: mkdir -p "$RUNNER_TEMP/somewhere-v2-ci"
+
+      - name: Verify V2 repository
+        run: |
+          SOMEWHERE_OPS_EVIDENCE_DIR="$RUNNER_TEMP/somewhere-v2-ci/operations" \
+            bun run verify:v2
+
+      - name: Validate field schema and honest release block
+        run: |
+          bun app/qa/field/v2/validate-evidence.mjs \
+            --mode schema \
+            --input app/qa/field/v2/fixtures/synthetic-schema-valid \
+            --output "$RUNNER_TEMP/somewhere-v2-ci/field-schema.json"
+          set +e
+          bun app/qa/field/v2/validate-evidence.mjs \
+            --mode release \
+            --input app/qa/field/v2/fixtures/synthetic-release-block \
+            --output "$RUNNER_TEMP/somewhere-v2-ci/field-release.json"
+          status=$?
+          set -e
+          test "$status" -eq 2
+          jq -e '.schemaValid and .deviceGate=="BLOCK"' \
+            "$RUNNER_TEMP/somewhere-v2-ci/field-release.json"
+
+      - name: Audit dependencies
+        run: bun audit --json > "$RUNNER_TEMP/somewhere-v2-ci/audit.json"
+
+      - name: Build production assets and Worker dry run
+        run: |
+          bun run build:production -- \
+            --outdir "$RUNNER_TEMP/somewhere-v2-build" \
+            --receipt "$RUNNER_TEMP/somewhere-v2-ci/production-build.json"
+
+      - name: Scan emitted production bundle
+        run: |
+          bun scripts/release/scan-production.mjs \
+            --build-receipt "$RUNNER_TEMP/somewhere-v2-ci/production-build.json" \
+            --final-root "$RUNNER_TEMP/somewhere-v2-build" \
+            --deny scripts/release/forbidden-production-patterns-v1.json \
+            --output "$RUNNER_TEMP/somewhere-v2-ci/production-scan.json"
+
+      - name: Validate repository PASS and release BLOCK
+        run: |
+          bun scripts/release/validate-workflows.mjs \
+            --ci .github/workflows/v2-ci.yml \
+            --staging .github/workflows/v2-staging.yml \
+            --wrangler server/wrangler.jsonc \
+            --output "$RUNNER_TEMP/somewhere-v2-ci/workflow.json"
+          tree="$(git rev-parse HEAD^{tree})"
+          bun scripts/release/validate-ci-verdict.mjs \
+            --mode repository \
+            --source-tree "$tree" \
+            --fixture scripts/release/fixtures/ci/repository-ready-release-blocked.json \
+            --workflow-verdict "$RUNNER_TEMP/somewhere-v2-ci/workflow.json" \
+            --expect-repository PASS \
+            --expect-release BLOCK \
+            --output "$RUNNER_TEMP/somewhere-v2-ci/release.json"
+
+      - name: Upload sanitized repository evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: somewhere-v2-sanitized-${{ github.run_id }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/somewhere-v2-ci

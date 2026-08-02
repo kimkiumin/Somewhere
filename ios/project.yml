@@ -1,0 +1,64 @@
+name: Somewhere
+options:
+  minimumXcodeGenVersion: 2.42.0
+  deploymentTarget:
+    iOS: "17.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+schemes:
+  Somewhere:
+    build:
+      targets:
+        Somewhere: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - SomewhereTests
+        - SomewhereUITests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+targets:
+  Somewhere:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - Somewhere
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: example.somewhere.field
+        INFOPLIST_FILE: Somewhere/Resources/Info.plist
+        SOMEWHERE_API_ORIGIN: https://example.invalid
+        CODE_SIGN_STYLE: Automatic
+  SomewhereTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - SomewhereTests
+    dependencies:
+      - target: Somewhere
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: example.somewhere.field.tests
+        GENERATE_INFOPLIST_FILE: YES
+  SomewhereUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - SomewhereUITests
+    dependencies:
+      - target: Somewhere
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: example.somewhere.field.uitests
+        GENERATE_INFOPLIST_FILE: YES

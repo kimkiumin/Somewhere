@@ -27,6 +27,7 @@
       "estimatedMinutes": 5,
       "reveal": {
         "name": "가족마당",
+        "language": "ko",
         "category": "Open lawn",
         "description": "A broad public lawn in the heart of Seoul Forest."
       },
@@ -46,6 +47,7 @@
       "estimatedMinutes": 9,
       "reveal": {
         "name": "갤러리정원",
+        "language": "ko",
         "category": "Garden",
         "description": "A landscaped garden space within Seoul Forest."
       },
@@ -65,6 +67,7 @@
       "estimatedMinutes": 7,
       "reveal": {
         "name": "거울연못",
+        "language": "ko",
         "category": "Pond",
         "description": "A reflective pond framed by trees and open sky."
       },
@@ -84,6 +87,7 @@
       "estimatedMinutes": 9,
       "reveal": {
         "name": "군마상",
+        "language": "ko",
         "category": "Sculpture",
         "description": "A horse sculpture marking a piece of the site's history."
       },
@@ -103,6 +107,7 @@
       "estimatedMinutes": 8,
       "reveal": {
         "name": "사슴우리",
+        "language": "ko",
         "category": "Animal enclosure",
         "description": "A public viewing area for deer inside Seoul Forest."
       },
@@ -122,6 +127,7 @@
       "estimatedMinutes": 9,
       "reveal": {
         "name": "서울숲 방문자센터",
+        "language": "ko",
         "category": "Visitor center",
         "description": "The visitor information point for Seoul Forest."
       },
@@ -141,6 +147,7 @@
       "estimatedMinutes": 4,
       "reveal": {
         "name": "서울숲호수",
+        "language": "ko",
         "category": "Lake",
         "description": "A waterside landmark near the center of Seoul Forest."
       },

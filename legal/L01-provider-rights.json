@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "providerId": "unassigned",
+  "adapterVersion": "unassigned",
+  "environment": "production",
+  "reviewedReleaseDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "terms": {
+    "documentUrl": "https://example.invalid/provider-terms-not-reviewed",
+    "versionOrPublishedAt": "UNREVIEWED",
+    "reviewedAt": "2026-07-29T00:00:00Z",
+    "expiresAt": "2026-07-30T00:00:00Z"
+  },
+  "rights": {
+    "search": true,
+    "routing": true,
+    "storeRaw": false,
+    "storeDerived": true,
+    "cacheTtlSeconds": 0,
+    "display": true,
+    "attribution": "UNREVIEWED",
+    "manualFixture": false,
+    "commercialPilot": true,
+    "geographies": ["KR"],
+    "deletionMechanism": "UNREVIEWED"
+  },
+  "dataFlow": {
+    "endpointOrigins": ["https://example.invalid"],
+    "methods": ["GET"],
+    "sendsPreciseOrigin": false,
+    "sendsDestination": false,
+    "processingRegions": ["UNREVIEWED"],
+    "providerRetentionDays": 0,
+    "subprocessorEvidenceDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "quota": {
+    "unit": "UNREVIEWED",
+    "hardDailyCap": 1,
+    "billableFallback": false,
+    "payer": "UNASSIGNED",
+    "checkedAt": "2026-07-29T00:00:00Z",
+    "reservationOwner": "UNASSIGNED"
+  },
+  "credential": {
+    "bindingName": "UNASSIGNED_PROVIDER",
+    "scopeDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "rotatedAt": "2026-07-29T00:00:00Z",
+    "expiresAt": "2026-07-30T00:00:00Z"
+  },
+  "evidence": {
+    "owner": {
+      "name": "UNASSIGNED",
+      "role": "owner",
+      "organization": "UNASSIGNED",
+      "attestationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "legalReviewer": {
+      "name": "UNASSIGNED",
+      "role": "legal reviewer",
+      "organization": "UNASSIGNED",
+      "attestationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "securityReviewer": {
+      "name": "UNASSIGNED",
+      "role": "security reviewer",
+      "organization": "UNASSIGNED",
+      "attestationDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "signedAt": "2026-07-29T00:00:00Z",
+    "artifactDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "decision": "BLOCK"
+}

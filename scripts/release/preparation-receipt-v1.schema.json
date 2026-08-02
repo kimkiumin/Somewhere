@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.invalid/schemas/preparation-receipt-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "preparationGate", "finalSha", "sourceTree", "reviewedPlan", "policy", "buildReceipt", "buildArchive", "sourceArchive", "preparationManifest", "rcPromotionReceipt", "cleanup"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "preparationGate": { "enum": ["PASS", "BLOCK", "FAIL"] },
+    "finalSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sourceTree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "reviewedPlan": { "$ref": "#/$defs/artifact" },
+    "policy": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "type": "object", "required": ["kind"], "properties": { "kind": { "enum": ["calibration", "rc"] } } }] },
+    "buildReceipt": { "$ref": "#/$defs/artifact" },
+    "buildArchive": { "$ref": "#/$defs/artifact" },
+    "sourceArchive": { "$ref": "#/$defs/artifact" },
+    "preparationManifest": { "$ref": "#/$defs/artifact" },
+    "rcPromotionReceipt": { "$ref": "#/$defs/artifact" },
+    "cleanup": { "type": "object", "additionalProperties": false, "required": ["temporaryRootRemoved"], "properties": { "temporaryRootRemoved": { "const": true } } }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "kind": { "type": "string" }
+      }
+    }
+  }
+}

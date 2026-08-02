@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "productVersion": "v2",
+  "authorityOrder": [
+    "owner-latest-direction",
+    "approved-blueprint",
+    "v2-implementation-design",
+    "executable-contracts-code-tests",
+    "historical-v0.2-and-v0.1"
+  ],
+  "canonical": {
+    "product": "BLUEPRINT.md",
+    "design": "docs/superpowers/specs/2026-07-29-somewhere-v2-mobile-service-design.md",
+    "wireContract": "docs/architecture/wire-contract-v1.json",
+    "navigationPolicy": "contracts/policy/navigation-v2-calibration-1.json",
+    "operationsPolicy": "docs/architecture/operations-policy-v1.json",
+    "backendRunbook": "docs/operations/v2-pilot-backend.md",
+    "releaseRunbook": "docs/operations/v2-release.md",
+    "projectStatus": "docs/project-status.md",
+    "blueprintCompletionRunbook": "docs/operations/blueprint-completion.md",
+    "blueprintCompletionRegistry": "scripts/completion/blueprint-completion-v1.json",
+    "publicReleaseAuthorityRunbook": "docs/operations/public-release-authority.md",
+    "nativeIOSSource": "ios/README.md",
+    "nativeIOSSourceValidator": "scripts/ios/validate-ios-source.mjs"
+  },
+  "product": {
+    "mobileOnly": true,
+    "oneHiddenDestination": true,
+    "routeAwareGuidance": true,
+    "activeReroll": false,
+    "directBearingFallback": false,
+    "candidateBrowsing": false,
+    "mapFirst": false,
+    "desktopProductSurface": false,
+    "backgroundNavigationPromise": false,
+    "koreaResidencyClaim": false,
+    "fixedZeroCostClaim": false
+  },
+  "backend": {
+    "platform": "Cloudflare Workers Free-first pilot",
+    "systems": ["Workers", "D1", "Durable Objects", "Queues", "Static Assets"],
+    "productionConfigured": true,
+    "productionDeployed": false,
+    "providerMode": "reviewed fixture until external rights gate passes",
+    "koreaResidencyClaim": false,
+    "fixedZeroCostClaim": false
+  },
+  "costPolicy": {
+    "source": "docs/architecture/operations-policy-v1.json",
+    "warningFraction": 0.5,
+    "admissionCloseFraction": 0.8,
+    "freeTierIsBudgetTargetNotGuarantee": true
+  },
+  "retention": {
+    "sessionHours": 24,
+    "csrfMinutes": 30,
+    "preparedReceiptHours": 1,
+    "sealedSelectionDays": 180,
+    "inboxOutboxHours": 48,
+    "feedbackCapabilityDays": 7,
+    "coarseOperationsDays": 7,
+    "securityMigrationDeletionAuditDays": 180,
+    "queueDlqHours": 24,
+    "workerLogsDays": 3,
+    "d1TimeTravelDays": 7,
+    "durableObjectPitrDays": 30,
+    "tombstoneHours": 48
+  },
+  "repositoryGate": "automatable checks must pass",
+  "releaseGate": "BLOCK until Cloudflare, provider, Korean legal, Study A, four exact-build iPhone runs, and native distribution evidence pass",
+  "completionScopes": {
+    "serviceSlice": "mobile web, contracts, Cloudflare backend, operations, and repository evidence",
+    "blueprintProject": "service slice plus native iOS, physical compass, Study A, Study B, and provider/legal feasibility",
+    "publicRelease": "blueprint project plus production operations, exact-device, and distribution authority",
+    "current": {
+      "serviceSlice": "PASS",
+      "blueprintProject": "BLOCK",
+      "publicRelease": "BLOCK"
+    }
+  },
+  "historical": {
+    "v0.2": ["app/qa/field/README.md", "app/qa/field/evidence.schema.json"],
+    "v0.1": ["prototype", "docs/project_brief.md", "docs/prototype_spec.md"],
+    "research": ["docs/prompt_library.md", "docs/combined_source_pack.md", "docs/codex_handoff_agents.md"]
+  }
+}

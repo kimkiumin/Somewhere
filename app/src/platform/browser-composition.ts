@@ -23,7 +23,7 @@ function orientationPermissionProvider(): OrientationPermissionProvider | undefi
   };
 }
 
-function wakeLockSentinel(input: unknown): WakeLockSentinelLike {
+export function wakeLockSentinel(input: unknown): WakeLockSentinelLike {
   if (typeof input !== "object" || input === null) {
     throw new Error("Wake Lock returned a malformed sentinel.");
   }
@@ -39,7 +39,9 @@ function wakeLockSentinel(input: unknown): WakeLockSentinelLike {
   }
   const listenerMap = new Map<() => void, EventListener>();
   return {
-    released: Reflect.get(input, "released") === true,
+    get released() {
+      return Reflect.get(input, "released") === true;
+    },
     release: async () => {
       await Promise.resolve(Reflect.apply(release, input, []));
     },
@@ -134,5 +136,11 @@ export function createBrowserSensorPorts(): SensorControllerPorts {
     visibility: createBrowserVisibilitySource(visibilityEnvironment),
     wakeLock: createBrowserWakeLockSource(wakeLockEnvironment()),
     clock: { nowMs: () => Date.now() },
+    scheduler: {
+      schedule(delayMs, callback) {
+        const timeoutId = window.setTimeout(callback, Math.max(0, delayMs));
+        return () => window.clearTimeout(timeoutId);
+      },
+    },
   };
 }

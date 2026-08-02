@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    { "id": "session-origin-host-csrf", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/session-security-boundary-todo8.test.ts", "test/security-adversarial-todo8.test.ts"], "expectedExit": 0 },
+    { "id": "idor-idempotency-sequence", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/idempotency-sequence-todo8.test.ts"], "expectedExit": 0 },
+    { "id": "stop-reveal-race", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/lifecycle-race.test.ts"], "expectedExit": 0 },
+    { "id": "feedback-capability-deletion", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/feedback-deletion.test.ts"], "expectedExit": 0 },
+    { "id": "provider-boundary", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/provider-boundary-todo7.test.ts"], "expectedExit": 0 },
+    { "id": "meter-admission", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/budget-admission-todo8.test.ts"], "expectedExit": 0 },
+    { "id": "operations-authority", "argv": ["bun", "run", "--cwd", "server", "test", "--", "test/task14-production-authority.test.ts"], "expectedExit": 0 },
+    { "id": "production-harness-boundary", "argv": ["bash", "scripts/release/assert-v2-bundle-boundary.sh"], "expectedExit": 0 }
+  ]
+}

@@ -9,8 +9,9 @@
   },
   "scripts": {
     "dev": "bun --bun vite",
-    "build": "bun --bun vite build",
-    "build:harness": "bun --bun vite build --mode test-harness",
+    "build": "bun --bun vite build && bun scripts/assert-precache-unique.mjs dist production",
+    "build:harness": "bun --bun vite build --config vite.harness.config.ts --mode test-harness && bun scripts/assert-precache-unique.mjs dist-e2e harness",
+    "build:field": "bun --bun vite build --config vite.field.config.ts && bun scripts/assert-build-boundaries.mjs",
     "preview": "bun --bun vite preview",
     "preview:harness": "bun --bun vite preview --outDir dist-e2e",
     "typecheck": "tsc --noEmit",
@@ -18,20 +19,21 @@
     "format": "biome format --write .",
     "test:unit": "vitest run --passWithNoTests",
     "test:e2e": "bun run build:harness && playwright test",
+    "test:e2e:v2": "playwright test --config playwright.v2.config.ts",
+    "qa:field:v2": "bun qa/field/v2/validate-evidence.mjs --mode release",
     "test:prototype": "node --test ../prototype/app.test.js",
     "verify": "bun run test:prototype && bun run lint && bun run typecheck && bun run test:unit && bun run build && bun run test:e2e"
   },
   "dependencies": {
+    "@somewhere/contracts": "workspace:*",
+    "workbox-window": "7.4.1",
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.6",
     "@axe-core/playwright": "4.12.1",
     "@playwright/test": "1.62.0",
     "@types/node": "26.1.2",
-    "typescript": "7.0.2",
     "vite": "8.1.5",
-    "vite-plugin-pwa": "1.3.0",
-    "vitest": "4.1.10"
+    "vite-plugin-pwa": "1.3.0"
   }
 }

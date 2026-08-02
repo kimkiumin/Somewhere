@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "fixtureVersion": "seoul-forest-closed-pilot-2026-07-29",
+  "providerId": "somewhere-manual-pilot",
+  "adapterVersion": "manual-place-v1",
+  "reviewStatus": "approved",
+  "reviewedAt": "2026-07-28T06:00:00Z",
+  "expiresAt": "2026-08-27T06:00:00Z",
+  "reviewer": "Somewhere closed-pilot rights reviewer",
+  "attribution": "Somewhere repository-authored closed-pilot field fixture.",
+  "sourceRightNote": "Original manual observations may be stored and used only for the named closed pilot.",
+  "permitted": {
+    "search": true,
+    "routing": true,
+    "storeDerived": true,
+    "displayAfterReveal": true,
+    "commercialApiDataCopied": false
+  },
+  "quota": {
+    "enabled": true,
+    "hardDailyCap": 100,
+    "billableFallback": false,
+    "reservationOwner": "manual-pilot-admission-v1",
+    "checkedAt": "2026-07-28T06:00:00Z"
+  }
+}

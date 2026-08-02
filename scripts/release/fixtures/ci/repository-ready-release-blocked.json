@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "declaredReleaseReady": "BLOCK",
+  "repositoryChecks": {
+    "verifyV2": true,
+    "fieldSchema": true,
+    "dependencyAudit": true,
+    "workerDryRun": true,
+    "productionScan": true
+  },
+  "externalGates": {
+    "cloudflareCredential": "BLOCK",
+    "cloudflareProductionPitr": "BLOCK",
+    "githubEnvironmentProtection": "BLOCK",
+    "physicalIPhone": "BLOCK",
+    "providerRightsQuota": "BLOCK",
+    "koreanPrivacyLocationReview": "BLOCK"
+  },
+  "safeguards": {
+    "environmentBindingsDistinct": true,
+    "lifecycleGradualRollback": false,
+    "migrationBackup": true,
+    "privateResponsesNoStore": true,
+    "untrustedEventSecrets": false
+  },
+  "externalWrites": 0
+}

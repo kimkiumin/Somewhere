@@ -68,6 +68,41 @@ describe("browser lifecycle adapters", () => {
     expect(sentinelReleaseCount).toBe(1);
   });
 
+  test("reacquires after the system marks the current Wake Lock released", async () => {
+    let requestCount = 0;
+    let releaseListener = (): void => undefined;
+    let currentReleased = false;
+    const source = createBrowserWakeLockSource({
+      request() {
+        requestCount += 1;
+        currentReleased = false;
+        return Promise.resolve({
+          get released() {
+            return currentReleased;
+          },
+          release: () => Promise.resolve(),
+          addReleaseListener(listener) {
+            releaseListener = listener;
+          },
+          removeReleaseListener() {
+            releaseListener = () => undefined;
+          },
+        });
+      },
+    });
+    const reacquired = deferred<void>();
+    source.subscribeToRelease(() => {
+      void source.acquire().then(() => reacquired.resolve());
+    });
+
+    await source.acquire();
+    currentReleased = true;
+    releaseListener();
+    await reacquired.promise;
+
+    expect(requestCount).toBe(2);
+  });
+
   test("deduplicates acquisition and releases a sentinel that arrives after release", async () => {
     const request = deferred<{
       readonly released: boolean;

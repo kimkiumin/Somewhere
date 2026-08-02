@@ -1,0 +1,285 @@
+name: Somewhere V2 protected staging release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Exact reviewed release commit
+        required: true
+        type: string
+      release_tag:
+        description: Approved immutable annotated V2 RC tag
+        required: true
+        type: string
+      repository_verdict_b64:
+        description: Base64 exact-SHA repository verdict (non-secret)
+        required: true
+        type: string
+      repository_verdict_sha256:
+        description: SHA-256 of the approved repository verdict
+        required: true
+        type: string
+      terminal_manifest_b64:
+        description: Base64 terminal evidence manifest (non-secret)
+        required: true
+        type: string
+      terminal_manifest_sha256:
+        description: SHA-256 of the approved terminal evidence manifest
+        required: true
+        type: string
+      prior_release_sha:
+        description: Exact approved prior release commit
+        required: true
+        type: string
+      prior_config_sha256:
+        description: SHA-256 of the approved prior Wrangler config
+        required: true
+        type: string
+      fence_receipt_sha256:
+        description: Digest published by the external fence authority
+        required: true
+        type: string
+      base_url:
+        description: Exact approved HTTPS staging origin
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: somewhere-v2-staging
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    name: Fence, back up, expand, deploy, smoke, and resume
+    runs-on: ubuntu-24.04
+    environment:
+      name: somewhere-v2-staging
+    steps:
+      - name: Check out exact release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
+
+      - name: Set up pinned Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install frozen dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate exact release and prior lifecycle snapshot
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          REPOSITORY_VERDICT_B64: ${{ inputs.repository_verdict_b64 }}
+          REPOSITORY_VERDICT_SHA256: ${{ inputs.repository_verdict_sha256 }}
+          TERMINAL_MANIFEST_B64: ${{ inputs.terminal_manifest_b64 }}
+          TERMINAL_MANIFEST_SHA256: ${{ inputs.terminal_manifest_sha256 }}
+          BASE_URL: ${{ inputs.base_url }}
+          PRIOR_RELEASE_SHA: ${{ inputs.prior_release_sha }}
+          PRIOR_CONFIG_SHA256: ${{ inputs.prior_config_sha256 }}
+          FENCE_RECEIPT_SHA256: ${{ inputs.fence_receipt_sha256 }}
+          APPROVED_REPOSITORY_VERDICT_SHA256: ${{ vars.STAGING_REPOSITORY_VERDICT_SHA256 }}
+          APPROVED_TERMINAL_MANIFEST_SHA256: ${{ vars.STAGING_TERMINAL_MANIFEST_SHA256 }}
+          APPROVED_FENCE_RECEIPT_SHA256: ${{ vars.STAGING_FENCE_RECEIPT_SHA256 }}
+        run: |
+          test "$RELEASE_SHA" = "$(git rev-parse HEAD)"
+          printf '%s' "$RELEASE_SHA" | rg '^[a-f0-9]{40}$'
+          printf '%s' "$RELEASE_TAG" | rg '^somewhere-v2-rc-[0-9]{8}\.[0-9]+$'
+          printf '%s' "$PRIOR_RELEASE_SHA" | rg '^[a-f0-9]{40}$'
+          printf '%s' "$PRIOR_CONFIG_SHA256" | rg '^[a-f0-9]{64}$'
+          printf '%s' "$REPOSITORY_VERDICT_SHA256" | rg '^[a-f0-9]{64}$'
+          printf '%s' "$TERMINAL_MANIFEST_SHA256" | rg '^[a-f0-9]{64}$'
+          printf '%s' "$FENCE_RECEIPT_SHA256" | rg '^[a-f0-9]{64}$'
+          test "$REPOSITORY_VERDICT_SHA256" = "$APPROVED_REPOSITORY_VERDICT_SHA256"
+          test "$TERMINAL_MANIFEST_SHA256" = "$APPROVED_TERMINAL_MANIFEST_SHA256"
+          test "$FENCE_RECEIPT_SHA256" = "$APPROVED_FENCE_RECEIPT_SHA256"
+          bun scripts/release/validate-https-origin.mjs --origin "$BASE_URL"
+          git show-ref --verify "refs/tags/$RELEASE_TAG"
+          test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_SHA"
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          SOURCE_TREE="$(git rev-parse HEAD^{tree})"
+          mkdir -p "$RUNNER_TEMP/staging-backup"
+          printf '%s' "$REPOSITORY_VERDICT_B64" | base64 --decode \
+            > "$RUNNER_TEMP/staging-backup/final-verdict.json"
+          printf '%s' "$TERMINAL_MANIFEST_B64" | base64 --decode \
+            > "$RUNNER_TEMP/staging-backup/terminal-manifest.sha256"
+          git for-each-ref --format='%(contents)' "refs/tags/$RELEASE_TAG" \
+            > "$RUNNER_TEMP/staging-backup/release-tag-message.txt"
+          bun scripts/release/verify-staging-seal.mjs \
+            --verdict "$RUNNER_TEMP/staging-backup/final-verdict.json" \
+            --verdict-sha256 "$REPOSITORY_VERDICT_SHA256" \
+            --manifest "$RUNNER_TEMP/staging-backup/terminal-manifest.sha256" \
+            --manifest-sha256 "$TERMINAL_MANIFEST_SHA256" \
+            --sha "$RELEASE_SHA" \
+            --source-tree "$SOURCE_TREE" \
+            --tag-message "$RUNNER_TEMP/staging-backup/release-tag-message.txt" \
+            --output "$RUNNER_TEMP/staging-backup/repository-seal.json"
+          git show "$PRIOR_RELEASE_SHA:server/wrangler.jsonc" \
+            > "$RUNNER_TEMP/prior-wrangler.jsonc"
+          test "$PRIOR_CONFIG_SHA256" = \
+            "$(sha256sum "$RUNNER_TEMP/prior-wrangler.jsonc" | cut -d' ' -f1)"
+          bash scripts/release/cloudflare-acceptance-gates.sh \
+            lifecycle-contract "$RUNNER_TEMP/prior-wrangler.jsonc" staging
+          printf 'SOMEWHERE_SOURCE_TREE=%s\n' "$SOURCE_TREE" \
+            >> "$GITHUB_ENV"
+
+      - name: Build and scan exact staging assets
+        id: build
+        env:
+          SOMEWHERE_SOURCE_SHA: ${{ inputs.release_sha }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/staging-backup"
+          bun run build:production -- \
+            --environment staging \
+            --outdir "$RUNNER_TEMP/staging-build" \
+            --receipt "$RUNNER_TEMP/staging-backup/staging-build.json"
+          bun scripts/release/scan-production.mjs \
+            --build-receipt "$RUNNER_TEMP/staging-backup/staging-build.json" \
+            --final-root "$RUNNER_TEMP/staging-build" \
+            --deny scripts/release/forbidden-production-patterns-v1.json \
+            --output "$RUNNER_TEMP/staging-backup/staging-scan.json"
+
+      - name: Verify the externally applied write fence
+        id: fence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FENCE_RECEIPT_SHA256: ${{ inputs.fence_receipt_sha256 }}
+        run: |
+          D1_DATABASE_NAME="$(
+            bash scripts/release/cloudflare-acceptance-gates.sh database-name staging
+          )"
+          export D1_DATABASE_NAME
+          printf '%s\n' "$FENCE_RECEIPT_SHA256" \
+            > "$RUNNER_TEMP/staging-backup/fence-authority.sha256"
+          GATE_RECEIPT="$RUNNER_TEMP/staging-backup/fence-check.json" \
+          bash scripts/release/cloudflare-acceptance-gates.sh fence-check staging
+
+      - name: Verify old-epoch work is drained
+        id: drain
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          D1_DATABASE_NAME="$(
+            bash scripts/release/cloudflare-acceptance-gates.sh database-name staging
+          )"
+          export D1_DATABASE_NAME
+          GATE_RECEIPT="$RUNNER_TEMP/staging-backup/drain-check.json" \
+          bash scripts/release/cloudflare-acceptance-gates.sh drain-check staging
+
+      - name: Capture current restore point and portable backup
+        id: backup
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BACKUP_RECIPIENT_CERT_B64: ${{ secrets.STAGING_BACKUP_RECIPIENT_CERT_B64 }}
+        run: |
+          umask 077
+          D1_DATABASE_NAME="$(
+            bash scripts/release/cloudflare-acceptance-gates.sh database-name staging
+          )"
+          mkdir -p "$RUNNER_TEMP/staging-backup"
+          mkdir -p "$RUNNER_TEMP/staging-private"
+          cleanup_private_backup() {
+            test -d "$RUNNER_TEMP/staging-private" || return 0
+            find "$RUNNER_TEMP/staging-private" -depth -mindepth 1 -delete
+            rmdir "$RUNNER_TEMP/staging-private"
+          }
+          handle_backup_signal() {
+            trap - EXIT HUP INT TERM
+            cleanup_private_backup
+            exit "$1"
+          }
+          trap cleanup_private_backup EXIT
+          trap 'handle_backup_signal 129' HUP
+          trap 'handle_backup_signal 130' INT
+          trap 'handle_backup_signal 143' TERM
+          printf '%s' "$BACKUP_RECIPIENT_CERT_B64" \
+            | base64 --decode > "$RUNNER_TEMP/staging-private/recipient.pem"
+          openssl x509 \
+            -in "$RUNNER_TEMP/staging-private/recipient.pem" \
+            -noout
+          node_modules/.bin/wrangler d1 time-travel info "$D1_DATABASE_NAME" \
+            --config server/wrangler.jsonc --env staging \
+            > "$RUNNER_TEMP/staging-backup/time-travel.txt"
+          node_modules/.bin/wrangler d1 export "$D1_DATABASE_NAME" \
+            --remote --env staging --config server/wrangler.jsonc \
+            --output "$RUNNER_TEMP/staging-private/database.sql"
+          openssl cms -encrypt -binary -aes-256-cbc -outform DER \
+            -in "$RUNNER_TEMP/staging-private/database.sql" \
+            -out "$RUNNER_TEMP/staging-backup/database.sql.cms" \
+            "$RUNNER_TEMP/staging-private/recipient.pem"
+          sha256sum "$RUNNER_TEMP/staging-backup/database.sql.cms" \
+            > "$RUNNER_TEMP/staging-backup/database.sql.cms.sha256"
+          cleanup_private_backup
+          trap - EXIT HUP INT TERM
+
+      - name: Apply forward-only expand migrations
+        id: expand
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          D1_DATABASE_NAME="$(
+            bash scripts/release/cloudflare-acceptance-gates.sh database-name staging
+          )"
+          node_modules/.bin/wrangler d1 migrations apply "$D1_DATABASE_NAME" \
+            --remote --config server/wrangler.jsonc --env staging
+
+      - name: Deploy atomically while admission remains fenced
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          bash scripts/release/cloudflare-acceptance-gates.sh \
+            deployment-secret-check staging
+          node_modules/.bin/wrangler deploy \
+            --config server/wrangler.jsonc --env staging --strict \
+            --assets "$RUNNER_TEMP/staging-build/app/dist" \
+            --message "atomic fenced V2 staging release $RELEASE_SHA"
+
+      - name: Run same-origin staging smoke
+        id: smoke
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+        run: |
+          bash scripts/release/cloudflare-acceptance-gates.sh postdeploy
+
+      - name: Verify authority-controlled recovery before admission resumes
+        id: resume
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+        run: |
+          bash scripts/release/cloudflare-acceptance-gates.sh resume-check
+
+      - name: Require the failure fence to remain closed
+        id: failure_fence
+        if: failure()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          D1_DATABASE_NAME="$(
+            bash scripts/release/cloudflare-acceptance-gates.sh database-name staging
+          )"
+          export D1_DATABASE_NAME
+          bash scripts/release/cloudflare-acceptance-gates.sh fence-check staging
+
+      - name: Upload governed staging receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: somewhere-v2-staging-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/staging-backup

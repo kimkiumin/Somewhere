@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.invalid/schemas/final-cleanup-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "gate", "serverCount", "browserContextCount", "openPorts", "tempRoots"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "gate": { "enum": ["PASS", "FAIL"] },
+    "serverCount": { "type": "integer", "minimum": 0 },
+    "browserContextCount": { "type": "integer", "minimum": 0 },
+    "openPorts": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 65535 } },
+    "tempRoots": { "type": "array", "items": { "type": "string" } }
+  }
+}

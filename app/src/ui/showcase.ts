@@ -1,48 +1,5 @@
+import { actionButton, compass, element, infoRows, safetyControls } from "./dom-primitives";
 import "./styles.css";
-
-function element<K extends keyof HTMLElementTagNameMap>(
-  tagName: K,
-  className?: string,
-  text?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tagName);
-  if (className !== undefined) {
-    node.className = className;
-  }
-  if (text !== undefined) {
-    node.textContent = text;
-  }
-  return node;
-}
-
-function button(label: string, variant: string): HTMLButtonElement {
-  const node = element("button", `button ${variant}`, label);
-  node.type = "button";
-  return node;
-}
-
-function compass(variant: "live" | "paused" | "arrived"): HTMLElement {
-  const stage = element(
-    "section",
-    `compass-stage${variant === "live" ? "" : ` compass-stage--${variant}`}`,
-  );
-  stage.setAttribute("aria-label", `Compass ${variant} state`);
-  stage.append(element("span", "compass-cardinal", "N"));
-  const needle = element("span", "compass-needle");
-  needle.setAttribute("aria-hidden", "true");
-  stage.append(needle, element("span", "compass-hub"));
-  const readout = element("div", "compass-readout");
-  readout.append(
-    element("strong", "distance", variant === "arrived" ? "Arrived" : "184 m"),
-    element(
-      "span",
-      "small-copy",
-      variant === "paused" ? "Direction paused" : "Keep to public paths",
-    ),
-  );
-  stage.append(readout);
-  return stage;
-}
 
 const root = document.querySelector<HTMLElement>("#showcase");
 if (root === null) {
@@ -52,33 +9,28 @@ if (root === null) {
 const main = element("main", "showcase");
 const header = element("header", "showcase-section");
 header.append(
-  element("p", "eyebrow", "Somewhere v0.2"),
-  element("h1", undefined, "Primitive showcase"),
-  element(
-    "p",
-    "lead muted",
-    "A quiet field instrument for hidden-destination walks. Every journey state starts here.",
-  ),
+  element("p", "eyebrow", "Somewhere V2"),
+  element("h1", undefined, "여정 프리미티브"),
+  element("p", "lead muted", "한 곳만 조용히 고르고, 신뢰할 수 있을 때만 방향을 보여줍니다."),
 );
 
 const controls = element("section", "showcase-section");
-controls.append(element("h2", undefined, "Controls & status"));
+controls.append(element("h2", undefined, "행동과 상태"));
 const controlGrid = element("div", "showcase-grid");
 const buttons = element("div", "panel stack");
 buttons.append(
-  element("h3", undefined, "Button variants"),
-  button("Start adventure", "button--primary"),
-  button("Reveal destination", "button--secondary"),
-  button("Reroll", "button--quiet"),
-  button("Give up safely", "button--caution"),
+  element("h3", undefined, "버튼"),
+  actionButton("시작하기", "showcase-start", "button--primary"),
+  actionButton("목적지 확인", "showcase-reveal"),
+  actionButton("중단", "showcase-stop", "button--caution"),
 );
 const statuses = element("div", "panel stack");
-statuses.append(element("h3", undefined, "Signal states"));
+statuses.append(element("h3", undefined, "안내 상태"));
 for (const [label, variant] of [
-  ["Signals ready", ""],
-  ["Finding direction", " status-pill--acquiring"],
-  ["Direction paused", " status-pill--paused"],
-  ["Arrived", " status-pill--arrived"],
+  ["안내 준비", ""],
+  ["방향 확인 중", " status-pill--acquiring"],
+  ["안내 멈춤", " status-pill--paused"],
+  ["도착", " status-pill--arrived"],
 ] as const) {
   statuses.append(element("span", `status-pill${variant}`, label));
 }
@@ -86,56 +38,20 @@ controlGrid.append(buttons, statuses);
 controls.append(controlGrid);
 
 const instruments = element("section", "showcase-section");
-instruments.append(element("h2", undefined, "Compass states"));
+instruments.append(element("h2", undefined, "나침반 상태"));
 const compassGrid = element("div", "showcase-grid");
-compassGrid.append(compass("live"), compass("paused"), compass("arrived"));
+compassGrid.append(
+  compass("live", "184m", "공공 보행로를 이용하세요"),
+  compass("paused", "잠시 멈춤", "신뢰할 수 있는 방향을 확인 중이에요"),
+  compass("arrived", "도착", "주변을 천천히 살펴보세요"),
+);
 instruments.append(compassGrid);
 
-const surfaces = element("section", "showcase-section");
-surfaces.append(element("h2", undefined, "Trust surfaces"));
-const surfaceGrid = element("div", "showcase-grid");
-const hidden = element("article", "panel hidden-panel");
-hidden.append(
-  element("span", "hidden-mark", "?"),
-  element("p", "eyebrow", "Destination hidden"),
-  element("h3", undefined, "Still water holds the sky."),
-);
-const meta = element("div", "meta-grid");
-for (const [label, value] of [
-  ["Approx. distance", "640 m"],
-  ["Walking time", "8 min"],
-] as const) {
-  const item = element("div", "meta-item");
-  item.append(element("span", "label muted", label), element("strong", undefined, value));
-  meta.append(item);
-}
-hidden.append(meta);
-const safety = element("div", "safety-row");
-safety.append(button("Reveal", "button--secondary"), button("Give up", "button--caution"));
-hidden.append(safety);
-
-const diagnostics = element("article", "panel diagnostics");
-diagnostics.append(
-  element("p", "eyebrow", "Field diagnostics"),
-  element("h3", undefined, "Memory-only trace"),
-  element(
-    "p",
-    "small-copy muted",
-    "Exports contain exact coordinates. Download only when you intend to keep them.",
-  ),
-);
-for (const [label, value] of [
-  ["Location", "Live · ±12 m"],
-  ["Heading", "Live · ±7°"],
-  ["Wake Lock", "Active"],
-] as const) {
-  const row = element("div", "diagnostic-row small-copy");
-  row.append(element("span", "muted", label), element("strong", undefined, value));
-  diagnostics.append(row);
-}
-diagnostics.append(button("Download trace", "button--secondary button--wide"));
-surfaceGrid.append(hidden, diagnostics);
-surfaces.append(surfaceGrid);
-
-main.append(header, controls, instruments, surfaces);
+const hidden = element("section", "showcase-section");
+hidden.append(element("h2", undefined, "숨겨진 한 곳"));
+const panel = element("article", "hidden-place");
+panel.append(element("span", "hidden-mark", "?"), infoRows("700m · 약 10분", "카페", "₩₩"));
+panel.append(safetyControls(false));
+hidden.append(panel);
+main.append(header, controls, instruments, hidden);
 root.append(main);

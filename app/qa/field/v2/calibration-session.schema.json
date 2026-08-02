@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.example/qa/field/v2/calibration-session.schema.json",
+  "title": "Somewhere V2 Study A supervised calibration session",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sessionId",
+    "evidenceOrigin",
+    "supervised",
+    "deviceModel",
+    "iosVersion",
+    "browserMode",
+    "startedAt",
+    "endedAt",
+    "environment",
+    "routeId",
+    "parentPolicySha256",
+    "candidatePolicySha256",
+    "candidatePolicy",
+    "candidateInEnvelope",
+    "unsafeEvents",
+    "outcomes",
+    "traceSha256",
+    "traceStoredPrivately",
+    "supervisor",
+    "supervisorAttestationSha256",
+    "supervisorKeyId",
+    "supervisorSignatureBase64"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "sessionId": { "type": "string", "pattern": "^study-a-[a-z0-9-]{8,64}$" },
+    "evidenceOrigin": { "const": "physical" },
+    "supervised": { "const": true },
+    "deviceModel": { "const": "iPhone 15 Pro Max" },
+    "iosVersion": { "type": "string", "minLength": 3, "maxLength": 20 },
+    "browserMode": { "enum": ["safari", "home-screen"] },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "endedAt": { "type": "string", "format": "date-time" },
+    "environment": { "enum": ["open-sky", "building-dense"] },
+    "routeId": { "type": "string", "minLength": 3, "maxLength": 64 },
+    "parentPolicySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "candidatePolicySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "candidatePolicy": { "type": "object" },
+    "candidateInEnvelope": { "const": true },
+    "unsafeEvents": { "const": 0 },
+    "outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "falseArrivals",
+        "directionOutsideExit",
+        "staleBackgroundArrows",
+        "directBearingFallbacks",
+        "duplicateListeners",
+        "newP0P1Defects",
+        "missedArrivals",
+        "recoveries",
+        "missedArrivalsReviewed",
+        "recoveriesReviewed"
+      ],
+      "properties": {
+        "falseArrivals": { "const": 0 },
+        "directionOutsideExit": { "const": 0 },
+        "staleBackgroundArrows": { "const": 0 },
+        "directBearingFallbacks": { "const": 0 },
+        "duplicateListeners": { "const": 0 },
+        "newP0P1Defects": { "const": 0 },
+        "missedArrivals": { "type": "integer", "minimum": 0 },
+        "recoveries": { "type": "integer", "minimum": 0 },
+        "missedArrivalsReviewed": { "const": true },
+        "recoveriesReviewed": { "const": true }
+      }
+    },
+    "traceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "traceStoredPrivately": { "const": true },
+    "supervisor": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "supervisorAttestationSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "supervisorKeyId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$"
+    },
+    "supervisorSignatureBase64": {
+      "type": "string",
+      "contentEncoding": "base64"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://somewhere.invalid/schemas/reviewer-verdict-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "verdict", "reviewedSha", "sourceTree", "profileId", "profileSha256", "runner", "inputs", "findings"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "verdict": { "enum": ["APPROVE", "REQUEST_CHANGES", "BLOCK"] },
+    "reviewedSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sourceTree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "profileId": { "type": "string" },
+    "profileSha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "runner": { "type": "object", "additionalProperties": false, "required": ["binary", "version", "model", "sandbox"], "properties": { "binary": { "const": "codex" }, "version": { "type": "string" }, "model": { "type": "string" }, "sandbox": { "const": "read-only" } } },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "summary"],
+        "properties": {
+          "severity": { "enum": ["P0", "P1", "P2", "NOTE"] },
+          "summary": { "type": "string" }
+        }
+      }
+    }
+  }
+}

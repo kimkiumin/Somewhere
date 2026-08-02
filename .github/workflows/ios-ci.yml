@@ -1,0 +1,142 @@
+name: Somewhere native iOS read-only gate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: somewhere-ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-source:
+    name: Build native source without distribution authority
+    runs-on: macos-15
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pinned Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install frozen dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate native source and handoff contract
+        run: bun run verify:ios-source
+
+      - name: Build pinned XcodeGen
+        env:
+          XCODEGEN_SHA: 82c6ab9bbd5b6075fc0887d897733fc0c4ffc9ab
+        run: |
+          git init "$RUNNER_TEMP/XcodeGen"
+          git -C "$RUNNER_TEMP/XcodeGen" remote add origin https://github.com/yonaskolb/XcodeGen.git
+          git -C "$RUNNER_TEMP/XcodeGen" fetch --depth 1 origin "$XCODEGEN_SHA"
+          git -C "$RUNNER_TEMP/XcodeGen" checkout --detach FETCH_HEAD
+          swift build --package-path "$RUNNER_TEMP/XcodeGen" -c release
+          "$RUNNER_TEMP/XcodeGen/.build/release/xcodegen" --version | grep '2.42.0'
+
+      - name: Generate exact Xcode project
+        run: |
+          "$RUNNER_TEMP/XcodeGen/.build/release/xcodegen" generate --spec ios/project.yml
+          xcodebuild -list -project ios/Somewhere.xcodeproj
+
+      - name: Create exact target simulator
+        id: simulator
+        run: |
+          runtime_id="$(xcrun simctl list runtimes --json | jq -r '[.runtimes[] | select(.isAvailable == true and (.identifier | contains("SimRuntime.iOS-")))] | sort_by(.version | split(".") | map(tonumber)) | last | .identifier // empty')"
+          test -n "$runtime_id"
+          device_type="com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro-Max"
+          xcrun simctl list devicetypes --json | jq -e --arg id "$device_type" '.devicetypes[] | select(.identifier == $id)' >/dev/null
+          udid="$(xcrun simctl create "Somewhere iPhone 15 Pro Max" "$device_type" "$runtime_id")"
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          echo "runtime_id=$runtime_id" >> "$GITHUB_OUTPUT"
+          echo "device_type=$device_type" >> "$GITHUB_OUTPUT"
+
+      - name: Run native unit tests
+        run: |
+          xcodebuild test \
+            -project ios/Somewhere.xcodeproj \
+            -scheme Somewhere \
+            -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}' \
+            -only-testing:SomewhereTests \
+            -resultBundlePath "$RUNNER_TEMP/Somewhere-unit.xcresult" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run native UI tests
+        run: |
+          xcodebuild test \
+            -project ios/Somewhere.xcodeproj \
+            -scheme Somewhere \
+            -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}' \
+            -only-testing:SomewhereUITests \
+            -resultBundlePath "$RUNNER_TEMP/Somewhere-ui.xcresult" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Archive without signing or distribution
+        run: |
+          xcodebuild archive \
+            -project ios/Somewhere.xcodeproj \
+            -scheme Somewhere \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Somewhere.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Inspect privacy manifest and background boundary
+        run: |
+          test -f ios/Somewhere/Resources/PrivacyInfo.xcprivacy
+          plutil -lint ios/Somewhere/Resources/PrivacyInfo.xcprivacy
+          test -f "$RUNNER_TEMP/Somewhere.xcarchive/Products/Applications/Somewhere.app/PrivacyInfo.xcprivacy"
+          ! /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' ios/Somewhere/Resources/Info.plist
+          grep -q 'foreground-only-no-locked-screen-guidance' docs/operations/ios-field-release.md
+
+      - name: Scan source and metadata for accidental secrets
+        run: |
+          ! git grep -nE '(BEGIN (RSA|EC|OPENSSH) PRIVATE KEY|api[_-]?key[[:space:]]*[:=][[:space:]]*[A-Za-z0-9_-]{20,})' -- ':!*.test.*'
+          ! git grep -nE '"(latitude|longitude)"[[:space:]]*:[[:space:]]*-?[0-9]+\.[0-9]+' \
+            -- ios scripts/ios app/src server/src contracts/src \
+            ':!app/src/data/curated-destinations.json' ':!**/*.test.*' ':!**/*.testkit.*'
+          ! git grep -nEi '(participant(Name|Email)|contactEmail)[[:space:]]*[:=][[:space:]]*["'"'][^"'"']+["'"']' \
+            -- ios scripts/ios app/src server/src contracts/src \
+            ':!**/*.test.*' ':!**/*.testkit.*'
+
+      - name: Write sanitized build metadata
+        run: |
+          mkdir -p "$RUNNER_TEMP/somewhere-ios-ci"
+          project_digest="$(find ios/Somewhere.xcodeproj -type f -print0 | xargs -0 shasum -a 256 | LC_ALL=C sort | shasum -a 256 | awk '{print $1}')"
+          privacy_digest="$(shasum -a 256 ios/Somewhere/Resources/PrivacyInfo.xcprivacy | awk '{print $1}')"
+          xcode_version="$(xcodebuild -version | paste -sd ';' -)"
+          swift_version="$(swift --version | paste -sd ';' -)"
+          sdk_version="$(xcrun --sdk iphoneos --show-sdk-version)"
+          macos_version="$(sw_vers -productVersion)"
+          xcodegen_version="$("$RUNNER_TEMP/XcodeGen/.build/release/xcodegen" --version)"
+          jq -n \
+            --arg finalSha "${GITHUB_SHA}" \
+            --arg sourceTree "$(git rev-parse HEAD^{tree})" \
+            --arg projectDigest "sha256:${project_digest}" \
+            --arg privacyDigest "sha256:${privacy_digest}" \
+            --arg macosVersion "$macos_version" \
+            --arg xcodeVersion "$xcode_version" \
+            --arg swiftVersion "$swift_version" \
+            --arg sdkVersion "$sdk_version" \
+            --arg xcodegenVersion "$xcodegen_version" \
+            --arg simulatorRuntime "${{ steps.simulator.outputs.runtime_id }}" \
+            --arg simulatorDeviceType "${{ steps.simulator.outputs.device_type }}" \
+            '{schemaVersion:1,kind:"sanitized-native-ci",finalSha:$finalSha,sourceTree:$sourceTree,generatedProjectSha256:$projectDigest,privacyManifestSha256:$privacyDigest,toolchain:{macOS:$macosVersion,xcode:$xcodeVersion,swift:$swiftVersion,iphoneOSSDK:$sdkVersion,xcodegen:$xcodegenVersion,simulatorRuntime:$simulatorRuntime,simulatorDeviceType:$simulatorDeviceType},unit:"PASS",ui:"PASS",archive:"PASS",signing:"unsigned",distribution:"none",rawCoordinateAttachments:false}' \
+            > "$RUNNER_TEMP/somewhere-ios-ci/build-metadata.json"
+
+      - name: Upload sanitized native metadata only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: somewhere-ios-sanitized-${{ github.run_id }}
+          if-no-files-found: ignore
+          path: ${{ runner.temp }}/somewhere-ios-ci/build-metadata.json

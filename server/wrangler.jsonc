@@ -1,0 +1,181 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "somewhere-api-local",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "../app/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false,
+      "persist": true
+    },
+    "traces": {
+      "enabled": false,
+      "head_sampling_rate": 0,
+      "persist": false
+    }
+  },
+  "vars": {
+    "ENVIRONMENT": "local"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "somewhere-local"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "JOURNEYS",
+        "class_name": "JourneyDurableObject"
+      }
+    ]
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "EVENTS_QUEUE",
+        "queue": "somewhere-events-local"
+      },
+      {
+        "binding": "EVENTS_DLQ",
+        "queue": "somewhere-events-dlq-local"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "somewhere-events-local",
+        "max_batch_size": 100,
+        "max_batch_timeout": 5,
+        "max_retries": 4,
+        "dead_letter_queue": "somewhere-events-dlq-local"
+      },
+      {
+        "queue": "somewhere-events-dlq-local",
+        "max_batch_size": 100,
+        "max_batch_timeout": 1,
+        "max_retries": 0
+      }
+    ]
+  },
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "exports": {
+    "JourneyDurableObject": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+  "env": {
+    "staging": {
+      "name": "somewhere-api-staging",
+      "secrets": {
+        "required": ["CANONICAL_ORIGIN"]
+      },
+      "services": [
+        {
+          "binding": "OPERATIONS_AUTHORITY",
+          "service": "somewhere-operations-authority-staging"
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "staging"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "somewhere-staging"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "JOURNEYS",
+            "class_name": "JourneyDurableObject"
+          }
+        ]
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "EVENTS_QUEUE",
+            "queue": "somewhere-events-staging"
+          },
+          {
+            "binding": "EVENTS_DLQ",
+            "queue": "somewhere-events-dlq-staging"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "somewhere-events-staging",
+            "max_batch_size": 100,
+            "max_batch_timeout": 5,
+            "max_retries": 4,
+            "dead_letter_queue": "somewhere-events-dlq-staging"
+          }
+        ]
+      }
+    },
+    "production": {
+      "name": "somewhere-api-production",
+      "secrets": {
+        "required": ["CANONICAL_ORIGIN"]
+      },
+      "services": [
+        {
+          "binding": "OPERATIONS_AUTHORITY",
+          "service": "somewhere-operations-authority-production"
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "production"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "somewhere-production"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "JOURNEYS",
+            "class_name": "JourneyDurableObject"
+          }
+        ]
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "EVENTS_QUEUE",
+            "queue": "somewhere-events-production"
+          },
+          {
+            "binding": "EVENTS_DLQ",
+            "queue": "somewhere-events-dlq-production"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "somewhere-events-production",
+            "max_batch_size": 100,
+            "max_batch_timeout": 5,
+            "max_retries": 4,
+            "dead_letter_queue": "somewhere-events-dlq-production"
+          }
+        ]
+      }
+    }
+  }
+}

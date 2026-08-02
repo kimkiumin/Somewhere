@@ -2,11 +2,33 @@
 
 ## Project Goal
 
-Build and refine a mobile-first prototype for a hidden-destination compass adventure experience.
+Build and operate the mobile-only V2 hidden-destination service defined by
+`BLUEPRINT.md`, while preserving v0.1/v0.2 as historical regression evidence.
 
 The user does not know the destination. The app gives only minimal direction and distance cues. The user follows those cues and discovers the destination at the end.
 
-## Current v0.2 Working Surface
+## V2 Authority and Version Boundary
+
+For V2 product and backend work, resolve conflicting sources in this exact
+order:
+
+1. The project owner's latest explicit direction.
+2. Root [`BLUEPRINT.md`](BLUEPRINT.md) and its linked
+   [`docs/blueprint/`](docs/blueprint/) documents. These are the authoritative
+   approved V2 product direction.
+3. The current V2 mobile-service design for implementation details that do not
+   conflict with the blueprint.
+4. Executable V2 contracts, code, and tests as implementation evidence; they
+   must not silently override items 1–3.
+5. The v0.2 application and frozen v0.1 prototype as historical evidence only.
+
+The historical v0.2 and v0.1 sections below do not create V2 requirements. In
+particular, V2 has no active Reroll control: it uses immediate Stop pause,
+explicit stop confirmation, and guarded new recommendation only after a journey
+has ended. Preserve the older documents and tests as versioned evidence rather
+than rewriting them to look like V2.
+
+## Historical v0.2 Working Surface
 
 - Treat `/prototype` as the frozen v0.1 reference. Preserve its 11 Node tests
   and do not import it at runtime.
@@ -24,6 +46,9 @@ The user does not know the destination. The app gives only minimal direction and
   a live or paid place API.
 - No background or locked-screen navigation promise. If it becomes required,
   apply the native-pivot gate in `/app/qa/field/README.md`.
+- Read `/docs/README.md` before using older product or implementation documents.
+  Current `/app` behavior is governed by this file, the root README and DESIGN,
+  current code/tests, and the field runbook.
 
 ## Core Flow
 
@@ -39,7 +64,15 @@ This is an off-screen discovery experience.
 
 The core value is not recommendation accuracy. The core value is hidden destination discovery, safe uncertainty, and screen-reduced exploration.
 
-## Source Documents to Read Before Working
+## Frozen v0.1 Guidance
+
+The remaining source list, simulation rules, file structure, and prototype
+documentation requirements in this file apply only to `/prototype`. They are
+historical product context for `/app`, not current implementation constraints.
+In particular, do not apply the v0.1 “no real GPS” or “simulate movement first”
+rules to the v0.2 sensor application.
+
+## Source Documents for v0.1 Work
 
 Before implementation, read these files if they exist:
 
