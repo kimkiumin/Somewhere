@@ -39,7 +39,10 @@
 
   function affectedConditionsForNoFit(constraints) {
     const affected = [];
-    if (constraints?.budget != null && String(constraints.budget).trim() !== "") {
+    const budget = Number.isFinite(constraints?.budget)
+      ? constraints.budget
+      : Number(String(constraints?.budget ?? "").replace(/[^0-9]/g, ""));
+    if (Number.isFinite(budget) && budget > 0) {
       affected.push({ field: "budget", label: "예산" });
     }
     if (Array.isArray(constraints?.dietary) && constraints.dietary.length > 0) {
@@ -51,7 +54,7 @@
     if (Array.isArray(constraints?.accessibility) && constraints.accessibility.length > 0) {
       affected.push({ field: "accessibility", label: "접근성 조건" });
     }
-    if (constraints?.disclosure === "minimal") {
+    if (constraints?.disclosure === "private") {
       affected.push({ field: "disclosure", label: "목적지 공개 수준" });
     }
     return affected.length > 0
@@ -202,9 +205,13 @@
 
     const FormDataType = options.FormData || globalScope.FormData;
     const controllerFactory = inspectable ? createTestController : createController;
+    let currentView = null;
     const controller = controllerFactory({
       ...options,
-      render: (view) => screens.renderApp(root, controlsRoot, view),
+      render: (view) => {
+        currentView = view;
+        screens.renderApp(root, controlsRoot, view);
+      },
     });
 
     function inside(container, element) {
@@ -226,16 +233,30 @@
       };
     }
 
+    function readProfileForm(button) {
+      const form = button.closest?.('[data-form="profile"]');
+      if (!form || typeof FormDataType !== "function") return null;
+      const data = new FormDataType(form);
+      const getAll = typeof data.getAll === "function" ? (name) => data.getAll(name) : (name) => {
+        const value = data.get(name);
+        return value == null ? [] : [value];
+      };
+      return {
+        dietary: getAll("dietary").map(String),
+        allergies: getAll("allergies").map(String),
+      };
+    }
+
     function readConstraints(form) {
       const data = new FormDataType(form);
-      const budget = String(data.get("budget") ?? "").trim();
-      const disclosure = data.get("disclosure") === "minimal" ? "minimal" : "standard";
+      const budgetStep = Number(data.get("budget"));
+      const disclosure = data.get("disclosure") === "private" ? "private" : "minimal";
       return {
-        category: String(data.get("category") ?? ""),
+        category: "restaurant",
         maxWalkMinutes: Number(data.get("maxWalkMinutes")),
-        budget: budget || null,
-        dietary: splitList(data.get("dietary")),
-        allergies: splitList(data.get("allergies")),
+        budget: Number.isFinite(budgetStep) && budgetStep >= 1 && budgetStep <= 25 ? budgetStep * 2_000 : null,
+        dietary: clone(currentView?.profile?.dietary || []),
+        allergies: clone(currentView?.profile?.allergies || []),
         accessibility: splitList(data.get("accessibility")),
         disclosure,
       };
@@ -243,6 +264,8 @@
 
     const productActions = {
       "continue-onboarding": () => controller.dispatch({ type: "CONTINUE_ONBOARDING" }),
+      "open-profile": () => controller.dispatch({ type: "OPEN_PROFILE" }),
+      "cancel-profile": () => controller.dispatch({ type: "CANCEL_PROFILE" }),
       stop: () => controller.dispatch({ type: "STOP" }),
       "continue-guidance": () => controller.dispatch({ type: "CONTINUE_GUIDANCE" }),
       "open-destination-info": () => controller.dispatch({ type: "OPEN_DESTINATION_INFO" }),
@@ -272,6 +295,11 @@
         });
         return;
       }
+      if (actionName === "save-profile") {
+        const profile = readProfileForm(button);
+        if (profile) controller.dispatch({ type: "SAVE_PROFILE", profile });
+        return;
+      }
       if (actionName === "reveal-destination") {
         controller.dispatch({ type: "REVEAL_DESTINATION", reason: button.dataset.reason });
         return;
@@ -296,16 +324,55 @@
 
     function onConstraintsInput(event) {
       const form = event.target?.closest?.('[data-form="constraints"]');
-      const details = event.target?.closest?.("[data-advanced-conditions]");
-      if (!form || !details || typeof screens.summarizeAdvancedConditions !== "function") return;
-      const summary = details.querySelector?.("summary");
-      if (!summary) return;
-      summary.textContent = screens.summarizeAdvancedConditions(readConstraints(form));
+      const details = event.target?.closest?.("[data-advanced-conditions]") || form?.querySelector?.("[data-advanced-conditions]");
+      if (!form || typeof screens.summarizeAdvancedConditions !== "function") return;
+      if (details) {
+        const summary = details.querySelector?.("summary");
+        if (summary) summary.textContent = screens.summarizeAdvancedConditions(readConstraints(form));
+      }
+      const time = form.querySelector?.('[name="maxWalkMinutes"]');
+      const timeOutput = form.querySelector?.("#walk-time-value");
+      if (time && timeOutput) timeOutput.textContent = `${time.value}분`;
+      const budget = form.querySelector?.('[name="budget"]');
+      const budgetOutput = form.querySelector?.("#budget-value");
+      if (budget && budgetOutput) {
+        const unlimited = Number(budget.value) >= 26;
+        budgetOutput.textContent = unlimited ? "상관없음" : `${(Number(budget.value) * 2_000).toLocaleString("ko-KR")}원 이하`;
+        if (unlimited) budgetOutput.setAttribute?.("data-budget-unlimited", "");
+        else budgetOutput.removeAttribute?.("data-budget-unlimited");
+      }
+    }
+
+    function onProfileInput(event) {
+      const search = event.target?.closest?.("[data-picker-search]");
+      if (!search) return;
+      const picker = search.closest?.("[data-profile-picker]");
+      const query = String(search.value || "").trim().toLocaleLowerCase();
+      const options = picker?.querySelectorAll?.(".picker-options label") || [];
+      for (const option of options) {
+        option.hidden = query !== "" && !String(option.textContent || "").toLocaleLowerCase().includes(query);
+      }
+    }
+
+    function onSliderWheel(event) {
+      const slider = event.target?.closest?.('input[type="range"][data-slider]');
+      if (!slider || !inside(root, slider)) return;
+      const direction = event.deltaY < 0 ? 1 : -1;
+      const step = Number(slider.step) || 1;
+      const min = Number(slider.min);
+      const max = Number(slider.max);
+      const next = Math.min(max, Math.max(min, Number(slider.value) + direction * step));
+      if (next === Number(slider.value)) return;
+      event.preventDefault?.();
+      slider.value = String(next);
+      onConstraintsInput({ target: slider });
     }
 
     root.addEventListener("click", onProductClick);
     root.addEventListener("input", onConstraintsInput);
     root.addEventListener("change", onConstraintsInput);
+    root.addEventListener("input", onProfileInput);
+    root.addEventListener("wheel", onSliderWheel, { passive: false });
     controlsRoot.addEventListener("click", onPrototypeClick);
 
     let mounted = true;
@@ -315,6 +382,8 @@
       root.removeEventListener("click", onProductClick);
       root.removeEventListener("input", onConstraintsInput);
       root.removeEventListener("change", onConstraintsInput);
+      root.removeEventListener("input", onProfileInput);
+      root.removeEventListener("wheel", onSliderWheel);
       controlsRoot.removeEventListener("click", onPrototypeClick);
       controller.destroy();
     }

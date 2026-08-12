@@ -28,6 +28,29 @@ test("one start action moves valid constraints directly into finding", () => {
   assert.equal(finding.destination, null);
 });
 
+test("first-use onboarding opens profile setup before constraints", () => {
+  const initial = stateApi.createInitialState({ firstUse: true });
+  const profile = stateApi.reduce(initial, { type: "CONTINUE_ONBOARDING" });
+  assert.equal(profile.phase, "profile_setup");
+  const saved = stateApi.reduce(profile, {
+    type: "SAVE_PROFILE",
+    profile: { dietary: ["vegetarian"], allergies: ["peanut"] },
+  });
+  assert.equal(saved.phase, "constraints");
+  assert.deepEqual(saved.profile, { dietary: ["vegetarian"], allergies: ["peanut"] });
+  assert.deepEqual(saved.constraints.dietary, ["vegetarian"]);
+  assert.deepEqual(saved.constraints.allergies, ["peanut"]);
+});
+
+test("default constraints use restaurant, minimum disclosure, and unlimited budget", () => {
+  const initial = stateApi.createInitialState({ firstUse: false });
+  assert.equal(initial.constraints.category, "restaurant");
+  assert.equal(initial.constraints.disclosure, "minimal");
+  assert.equal(initial.constraints.budget, null);
+  assert.deepEqual(initial.profile, { dietary: [], allergies: [] });
+  assert.equal(stateApi.validateConstraints({ ...initial.constraints, category: "cafe" }).valid, false);
+});
+
 test("invalid constraints remain editable and identify exact fields", () => {
   const initial = stateApi.createInitialState({ firstUse: false });
   const unchanged = stateApi.reduce(initial, {

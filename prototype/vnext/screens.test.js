@@ -39,6 +39,55 @@ test("constraints show one start action and collapsed advanced settings", () => 
   assert.doesNotMatch(html, /Reroll|다시 추천/);
 });
 
+test("constraints fix the category to restaurant and expose time and budget sliders", () => {
+  const html = screens.renderProductScreen(view());
+  assert.doesNotMatch(html, /어디로 갈까요|value="cafe"|카페/);
+  assert.match(html, /name="maxWalkMinutes"[^>]*type="range"/);
+  assert.match(html, /min="5"[^>]*max="60"[^>]*step="5"/);
+  assert.match(html, /name="budget"[^>]*type="range"/);
+  assert.match(html, /data-budget-unlimited/);
+  assert.match(html, /상관없음/);
+  const withBudget = screens.renderProductScreen(view({
+    constraints: { ...view().constraints, budget: 2_000 },
+  }));
+  assert.match(withBudget, /2,000원 이하/);
+});
+
+test("minimal disclosure is the default and private is the optional choice", () => {
+  const html = screens.renderProductScreen(view({
+    constraints: { ...view().constraints, disclosure: "minimal" },
+  }));
+  assert.match(html, /최소 정보 공개/);
+  assert.match(html, /비공개/);
+  assert.match(html, /option value="minimal" selected/);
+  assert.doesNotMatch(html, /기본 비공개/);
+});
+
+test("profile screens expose searchable multi-select diet and allergy pickers", () => {
+  for (const phase of ["profile_setup", "profile"]) {
+    const html = screens.renderProductScreen(view({ phase, profile: {
+      dietary: ["vegetarian"], allergies: ["peanut"],
+    } }));
+    assert.match(html, /식이 조건/);
+    assert.match(html, /알레르기/);
+    assert.match(html, /data-picker-search="dietary"/);
+    assert.match(html, /data-picker-search="allergies"/);
+    assert.match(html, /type="checkbox"[^>]*name="dietary"/);
+    assert.match(html, /type="checkbox"[^>]*name="allergies"/);
+    assert.match(html, /검색해서 선택할 수 있어요/);
+  }
+});
+
+test("private disclosure hides guidance detail rows", () => {
+  const html = screens.renderProductScreen(view({
+    phase: "following", distanceM: 850, bearingDeg: 40,
+    needleMode: "pointing", confidence: "ready", menu: "국수", priceBand: "중간",
+    constraints: { ...view().constraints, disclosure: "private" },
+  }));
+  assert.match(html, /정보 비공개 상태로 안내 중이에요/);
+  assert.doesNotMatch(html, /<dt>남은 거리<\/dt>|<dt>대표 메뉴<\/dt>|<dt>가격대<\/dt>/);
+});
+
 test("onboarding explicitly says the destination stays hidden", () => {
   const html = screens.renderProductScreen(view({ phase: "onboarding" }));
   assert.match(html, /목적지는 도착하거나 직접 확인할 때까지 숨겨져 있어요/);
@@ -57,11 +106,12 @@ test("collapsed advanced conditions summarize every active type and preserve dis
     },
   }));
 
-  assert.match(html, /추가 조건 5개 적용 중/);
-  for (const label of ["예산", "식이 조건", "알레르기", "접근성 조건", "목적지 공개 수준"]) {
+  assert.match(html, /추가 조건 3개 적용 중/);
+  for (const label of ["식이 조건", "알레르기", "접근성 조건"]) {
     assert.match(html, new RegExp(label));
   }
-  assert.match(html, /name="allergies"[^>]*value="견과류"/);
+  assert.doesNotMatch(html, /추가 조건[^<]*목적지 공개 수준/);
+  assert.doesNotMatch(html, /name="allergies"/);
   assert.match(html, /name="disclosure"/);
   assert.match(html, /option value="minimal" selected/);
 });

@@ -106,7 +106,7 @@ test("destroy cancels a pending finding completion", () => {
     cancel: (id) => cancelled.push(id),
     now: () => 1000,
   });
-  controller.start(validConstraints({ category: "cafe", maxWalkMinutes: 15 }));
+  controller.start(validConstraints({ category: "restaurant", maxWalkMinutes: 15 }));
   controller.destroy();
   assert.deepEqual(cancelled, [91]);
 });
@@ -156,7 +156,7 @@ test("no-fit simulation reports the active advanced conditions without changing 
     dietary: ["채식"],
     allergies: ["견과류"],
     accessibility: ["계단 없는 입구"],
-    disclosure: "minimal",
+    disclosure: "private",
   });
 
   controller.start(constraints);
@@ -202,6 +202,11 @@ function createEventRoot() {
         listener({ target, preventDefault() {} });
       }
     },
+    wheel(target, deltaY) {
+      for (const listener of listeners.get("wheel") || []) {
+        listener({ target, deltaY, preventDefault() {} });
+      }
+    },
     input(target) {
       for (const listener of listeners.get("input") || []) listener({ target });
     },
@@ -219,7 +224,7 @@ function productButton(action, { reason, reaction, form } = {}) {
     dataset: { action, ...(reason ? { reason } : {}), ...(reaction ? { reaction } : {}) },
     closest(selector) {
       if (selector === "[data-action]") return this;
-      if (selector === '[data-form="constraints"]') return form ?? null;
+      if ([ '[data-form="constraints"]', '[data-form="profile"]' ].includes(selector)) return form ?? null;
       return null;
     },
   };
@@ -278,8 +283,8 @@ test("mount delegates product and prototype controls through the reducer", () =>
 
   root.click(productButton("start", { form }));
   assert.equal(mounted.controller.getState().phase, "finding");
-  assert.deepEqual(mounted.controller.getState().constraints.dietary, ["vegan", "shellfish-free"]);
-  assert.deepEqual(mounted.controller.getState().constraints.allergies, ["peanut", "sesame"]);
+  assert.deepEqual(mounted.controller.getState().constraints.dietary, []);
+  assert.deepEqual(mounted.controller.getState().constraints.allergies, []);
   assert.equal(mounted.controller.getState().constraints.disclosure, "minimal");
   timer.scheduled[0].callback();
   assert.equal(mounted.controller.getState().phase, "following");
@@ -310,6 +315,47 @@ test("mount delegates product and prototype controls through the reducer", () =>
   mounted.destroy();
   assert.equal(root.listenerCount(), 0);
   assert.equal(controlsRoot.listenerCount(), 0);
+});
+
+test("profile actions save searchable multi-select values without putting them in constraints form", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    FormData: class extends FixtureFormData {
+      getAll(name) {
+        return name === "dietary" ? ["vegetarian", "vegan"] : name === "allergies" ? ["peanut"] : [];
+      }
+    },
+  });
+  root.click(productButton("open-profile"));
+  assert.equal(mounted.controller.getState().phase, "profile");
+  const form = {
+    values: {},
+    querySelector() { return null; },
+  };
+  root.click(productButton("save-profile", { form }));
+  assert.equal(mounted.controller.getState().phase, "constraints");
+  assert.deepEqual(mounted.controller.getState().profile, {
+    dietary: ["vegetarian", "vegan"],
+    allergies: ["peanut"],
+  });
+  mounted.destroy();
+});
+
+test("wheel over sliders changes their values by their configured step", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+  });
+  const timeSlider = { value: "20", min: "5", max: "60", step: "5", dataset: { slider: "walk" }, closest(selector) { return selector.includes("range") ? this : null; } };
+  const budgetSlider = { value: "26", min: "1", max: "26", step: "1", dataset: { slider: "budget" }, closest(selector) { return selector.includes("range") ? this : null; } };
+  root.wheel(timeSlider, -1);
+  root.wheel(budgetSlider, 1);
+  assert.equal(timeSlider.value, "25");
+  assert.equal(budgetSlider.value, "25");
+  mounted.destroy();
 });
 
 test("mount renders guarded review and restarts with one acknowledged Start", () => {
@@ -469,8 +515,6 @@ test("advanced input updates its collapsed summary without rerendering or moving
       category: "restaurant",
       maxWalkMinutes: "20",
       budget: "20000",
-      dietary: "채식",
-      allergies: "견과류",
       accessibility: "계단 없는 입구",
       disclosure: "minimal",
     },
@@ -492,7 +536,7 @@ test("advanced input updates its collapsed summary without rerendering or moving
 
   assert.equal(
     summary.textContent,
-    "추가 조건 5개 적용 중 — 예산 · 식이 조건 · 알레르기 · 접근성 조건 · 목적지 공개 수준",
+    "추가 조건 1개 적용 중 — 접근성 조건",
   );
   assert.equal(root.focusCount(), focusBeforeInput);
   mounted.destroy();

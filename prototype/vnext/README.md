@@ -8,7 +8,9 @@ Open `prototype/vnext/index.html` directly in a modern browser. No install or se
 
 ## Product Path
 
-Use the product canvas for onboarding, conditions, one-action start, compass guidance, Stop, Reveal reason, confirmed Stop, arrival details, and place reaction.
+Use the product canvas for onboarding, first-use dietary/allergy profile setup, restaurant-only conditions, wheel-adjustable walking-time and budget sliders, one-action start, compass guidance, Stop, Reveal reason, confirmed Stop, arrival details, and place reaction.
+
+Budget moves in 2,000 KRW increments from 2,000 to 50,000 KRW; the final slider value is `상관없음`. Minimum destination disclosure (walking time, budget, and main menu) is the default, with an optional private mode under the collapsed settings.
 
 ## Prototype Controls
 

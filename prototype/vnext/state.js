@@ -2,7 +2,7 @@
 
 (function initState(globalScope) {
   const PHASES = Object.freeze([
-    "onboarding", "constraints", "finding", "following", "near",
+    "onboarding", "profile_setup", "profile", "constraints", "finding", "following", "near",
     "paused", "reveal_reason", "revealed", "following_revealed",
     "stop_confirm", "stop_reason", "stopped", "route_recovery",
     "recomputing", "external_map_warning", "external_map_handoff",
@@ -34,7 +34,7 @@
       dietary: [],
       allergies: [],
       accessibility: [],
-      disclosure: "standard",
+      disclosure: "minimal",
     };
   }
 
@@ -42,6 +42,7 @@
     return {
       phase: firstUse ? "onboarding" : "constraints",
       constraints: defaultConstraints(),
+      profile: { dietary: [], allergies: [] },
       errors: {},
       affectedConditions: [],
       permission,
@@ -67,8 +68,8 @@
 
   function validateConstraints(value) {
     const errors = {};
-    if (!value || !["restaurant", "cafe"].includes(value.category)) {
-      errors.category = "식당 또는 카페를 선택해 주세요.";
+    if (!value || value.category !== "restaurant") {
+      errors.category = "식당 조건을 확인해 주세요.";
     }
     if (!Number.isFinite(value?.maxWalkMinutes) || value.maxWalkMinutes < 1) {
       errors.maxWalkMinutes = "도보 시간은 1분 이상이어야 합니다.";
@@ -125,7 +126,33 @@
   function reduce(state, action) {
     if (!state || !action || typeof action.type !== "string") return state;
     if (action.type === "CONTINUE_ONBOARDING" && state.phase === "onboarding") {
+      return { ...state, phase: "profile_setup" };
+    }
+    if (action.type === "OPEN_PROFILE" && state.phase === "constraints") {
+      return { ...state, phase: "profile" };
+    }
+    if (action.type === "CANCEL_PROFILE" && state.phase === "profile") {
       return { ...state, phase: "constraints" };
+    }
+    if (
+      action.type === "SAVE_PROFILE"
+      && ["profile_setup", "profile"].includes(state.phase)
+      && action.profile
+    ) {
+      const profile = {
+        dietary: Array.isArray(action.profile.dietary) ? structuredClone(action.profile.dietary) : [],
+        allergies: Array.isArray(action.profile.allergies) ? structuredClone(action.profile.allergies) : [],
+      };
+      return {
+        ...state,
+        phase: "constraints",
+        profile,
+        constraints: {
+          ...state.constraints,
+          dietary: structuredClone(profile.dietary),
+          allergies: structuredClone(profile.allergies),
+        },
+      };
     }
     if (action.type === "START" && state.phase === "constraints") {
       const result = validateConstraints(action.constraints);
@@ -265,6 +292,7 @@
       return {
         ...createInitialState({ firstUse: false, permission: state.permission }),
         constraints: structuredClone(state.constraints),
+        profile: structuredClone(state.profile),
         guardedRecovery,
         recoveryReason: guardedRecovery ? state.stopReason : null,
         recoveryReviewed: false,
@@ -361,6 +389,7 @@
     return {
       phase: state.phase,
       constraints: structuredClone(state.constraints),
+      profile: structuredClone(state.profile),
       errors: structuredClone(state.errors),
       affectedConditions: structuredClone(state.affectedConditions),
       permission: state.permission,

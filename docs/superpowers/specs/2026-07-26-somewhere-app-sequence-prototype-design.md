@@ -4,6 +4,8 @@ Status: approved sequence captured for final written review
 
 Date: 2026-07-26
 
+Constraint-screen amendment: 2026-08-12
+
 ## Purpose
 
 Build a low-fidelity browser prototype that makes the approved Somewhere vNext app sequence tangible before visual styling or native implementation. The prototype demonstrates screen order, disclosure timing, state transitions, and safety/recovery branches. It does not test brand design, recommendation quality, real location, provider data, iOS behavior, or physical hardware.
@@ -18,6 +20,8 @@ The user approved the sequence represented in the visual companion on 2026-07-26
 4. Confirmed arrival automatically reveals source-supported arrival details: venue name, exact address, building, floor/unit, and entrance guidance. Unknown details remain explicitly unavailable and are never inferred.
 
 All other approved vNext rules remain active: one destination, no candidate list, no active Reroll, immediate Stop pause, skippable reasons, guarded recommendation recovery, route-aware guidance, and delayed place reaction.
+
+The 2026-08-12 constraint-screen amendment fixes the category to restaurant for this prototype, moves walking time and budget into the primary condition area, uses wheel-adjustable numeric sliders, and reserves the final budget value for `상관없음` after 2,000 KRW increments. Minimum disclosure (walking time, budget, and main menu) is the default with optional private mode. Dietary and allergy choices are collected during first-use profile setup and edited later through Profile search/list multi-select, not in the recurring constraints form.
 
 ## Prototype Scope
 
@@ -53,18 +57,17 @@ All other approved vNext rules remain active: one destination, no candidate list
 
 Visible by default:
 
-- category: restaurant or cafe;
-- maximum walking distance or time;
+- category: restaurant (cafe deferred);
+- maximum walking time on a 5-minute-step slider;
+- budget on a 2,000 KRW-step slider ending with `상관없음`;
 - primary action: `이 조건으로 바로 출발`.
 
 Collapsed under `고급 조건`:
 
-- budget range;
-- dietary and allergy constraints;
 - accessibility requirements;
 - destination disclosure preference.
 
-When advanced constraints are active, the collapsed row summarizes their count or types, such as `추가 조건 2개 적용 중`. Safety-relevant conditions are never silently hidden from the user or ignored by selection logic.
+The default disclosure is minimum information (walking time, budget, and main menu), with an optional private setting. Dietary and allergy values are shown as applied profile conditions but edited only in the searchable multi-select Profile screen. When advanced constraints are active, the collapsed row summarizes their count or types, such as `추가 조건 2개 적용 중`. Safety-relevant conditions are never silently hidden from the user or ignored by selection logic.
 
 ### Compass Screen
 
@@ -101,6 +104,7 @@ Missing fields display a neutral unavailable state. The prototype fixture includ
 
 ```text
 onboarding (first use only)
+→ profile_setup (first use only)
 → constraints
 → finding
 → following

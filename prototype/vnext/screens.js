@@ -134,11 +134,10 @@
 
   function activeAdvancedConditions(constraints) {
     const active = [];
-    if (constraints.budget != null && String(constraints.budget).trim() !== "") active.push("예산");
     if (Array.isArray(constraints.dietary) && constraints.dietary.length > 0) active.push("식이 조건");
     if (Array.isArray(constraints.allergies) && constraints.allergies.length > 0) active.push("알레르기");
     if (Array.isArray(constraints.accessibility) && constraints.accessibility.length > 0) active.push("접근성 조건");
-    if (typeof constraints.disclosure === "string" && constraints.disclosure !== "") active.push("목적지 공개 수준");
+    if (constraints.disclosure === "private") active.push("목적지 공개 수준");
     return active;
   }
 
@@ -149,33 +148,60 @@
       : `추가 조건 ${active.length}개 적용 중 — ${active.join(" · ")}`;
   }
 
+  const DIETARY_OPTIONS = Object.freeze([
+    ["vegetarian", "채식"], ["vegan", "비건"], ["halal", "할랄"], ["kosher", "코셔"], ["low_sodium", "저염"],
+  ]);
+  const ALLERGY_OPTIONS = Object.freeze([
+    ["peanut", "땅콩"], ["tree_nut", "견과류"], ["shellfish", "갑각류"], ["milk", "유제품"], ["egg", "달걀"], ["wheat", "밀"],
+  ]);
+
+  function renderProfile(view, setup = false) {
+    const profile = view.profile || { dietary: [], allergies: [] };
+    const selected = (name) => Array.isArray(profile[name]) ? profile[name] : [];
+    const picker = (name, label, options) => `<fieldset class="profile-picker" data-profile-picker="${name}">
+      <legend>${label}</legend>
+      <label class="picker-search">검색해서 선택할 수 있어요<input type="search" data-picker-search="${name}" placeholder="${label} 검색"></label>
+      <div class="picker-options" data-picker-options="${name}">${options.map(([value, text]) => `<label><input type="checkbox" name="${name}" value="${value}"${selected(name).includes(value) ? " checked" : ""}> ${text}</label>`).join("")}</div>
+    </fieldset>`;
+    return `<h1>${setup ? "나에게 맞는 조건을 설정해요" : "프로필 조건"}</h1>
+      <p>${setup ? "식이 조건과 알레르기는 여기서 한 번 설정하면 다음부터 자동으로 적용돼요." : "식이 조건과 알레르기는 프로필에서 수정할 수 있어요."}</p>
+      <form data-form="profile">
+        ${picker("dietary", "식이 조건", DIETARY_OPTIONS)}
+        ${picker("allergies", "알레르기", ALLERGY_OPTIONS)}
+        ${action("저장하고 조건으로", "save-profile")}
+        ${setup ? "" : action("취소", "cancel-profile")}
+      </form>`;
+  }
+
   function renderConstraints(view) {
     const constraints = view.constraints || {};
-    const category = constraints.category === "cafe" ? "cafe" : "restaurant";
     const minutes = Number.isFinite(constraints.maxWalkMinutes) ? constraints.maxWalkMinutes : 20;
-    const disclosure = constraints.disclosure === "minimal" ? "minimal" : "standard";
+    const parsedBudget = Number.isFinite(constraints.budget)
+      ? constraints.budget
+      : Number(String(constraints.budget ?? "").replace(/[^0-9]/g, ""));
+    const budgetStep = Number.isFinite(parsedBudget) && parsedBudget > 0
+      ? Math.max(1, Math.min(25, Math.round(parsedBudget / 2_000)))
+      : 26;
+    const budgetAmount = budgetStep * 2_000;
+    const disclosure = constraints.disclosure === "private" ? "private" : "minimal";
     const advancedSummary = summarizeAdvancedConditions(constraints);
     return `<h1>지금 필요한 조건</h1>
       <p>최소 조건만 정하면 한 곳으로 바로 출발해요.</p>
       ${renderConstraintErrors(view.errors)}
       ${renderAffectedConditions(view.affectedConditions)}
       <form data-form="constraints">
-        <fieldset><legend>어디로 갈까요?</legend>
-          <label><input type="radio" name="category" value="restaurant"${category === "restaurant" ? " checked" : ""}> 식당</label>
-          <label><input type="radio" name="category" value="cafe"${category === "cafe" ? " checked" : ""}> 카페</label>
-        </fieldset>
-        <label>도보 시간 <input name="maxWalkMinutes" type="number" min="1" value="${escapeHtml(minutes)}"></label>
+        <input type="hidden" name="category" value="restaurant">
+        <div class="slider-field"><label for="walk-time-slider">도보 시간 <output id="walk-time-value">${escapeHtml(minutes)}분</output></label><input id="walk-time-slider" name="maxWalkMinutes" type="range" min="5" max="60" step="5" value="${escapeHtml(minutes)}" data-slider="walk" aria-label="최대 도보 시간"></div>
+        <div class="slider-field"><label for="budget-slider">예산 <output id="budget-value"${budgetStep === 26 ? " data-budget-unlimited" : ""}>${budgetStep === 26 ? "상관없음" : `${escapeHtml(budgetAmount.toLocaleString("ko-KR"))}원 이하`}</output></label><input id="budget-slider" name="budget" type="range" min="1" max="26" step="1" value="${escapeHtml(budgetStep)}" data-slider="budget" aria-label="1인 예산"></div>
         <details data-advanced-conditions>
           <summary>${escapeHtml(advancedSummary)}</summary>
-          <label>예산 <input name="budget" value="${escapeHtml(constraints.budget ?? "")}"></label>
-          <label>식이 조건 <input name="dietary" value="${escapeHtml((constraints.dietary || []).join(", "))}"></label>
-          <label>알레르기 <input name="allergies" value="${escapeHtml((constraints.allergies || []).join(", "))}"></label>
           <label>접근성 조건 <input name="accessibility" value="${escapeHtml((constraints.accessibility || []).join(", "))}"></label>
           <label>목적지 공개 수준 <select name="disclosure">
-            <option value="standard"${disclosure === "standard" ? " selected" : ""}>기본 비공개</option>
-            <option value="minimal"${disclosure === "minimal" ? " selected" : ""}>최소 정보 공개</option>
+            <option value="minimal"${disclosure === "minimal" ? " selected" : ""}>최소 정보 공개 (도보시간 · 예산 · 주요 메뉴)</option>
+            <option value="private"${disclosure === "private" ? " selected" : ""}>비공개</option>
           </select></label>
         </details>
+        ${action("프로필 수정", "open-profile")}
         ${renderGuardedRecovery(view)}
         ${action("이 조건으로 바로 출발", "start")}
       </form>`;
@@ -201,7 +227,7 @@
     return `<h1>${heading}</h1>
       ${renderDisclosedIdentity(view)}
       ${renderCompassShell(view)}
-      ${renderGuidanceRows(view)}
+      ${view.constraints?.disclosure === "private" ? '<p class="private-guidance">정보 비공개 상태로 안내 중이에요</p>' : renderGuidanceRows(view)}
       ${action("안내 멈추기", "stop")}`;
   }
 
@@ -340,6 +366,8 @@
   function renderProductScreen(view) {
     const renderers = {
       onboarding: renderOnboarding,
+      profile_setup: (value) => renderProfile(value, true),
+      profile: (value) => renderProfile(value, false),
       constraints: renderConstraints,
       finding: renderFinding,
       following: renderCompass,

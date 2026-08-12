@@ -111,6 +111,43 @@ details > label {
   gap: 6px;
 }
 
+.slider-field {
+  display: grid;
+  gap: 8px;
+}
+
+.slider-field > label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.slider-field output {
+  font-weight: 700;
+  text-align: right;
+}
+
+input[type="range"] {
+  min-height: 28px;
+  padding: 0;
+  accent-color: var(--ink);
+}
+
+.profile-picker .picker-search {
+  display: grid;
+  align-items: start;
+  gap: 6px;
+}
+
+.picker-options {
+  display: grid;
+  gap: 8px;
+}
+
+.picker-options label[hidden] {
+  display: none;
+}
+
 input:not([type="radio"]) {
   width: 100%;
   min-height: 44px;
