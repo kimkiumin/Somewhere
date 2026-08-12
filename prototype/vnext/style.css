@@ -264,6 +264,15 @@ input[type="range"] {
   gap: 8px;
 }
 
+.picker-options-scroll {
+  height: 216px;
+  max-height: 216px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 2px 4px 2px 0;
+}
+
 .picker-option {
   display: flex;
   align-items: flex-start;
@@ -276,6 +285,10 @@ input[type="range"] {
 
 .picker-option:hover {
   background: #f7f7f7;
+}
+
+.picker-option-none {
+  background: #fafafa;
 }
 
 .profile-choice-input {

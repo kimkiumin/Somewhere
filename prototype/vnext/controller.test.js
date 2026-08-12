@@ -211,6 +211,9 @@ function createEventRoot() {
     input(target) {
       for (const listener of listeners.get("input") || []) listener({ target });
     },
+    change(target) {
+      for (const listener of listeners.get("change") || []) listener({ target });
+    },
     listenerCount(type = "click") {
       return listeners.get(type)?.size ?? 0;
     },
@@ -342,6 +345,67 @@ test("profile actions save searchable multi-select values without putting them i
     dietary: ["vegetarian", "vegan"],
     allergies: ["peanut"],
   });
+  mounted.destroy();
+});
+
+test("profile none choices save as empty condition arrays", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    FormData: class extends FixtureFormData {
+      getAll() {
+        return ["none"];
+      }
+    },
+  });
+  root.click(productButton("open-profile-menu"));
+  root.click(productButton("open-profile-settings"));
+  root.click(productButton("save-profile", { form: { values: {} } }));
+  assert.deepEqual(mounted.controller.getState().profile, { dietary: [], allergies: [] });
+  assert.deepEqual(mounted.controller.getState().constraints.dietary, []);
+  assert.deepEqual(mounted.controller.getState().constraints.allergies, []);
+  mounted.destroy();
+});
+
+test("profile none choice is mutually exclusive with a selected condition", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+  });
+  const picker = {
+    querySelectorAll() { return [none, vegan]; },
+    querySelector() { return none; },
+  };
+  const none = {
+    checked: true,
+    name: "dietary",
+    dataset: { profileNone: "dietary" },
+    closest(selector) {
+      if (selector.includes("checkbox")) return this;
+      if (selector === "[data-profile-picker]") return picker;
+      return null;
+    },
+  };
+  const vegan = {
+    checked: false,
+    name: "dietary",
+    dataset: {},
+    closest(selector) {
+      if (selector.includes("checkbox")) return this;
+      if (selector === "[data-profile-picker]") return picker;
+      return null;
+    },
+  };
+  vegan.checked = true;
+  root.change(vegan);
+  assert.equal(none.checked, false);
+  vegan.checked = false;
+  none.checked = true;
+  vegan.checked = true;
+  root.change(none);
+  assert.equal(vegan.checked, false);
   mounted.destroy();
 });
 

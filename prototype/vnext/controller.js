@@ -241,9 +241,10 @@
         const value = data.get(name);
         return value == null ? [] : [value];
       };
+      const readValues = (name) => getAll(name).map(String).filter((value) => value !== "none");
       return {
-        dietary: getAll("dietary").map(String),
-        allergies: getAll("allergies").map(String),
+        dietary: readValues("dietary"),
+        allergies: readValues("allergies"),
       };
     }
 
@@ -367,6 +368,20 @@
     }
 
     function onProfileInput(event) {
+      const checkbox = event.target?.closest?.('input[type="checkbox"]');
+      const pickerForCheckbox = checkbox?.closest?.("[data-profile-picker]");
+      if (checkbox && pickerForCheckbox) {
+        const checkboxes = pickerForCheckbox.querySelectorAll?.('input[type="checkbox"]') || [];
+        if (checkbox.dataset?.profileNone && checkbox.checked) {
+          for (const option of checkboxes) {
+            if (option !== checkbox) option.checked = false;
+          }
+        } else if (checkbox.checked) {
+          const none = pickerForCheckbox.querySelector?.(`[data-profile-none="${checkbox.name}"]`);
+          if (none) none.checked = false;
+        }
+        return;
+      }
       const search = event.target?.closest?.("[data-picker-search]");
       if (!search) return;
       const picker = search.closest?.("[data-profile-picker]");
@@ -413,6 +428,7 @@
     root.addEventListener("input", onConstraintsInput);
     root.addEventListener("change", onConstraintsInput);
     root.addEventListener("input", onProfileInput);
+    root.addEventListener("change", onProfileInput);
     root.addEventListener("wheel", onSliderWheel, { passive: false });
     controlsRoot.addEventListener("click", onPrototypeClick);
 
@@ -424,6 +440,7 @@
       root.removeEventListener("input", onConstraintsInput);
       root.removeEventListener("change", onConstraintsInput);
       root.removeEventListener("input", onProfileInput);
+      root.removeEventListener("change", onProfileInput);
       root.removeEventListener("wheel", onSliderWheel);
       controlsRoot.removeEventListener("click", onPrototypeClick);
       controller.destroy();

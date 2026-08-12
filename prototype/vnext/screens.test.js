@@ -138,7 +138,7 @@ test("profile pickers use specific dietary taxonomy and the Korean 19-allergen s
   ]) {
     assert.match(html, new RegExp(label), label);
   }
-  assert.equal((html.match(/class="profile-choice-input"/g) || []).length, 29);
+  assert.equal((html.match(/class="profile-choice-input"/g) || []).length, 31);
   assert.match(html, /조개류\(굴·전복·홍합 포함\)/);
   assert.doesNotMatch(html, /tree_nut|견과류/);
 });
@@ -148,6 +148,22 @@ test("profile checkbox rows carry a compact layout hook instead of the generic f
   assert.match(html, /class="picker-option"/);
   assert.match(html, /class="profile-choice-input"/);
   assert.match(html, /class="picker-option-text"/);
+});
+
+test("dietary and allergy lists expose four-item scroll containers", () => {
+  const html = screens.renderProductScreen(view({ phase: "profile" }));
+  assert.equal((html.match(/class="picker-options picker-options-scroll"/g) || []).length, 2);
+  assert.equal((html.match(/data-visible-items="4"/g) || []).length, 2);
+  assert.match(html, /식이 조건 선택 목록\. 네 항목씩 보입니다\./);
+  assert.match(html, /알레르기 선택 목록\. 네 항목씩 보입니다\./);
+});
+
+test("each profile list starts with an explicit no-condition option", () => {
+  const html = screens.renderProductScreen(view({ phase: "profile" }));
+  assert.equal((html.match(/data-profile-none/g) || []).length, 2);
+  assert.equal((html.match(/value="none"[^>]* checked/g) || []).length, 2);
+  assert.ok(html.indexOf("data-profile-none=\"dietary\"") < html.indexOf("value=\"vegan\""));
+  assert.ok(html.indexOf("data-profile-none=\"allergies\"") < html.indexOf("value=\"egg\""));
 });
 
 test("private disclosure hides guidance detail rows", () => {

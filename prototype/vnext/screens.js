@@ -224,7 +224,10 @@
       <legend>${label}</legend>
       ${note ? `<p class="picker-note">${note}</p>` : ""}
       <label class="picker-search">검색해서 선택할 수 있어요<input type="search" data-picker-search="${name}" placeholder="${label} 검색"></label>
-      <div class="picker-options" data-picker-options="${name}">${options.map(([value, text, description]) => `<label class="picker-option"><input class="profile-choice-input" type="checkbox" name="${name}" value="${value}"${selected(name).includes(value) ? " checked" : ""}><span class="picker-option-text"><strong>${text}</strong>${description ? `<small>${description}</small>` : ""}</span></label>`).join("")}</div>
+      <div class="picker-options picker-options-scroll" data-picker-options="${name}" data-visible-items="4" tabindex="0" aria-label="${label} 선택 목록. 네 항목씩 보입니다.">
+        <label class="picker-option picker-option-none"><input class="profile-choice-input" type="checkbox" name="${name}" value="none" data-profile-none="${name}"${selected(name).length === 0 ? " checked" : ""}><span class="picker-option-text"><strong>없음</strong><small>이 조건을 적용하지 않음</small></span></label>
+        ${options.map(([value, text, description]) => `<label class="picker-option"><input class="profile-choice-input" type="checkbox" name="${name}" value="${value}"${selected(name).includes(value) ? " checked" : ""}><span class="picker-option-text"><strong>${text}</strong>${description ? `<small>${description}</small>` : ""}</span></label>`).join("")}
+      </div>
     </fieldset>`;
     const dietaryOptions = selected("dietary").includes("vegetarian")
       ? [...LEGACY_DIETARY_OPTIONS, ...DIETARY_OPTIONS]
