@@ -254,6 +254,7 @@
       const disclosure = data.get("disclosure") === "private" ? "private" : "minimal";
       return {
         category: "restaurant",
+        partySize: Number(data.get("partySize")),
         maxWalkMinutes: Number(data.get("maxWalkMinutes")),
         budget: budgetStep == null || typeof screens.budgetAmountForIndex !== "function"
           ? null
@@ -267,6 +268,17 @@
 
     const productActions = {
       "continue-onboarding": () => controller.dispatch({ type: "CONTINUE_ONBOARDING" }),
+      "open-profile-menu": () => controller.dispatch({ type: "OPEN_PROFILE_MENU" }),
+      "close-profile-menu": () => controller.dispatch({ type: "CLOSE_PROFILE_MENU" }),
+      "open-profile-settings": () => controller.dispatch({ type: "OPEN_PROFILE" }),
+      "party-decrement": () => {
+        const current = Number(currentView?.constraints?.partySize);
+        return controller.dispatch({ type: "SET_PARTY_SIZE", partySize: Math.max(1, current - 1) });
+      },
+      "party-increment": () => {
+        const current = Number(currentView?.constraints?.partySize);
+        return controller.dispatch({ type: "SET_PARTY_SIZE", partySize: Math.min(5, current + 1) });
+      },
       "open-profile": () => controller.dispatch({ type: "OPEN_PROFILE" }),
       "cancel-profile": () => controller.dispatch({ type: "CANCEL_PROFILE" }),
       stop: () => controller.dispatch({ type: "STOP" }),
@@ -287,7 +299,11 @@
 
     function onProductClick(event) {
       const button = event.target?.closest?.("[data-action]");
-      if (!button || !inside(root, button)) return;
+      if (!button) {
+        if (currentView?.profileMenuOpen) controller.dispatch({ type: "CLOSE_PROFILE_MENU" });
+        return;
+      }
+      if (!inside(root, button)) return;
       event.preventDefault?.();
       const actionName = button.dataset.action;
       if (actionName === "start") {

@@ -18,6 +18,7 @@ const mountInspectable = mountForTest ?? mount;
 function validConstraints(overrides = {}) {
   return {
     category: "restaurant",
+    partySize: 2,
     maxWalkMinutes: 20,
     budget: null,
     dietary: [],
@@ -272,6 +273,7 @@ test("mount delegates product and prototype controls through the reducer", () =>
   const form = {
     values: {
       category: "cafe",
+      partySize: "2",
       maxWalkMinutes: "15",
       budget: "10000",
       dietary: "vegan, shellfish-free",
@@ -343,6 +345,76 @@ test("profile actions save searchable multi-select values without putting them i
   mounted.destroy();
 });
 
+test("party arrow buttons update party size and stop at both boundaries", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+  });
+
+  root.click(productButton("party-increment"));
+  assert.equal(mounted.controller.getState().constraints.partySize, 3);
+  root.click(productButton("party-decrement"));
+  assert.equal(mounted.controller.getState().constraints.partySize, 2);
+  for (let index = 0; index < 5; index += 1) root.click(productButton("party-decrement"));
+  assert.equal(mounted.controller.getState().constraints.partySize, 1);
+  for (let index = 0; index < 8; index += 1) root.click(productButton("party-increment"));
+  assert.equal(mounted.controller.getState().constraints.partySize, 5);
+  mounted.destroy();
+});
+
+test("profile menu opens settings and profile save returns to constraints", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    FormData: class extends FixtureFormData {
+      getAll(name) {
+        return name === "dietary" ? ["vegetarian"] : name === "allergies" ? ["peanut"] : [];
+      }
+    },
+  });
+
+  root.click(productButton("open-profile-menu"));
+  assert.equal(mounted.controller.getState().profileMenuOpen, true);
+  root.click(productButton("open-profile-settings"));
+  assert.equal(mounted.controller.getState().phase, "profile");
+  assert.equal(mounted.controller.getState().profileMenuOpen, false);
+  root.click(productButton("save-profile", { form: { values: {} } }));
+  assert.equal(mounted.controller.getState().phase, "constraints");
+  assert.deepEqual(mounted.controller.getState().profile, {
+    dietary: ["vegetarian"],
+    allergies: ["peanut"],
+  });
+  mounted.destroy();
+});
+
+test("start forwards party size with the other constraints", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const timer = createScheduler();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+    FormData: FixtureFormData,
+  });
+  const form = {
+    values: {
+      category: "restaurant",
+      partySize: "3",
+      maxWalkMinutes: "20",
+      budget: "12",
+      disclosure: "minimal",
+    },
+  };
+
+  root.click(productButton("start", { form }));
+  assert.equal(mounted.controller.getState().constraints.partySize, 3);
+  assert.equal(mounted.controller.getState().phase, "finding");
+  mounted.destroy();
+});
+
 test("wheel over sliders changes their values by their configured step", () => {
   const root = createEventRoot();
   const controlsRoot = createEventRoot();
@@ -392,7 +464,7 @@ test("mount renders guarded review and restarts with one acknowledged Start", ()
     FormData: FixtureFormData,
   });
   const form = {
-    values: { category: "restaurant", maxWalkMinutes: "20" },
+    values: { category: "restaurant", partySize: "2", maxWalkMinutes: "20" },
     reviewVisible: false,
     querySelector(selector) {
       if (selector !== '[name="recoveryReviewed"]' || !this.reviewVisible) return null;
@@ -479,6 +551,7 @@ test("mount dispatches every Stop reason into its guarded new-start review", () 
     const form = {
       values: {
         category: "restaurant",
+        partySize: "2",
         maxWalkMinutes: "20",
         disclosure: "standard",
         recoveryReviewed: "yes",
@@ -508,6 +581,7 @@ test("mount focuses accepted screen renders but not rejected duplicate actions",
   const form = {
     values: {
       category: "restaurant",
+      partySize: "2",
       maxWalkMinutes: "20",
       disclosure: "standard",
     },
@@ -535,6 +609,7 @@ test("advanced input updates its collapsed summary without rerendering or moving
   const form = {
     values: {
       category: "restaurant",
+      partySize: "2",
       maxWalkMinutes: "20",
       budget: "20000",
       accessibility: "계단 없는 입구",
