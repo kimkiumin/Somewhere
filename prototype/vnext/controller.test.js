@@ -350,11 +350,11 @@ test("wheel over sliders changes their values by their configured step", () => {
     initialState: stateApi.createInitialState({ firstUse: false }),
   });
   const timeSlider = { value: "20", min: "5", max: "60", step: "5", dataset: { slider: "walk" }, closest(selector) { return selector.includes("range") ? this : null; } };
-  const budgetSlider = { value: "13", min: "0", max: "13", step: "1", dataset: { slider: "budget" }, closest(selector) { return selector.includes("range") ? this : null; } };
+  const budgetSlider = { value: "12", min: "0", max: "12", step: "1", dataset: { slider: "budget" }, closest(selector) { return selector.includes("range") ? this : null; } };
   root.wheel(timeSlider, -1);
   root.wheel(budgetSlider, 1);
   assert.equal(timeSlider.value, "25");
-  assert.equal(budgetSlider.value, "12");
+  assert.equal(budgetSlider.value, "11");
   mounted.destroy();
 });
 
@@ -367,7 +367,7 @@ test("budget wheel snaps odd thousands to even-thousand stops", () => {
   const budgetSlider = {
     value: "4",
     min: "0",
-    max: "13",
+    max: "12",
     step: "1",
     dataset: { slider: "budget", budgetAmount: "11000" },
     closest(selector) { return selector.includes("range") ? this : null; },

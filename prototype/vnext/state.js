@@ -74,6 +74,14 @@
     if (!Number.isFinite(value?.maxWalkMinutes) || value.maxWalkMinutes < 1) {
       errors.maxWalkMinutes = "도보 시간은 1분 이상이어야 합니다.";
     }
+    if (value?.budget != null) {
+      const budget = Number.isFinite(value.budget)
+        ? value.budget
+        : Number(String(value.budget).replace(/[^0-9]/g, ""));
+      if (!Number.isFinite(budget) || budget < 4_000) {
+        errors.budget = "예산은 4,000원 이상이어야 합니다.";
+      }
+    }
     return { valid: Object.keys(errors).length === 0, errors };
   }
 

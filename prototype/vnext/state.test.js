@@ -51,6 +51,15 @@ test("default constraints use restaurant, minimum disclosure, and unlimited budg
   assert.equal(stateApi.validateConstraints({ ...initial.constraints, category: "cafe" }).valid, false);
 });
 
+test("budget validation rejects the unsupported 2,000 won floor", () => {
+  const initial = stateApi.createInitialState({ firstUse: false });
+  const tooLow = stateApi.validateConstraints({ ...initial.constraints, budget: 2_000 });
+  const supported = stateApi.validateConstraints({ ...initial.constraints, budget: 4_000 });
+  assert.equal(tooLow.valid, false);
+  assert.equal(tooLow.errors.budget, "예산은 4,000원 이상이어야 합니다.");
+  assert.equal(supported.valid, true);
+});
+
 test("invalid constraints remain editable and identify exact fields", () => {
   const initial = stateApi.createInitialState({ firstUse: false });
   const unchanged = stateApi.reduce(initial, {

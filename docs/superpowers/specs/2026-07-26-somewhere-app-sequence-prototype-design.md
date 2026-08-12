@@ -21,7 +21,7 @@ The user approved the sequence represented in the visual companion on 2026-07-26
 
 All other approved vNext rules remain active: one destination, no candidate list, no active Reroll, immediate Stop pause, skippable reasons, guarded recommendation recovery, route-aware guidance, and delayed place reaction.
 
-The 2026-08-12 constraint-screen amendment fixes the category to restaurant for this prototype, moves walking time and budget into the primary condition area, uses wheel-adjustable numeric sliders, and reserves the final budget value for `상관없음`. Budget stops are 2,000 KRW increments through 20,000 KRW, then 30,000/40,000/50,000 KRW and unlimited. Wheel input is treated as a 1,000 KRW directional intent but settles on even-thousand valid stops, so an odd legacy value such as 11,000 KRW moves to 10,000 KRW when scrolling down and 12,000 KRW when scrolling up. Minimum disclosure (walking time, budget, and main menu) is the default with optional private mode. Dietary and allergy choices are collected during first-use profile setup and edited later through Profile search/list multi-select, not in the recurring constraints form.
+The 2026-08-12 constraint-screen amendment fixes the category to restaurant for this prototype, moves walking time and budget into the primary condition area, uses wheel-adjustable numeric sliders, and reserves the final budget value for `상관없음`. Budget stops start at 4,000 KRW, use 2,000 KRW increments through 20,000 KRW, then 30,000/40,000/50,000 KRW and unlimited. The 4,000 KRW floor is a product hypothesis rounded up from official Seoul reference prices near 3,700–3,800 KRW for a kimbap serving; it is not a guarantee that every area has a qualifying venue. Wheel input is treated as a 1,000 KRW directional intent but settles on even-thousand valid stops, so an odd legacy value such as 11,000 KRW moves to 10,000 KRW when scrolling down and 12,000 KRW when scrolling up. Minimum disclosure (walking time, budget, and main menu) is the default with optional private mode. Dietary and allergy choices are collected during first-use profile setup and edited later through Profile search/list multi-select, not in the recurring constraints form.
 
 ## Prototype Scope
 
@@ -59,7 +59,7 @@ Visible by default:
 
 - category: restaurant (cafe deferred);
 - maximum walking time on a 5-minute-step slider;
-- budget on a 2,000 KRW-step slider ending with `상관없음`;
+- budget on a slider starting at 4,000 KRW, using 2,000 KRW steps through 20,000 KRW and ending with coarse stops plus `상관없음`;
 - primary action: `이 조건으로 바로 출발`.
 
 Collapsed under `고급 조건`:

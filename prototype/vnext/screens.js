@@ -155,7 +155,7 @@
     ["peanut", "땅콩"], ["tree_nut", "견과류"], ["shellfish", "갑각류"], ["milk", "유제품"], ["egg", "달걀"], ["wheat", "밀"],
   ]);
   const BUDGET_STOPS = Object.freeze([
-    2_000, 4_000, 6_000, 8_000, 10_000, 12_000, 14_000, 16_000, 18_000, 20_000,
+    4_000, 6_000, 8_000, 10_000, 12_000, 14_000, 16_000, 18_000, 20_000,
     30_000, 40_000, 50_000, null,
   ]);
 
@@ -229,7 +229,7 @@
       <form data-form="constraints">
         <input type="hidden" name="category" value="restaurant">
         <div class="slider-field"><label for="walk-time-slider">도보 시간 <output id="walk-time-value">${escapeHtml(minutes)}분</output></label><input id="walk-time-slider" name="maxWalkMinutes" type="range" min="5" max="60" step="5" value="${escapeHtml(minutes)}" data-slider="walk" aria-label="최대 도보 시간"></div>
-        <div class="slider-field"><label for="budget-slider">예산 <output id="budget-value"${budgetAmount == null ? " data-budget-unlimited" : ""}>${budgetAmount == null ? "상관없음" : `${escapeHtml(budgetAmount.toLocaleString("ko-KR"))}원 이하`}</output></label><input id="budget-slider" name="budget" type="range" min="0" max="13" step="1" value="${escapeHtml(budgetStep)}" data-slider="budget" data-budget-amount="${budgetAmount == null ? "" : escapeHtml(budgetAmount)}" aria-label="1인 예산"></div>
+        <div class="slider-field"><label for="budget-slider">예산 <output id="budget-value"${budgetAmount == null ? " data-budget-unlimited" : ""}>${budgetAmount == null ? "상관없음" : `${escapeHtml(budgetAmount.toLocaleString("ko-KR"))}원 이하`}</output></label><input id="budget-slider" name="budget" type="range" min="0" max="12" step="1" value="${escapeHtml(budgetStep)}" data-slider="budget" data-budget-amount="${budgetAmount == null ? "" : escapeHtml(budgetAmount)}" aria-label="1인 예산"></div>
         <details data-advanced-conditions>
           <summary>${escapeHtml(advancedSummary)}</summary>
           <label>접근성 조건 <input name="accessibility" value="${escapeHtml((constraints.accessibility || []).join(", "))}"></label>

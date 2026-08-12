@@ -48,21 +48,24 @@ test("constraints fix the category to restaurant and expose time and budget slid
   assert.match(html, /data-budget-unlimited/);
   assert.match(html, /상관없음/);
   const withBudget = screens.renderProductScreen(view({
-    constraints: { ...view().constraints, budget: 2_000 },
+    constraints: { ...view().constraints, budget: 4_000 },
   }));
-  assert.match(withBudget, /2,000원 이하/);
+  assert.match(withBudget, /4,000원 이하/);
 });
 
 test("budget slider uses dense low stops, coarse high stops, and a final unlimited stop", () => {
   assert.deepEqual(screens.BUDGET_STOPS, [
-    2_000, 4_000, 6_000, 8_000, 10_000, 12_000, 14_000, 16_000, 18_000, 20_000,
+    4_000, 6_000, 8_000, 10_000, 12_000, 14_000, 16_000, 18_000, 20_000,
     30_000, 40_000, 50_000, null,
   ]);
+  const low = screens.renderProductScreen(view());
+  assert.match(low, /min="0"[^>]*max="12"[^>]*value="12"/);
+  assert.doesNotMatch(low, /2,000원 이하/);
   const high = screens.renderProductScreen(view({
     constraints: { ...view().constraints, budget: 30_000 },
   }));
-  assert.match(high, /name="budget"[^>]*min="0"[^>]*max="13"[^>]*step="1"/);
-  assert.match(high, /value="10"/);
+  assert.match(high, /name="budget"[^>]*min="0"[^>]*max="12"[^>]*step="1"/);
+  assert.match(high, /value="9"/);
   assert.match(high, /30,000원 이하/);
 });
 
