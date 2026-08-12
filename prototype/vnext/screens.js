@@ -149,10 +149,31 @@
   }
 
   const DIETARY_OPTIONS = Object.freeze([
-    ["vegetarian", "채식"], ["vegan", "비건"], ["halal", "할랄"], ["kosher", "코셔"], ["low_sodium", "저염"],
+    ["vegan", "비건", "동물성 식품을 먹지 않음"],
+    ["lacto", "락토", "유제품 허용 · 육류·생선·달걀 제외"],
+    ["ovo", "오보", "달걀 허용 · 유제품·육류·생선 제외"],
+    ["lacto_ovo", "락토-오보", "유제품·달걀 허용 · 육류·생선 제외"],
+    ["pesco", "페스코", "생선·어패류 허용 · 육류·가금류 제외"],
+    ["pollo_pesco", "폴로-페스코", "생선·어패류·가금류 허용 · 붉은 고기 제외"],
+    ["flexitarian", "플렉시테리언", "상황에 따라 육류 허용"],
+    ["halal", "할랄", "할랄 인증·조리 여부 확인 필요"],
+    ["kosher", "코셔", "코셔 기준·조리 여부 확인 필요"],
+    ["low_sodium", "저염", "나트륨 제한 메뉴 선호"],
   ]);
   const ALLERGY_OPTIONS = Object.freeze([
-    ["peanut", "땅콩"], ["tree_nut", "견과류"], ["shellfish", "갑각류"], ["milk", "유제품"], ["egg", "달걀"], ["wheat", "밀"],
+    ["egg", "난류", "가금류 알"], ["milk", "우유", "우유·유제품"], ["buckwheat", "메밀", "메밀 원재료"],
+    ["peanut", "땅콩", "땅콩 원재료"], ["soy", "대두", "콩·대두 원재료"], ["wheat", "밀", "밀·밀가루"],
+    ["mackerel", "고등어", "고등어 원재료"], ["crab", "게", "게 원재료"], ["shrimp", "새우", "새우 원재료"],
+    ["pork", "돼지고기", "돼지고기 원재료"], ["peach", "복숭아", "복숭아 원재료"], ["tomato", "토마토", "토마토 원재료"],
+    ["sulfites", "아황산류", "최종제품 이산화황 10mg/kg 이상"], ["walnut", "호두", "호두 원재료"],
+    ["chicken", "닭고기", "닭고기 원재료"], ["beef", "쇠고기", "쇠고기 원재료"], ["squid", "오징어", "오징어 원재료"],
+    ["shellfish", "조개류(굴·전복·홍합 포함)", "조개류 원재료"], ["pine_nut", "잣", "잣 원재료"],
+  ]);
+  const LEGACY_DIETARY_OPTIONS = Object.freeze([
+    ["vegetarian", "채식(세부 유형 미선택)", "기존 설정이에요. 비건·락토·오보 등으로 구체화해 주세요."],
+  ]);
+  const LEGACY_ALLERGY_OPTIONS = Object.freeze([
+    ["tree_nut", "기존 견과류 설정", "호두·잣을 각각 확인해 주세요."],
   ]);
   const BUDGET_STOPS = Object.freeze([
     4_000, 6_000, 8_000, 10_000, 12_000, 14_000, 16_000, 18_000, 20_000,
@@ -199,16 +220,23 @@
   function renderProfile(view, setup = false) {
     const profile = view.profile || { dietary: [], allergies: [] };
     const selected = (name) => Array.isArray(profile[name]) ? profile[name] : [];
-    const picker = (name, label, options) => `<fieldset class="profile-picker" data-profile-picker="${name}">
+    const picker = (name, label, options, note = "") => `<fieldset class="profile-picker" data-profile-picker="${name}">
       <legend>${label}</legend>
+      ${note ? `<p class="picker-note">${note}</p>` : ""}
       <label class="picker-search">검색해서 선택할 수 있어요<input type="search" data-picker-search="${name}" placeholder="${label} 검색"></label>
-      <div class="picker-options" data-picker-options="${name}">${options.map(([value, text]) => `<label><input type="checkbox" name="${name}" value="${value}"${selected(name).includes(value) ? " checked" : ""}> ${text}</label>`).join("")}</div>
+      <div class="picker-options" data-picker-options="${name}">${options.map(([value, text, description]) => `<label class="picker-option"><input class="profile-choice-input" type="checkbox" name="${name}" value="${value}"${selected(name).includes(value) ? " checked" : ""}><span class="picker-option-text"><strong>${text}</strong>${description ? `<small>${description}</small>` : ""}</span></label>`).join("")}</div>
     </fieldset>`;
+    const dietaryOptions = selected("dietary").includes("vegetarian")
+      ? [...LEGACY_DIETARY_OPTIONS, ...DIETARY_OPTIONS]
+      : DIETARY_OPTIONS;
+    const allergyOptions = selected("allergies").includes("tree_nut")
+      ? [...LEGACY_ALLERGY_OPTIONS, ...ALLERGY_OPTIONS]
+      : ALLERGY_OPTIONS;
     return `<h1>${setup ? "나에게 맞는 조건을 설정해요" : "프로필 조건"}</h1>
       <p>${setup ? "식이 조건과 알레르기는 여기서 한 번 설정하면 다음부터 자동으로 적용돼요." : "식이 조건과 알레르기는 프로필에서 수정할 수 있어요."}</p>
       <form data-form="profile">
-        ${picker("dietary", "식이 조건", DIETARY_OPTIONS)}
-        ${picker("allergies", "알레르기", ALLERGY_OPTIONS)}
+        ${picker("dietary", "식이 조건", dietaryOptions, "채식 유형은 하나를 선택하고, 할랄·코셔·저염은 필요한 경우 추가로 선택해요.")}
+        ${picker("allergies", "알레르기", allergyOptions, "식약처 표시 대상 원재료 기준이에요. 조리시설의 교차오염·혼입 가능성은 장소에서 별도로 확인해야 해요.")}
         ${action("저장하고 조건으로", "save-profile")}
         ${setup ? "" : action("취소", "cancel-profile")}
       </form>`;

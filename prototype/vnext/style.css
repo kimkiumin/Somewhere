@@ -16,6 +16,7 @@ body {
   min-height: 100vh;
   margin: 0;
   padding: 24px 16px 40px;
+  overflow-x: hidden;
   color: var(--ink);
   background: var(--paper);
   line-height: 1.5;
@@ -102,6 +103,8 @@ form {
 
 .screen-header h1 {
   max-width: 15ch;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .profile-menu-wrap {
@@ -238,6 +241,7 @@ details > label {
 }
 
 input[type="range"] {
+  width: 100%;
   min-height: 28px;
   padding: 0;
   accent-color: var(--ink);
@@ -249,16 +253,65 @@ input[type="range"] {
   gap: 6px;
 }
 
+.profile-picker .picker-note {
+  color: #555;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
 .picker-options {
   display: grid;
   gap: 8px;
+}
+
+.picker-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.picker-option:hover {
+  background: #f7f7f7;
+}
+
+.profile-choice-input {
+  flex: 0 0 auto;
+  width: 20px !important;
+  min-width: 20px;
+  height: 20px;
+  min-height: 20px !important;
+  margin: 2px 0 0;
+  padding: 0 !important;
+  accent-color: var(--ink);
+}
+
+.picker-option-text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.picker-option-text strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.picker-option-text small {
+  color: #666;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .picker-options label[hidden] {
   display: none;
 }
 
-input:not([type="radio"]) {
+input:not([type="radio"]):not([type="checkbox"]):not([type="range"]) {
   width: 100%;
   min-height: 44px;
   padding: 8px 10px;
@@ -425,6 +478,7 @@ dd {
   .product-screen {
     min-height: 100svh;
     border-inline: 0;
+    padding-inline: 20px;
   }
 
   #prototype-controls {
@@ -433,6 +487,29 @@ dd {
 
   .prototype-controls > div {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  body {
+    padding-block: 12px 24px;
+  }
+
+  .product-screen {
+    padding-inline: 16px;
+  }
+
+  h1 {
+    font-size: 1.75rem;
+  }
+
+  .party-selector-controls {
+    grid-template-columns: 40px 1fr 40px;
+    gap: 6px;
+  }
+
+  .party-selector-controls > button {
+    min-width: 40px;
   }
 }
 

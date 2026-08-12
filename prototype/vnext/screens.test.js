@@ -125,6 +125,31 @@ test("profile screens expose searchable multi-select diet and allergy pickers", 
   }
 });
 
+test("profile pickers use specific dietary taxonomy and the Korean 19-allergen set", () => {
+  const html = screens.renderProductScreen(view({ phase: "profile" }));
+  for (const label of [
+    "비건", "락토", "오보", "락토-오보", "페스코", "폴로-페스코", "플렉시테리언", "할랄", "코셔", "저염",
+  ]) {
+    assert.match(html, new RegExp(label), label);
+  }
+  for (const label of [
+    "난류", "우유", "메밀", "땅콩", "대두", "밀", "고등어", "게", "새우", "돼지고기",
+    "복숭아", "토마토", "아황산류", "호두", "닭고기", "쇠고기", "오징어", "조개류", "잣",
+  ]) {
+    assert.match(html, new RegExp(label), label);
+  }
+  assert.equal((html.match(/class="profile-choice-input"/g) || []).length, 29);
+  assert.match(html, /조개류\(굴·전복·홍합 포함\)/);
+  assert.doesNotMatch(html, /tree_nut|견과류/);
+});
+
+test("profile checkbox rows carry a compact layout hook instead of the generic full-width input rule", () => {
+  const html = screens.renderProductScreen(view({ phase: "profile" }));
+  assert.match(html, /class="picker-option"/);
+  assert.match(html, /class="profile-choice-input"/);
+  assert.match(html, /class="picker-option-text"/);
+});
+
 test("private disclosure hides guidance detail rows", () => {
   const html = screens.renderProductScreen(view({
     phase: "following", distanceM: 850, bearingDeg: 40,
