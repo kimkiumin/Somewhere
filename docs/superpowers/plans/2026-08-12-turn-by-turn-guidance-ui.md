@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
-**Goal:** Replace the vNext prototype's directional compass needle with a safe, map-free turn-by-turn guidance surface that always shows current heading, next action, distance to that action, and total remaining distance while keeping the destination private.
+**Goal:** Preserve the vNext prototype's identity-defining compass needle while adding a safe, map-free turn-by-turn cue at the upper left with action distance and total remaining distance, keeping the destination private.
 
 **Architecture:** Keep the reducer as the source of truth. Normalize route steps inside the state boundary, derive only the current step window for the public view, and render a navigation guidance block from that public view. The controller supplies deterministic mock steps; production API integration remains a documented backend adapter boundary.
 
@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Keep destination name, address, building, floor, entrance, and exact coordinates out of pre-Reveal public views and HTML.
-- Always expose current heading, next maneuver, distance to the next maneuver, and total remaining distance when route confidence is ready.
+- Keep the compass needle as the primary direction cue; expose next maneuver, distance to the next maneuver, and total remaining distance when route confidence is ready.
 - Suppress new maneuver claims during paused, route recovery, and recomputing states; show status instead.
 - Preserve the existing Stop, Reveal-reason, guarded recovery, arrival, and feedback transitions.
 - Do not add a visible map or a provider API key to the browser prototype.
@@ -106,7 +106,7 @@ git add prototype/vnext/controller.js prototype/vnext/controller.test.js
 git commit -m "feat: add mock turn-by-turn route"
 ~~~
 
-### Task 3: Replace the compass renderer with the navigation guidance surface
+### Task 3: Combine the compass renderer with the navigation guidance surface
 
 **Files:**
 - Modify: prototype/vnext/screens.js
@@ -114,7 +114,7 @@ git commit -m "feat: add mock turn-by-turn route"
 
 **Interfaces:**
 - Consumes public guidance fields from Task 1.
-- Produces HTML with navigation-guidance, current-heading, next-maneuver, distance-to-maneuver, and remaining-distance hooks.
+- Produces HTML with navigation-guidance, compass-shell, compass-needle, next-action, distance-to-maneuver, and remaining-distance hooks.
 
 - [ ] Step 1: Write failing screen tests.
 
@@ -122,12 +122,11 @@ Render a ready following view and assert:
 
 ~~~js
 assert.match(html, /class="navigation-guidance"/);
-assert.match(html, /현재 방향/);
-assert.match(html, /동쪽/);
+assert.match(html, /compass-shell|compass-needle/);
 assert.match(html, /오른쪽/);
 assert.match(html, /120m/);
 assert.match(html, /680m/);
-assert.doesNotMatch(html, /compass-shell|compass-needle/);
+assert.doesNotMatch(html, /현재 방향/);
 assert.doesNotMatch(html, /destination-name|서울시 테스트로/);
 ~~~
 
@@ -141,7 +140,7 @@ Expected: FAIL because the renderer still emits the compass shell.
 
 - [ ] Step 3: Implement the navigation renderer.
 
-Replace renderCompassShell with a renderer that maps maneuver enums to Korean labels and arrows, displays current heading, next instruction and step distance, total remaining distance, and route status. Render a status-only block when nextStep is absent. Use the same renderer in following, near, paused, route recovery, and recomputing branches. Keep menu/price disclosure rows.
+Restore renderCompassShell as the primary visual cue and add a compact upper-left next-action block that maps maneuver enums to Korean labels, displays next instruction and step distance, total remaining distance, and route status. Do not render a redundant current-heading text row. Render a status-only block when nextStep is absent, while keeping the compass in pointing, searching, or paused state. Use the same renderer in following, near, paused, route recovery, and recomputing branches. Keep menu/price disclosure rows.
 
 - [ ] Step 4: Run focused screen tests.
 
@@ -164,7 +163,7 @@ git commit -m "feat: render turn-by-turn guidance"
 
 **Interfaces:**
 - Consumes navigation renderer class hooks from Task 3.
-- Produces a readable 320px–390px layout without horizontal overflow and without compass animation.
+- Produces a readable 320px–390px layout without horizontal overflow, with a stable pointing needle and reduced-motion-safe searching state.
 
 - [ ] Step 1: Add CSS hooks.
 

@@ -249,7 +249,7 @@ test("constraints and finding do not render a compass", () => {
   );
 });
 
-test("following and near use navigation guidance and no Reveal control", () => {
+test("following and near keep the compass needle with concise navigation guidance", () => {
   const following = screens.renderProductScreen(view({
     phase: "following", distanceM: 850, bearingDeg: 40,
     currentHeading: "동쪽", nextStep: {
@@ -266,14 +266,21 @@ test("following and near use navigation guidance and no Reveal control", () => {
   }));
   assert.match(following, /class="navigation-guidance/);
   assert.match(near, /class="navigation-guidance/);
-  assert.doesNotMatch(following + near, /compass-shell|compass-needle/);
+  assert.match(following, /class="compass-shell"/);
+  assert.match(following, /compass-needle is-pointing/);
+  assert.match(following, /style="--bearing:40deg"/);
+  assert.match(near, /class="compass-shell"/);
+  assert.doesNotMatch(following, /현재 방향/);
   assert.doesNotMatch(following, /destination-name|목적지 정보 확인/);
   assert.match(following, /data-action="stop"/);
 });
 
-test("following renders current heading, next maneuver, and total remaining distance", () => {
+test("following renders the compass needle, next maneuver, and total remaining distance", () => {
   const html = screens.renderProductScreen(view({
     phase: "following",
+    bearingDeg: 40,
+    needleMode: "pointing",
+    confidence: "ready",
     currentHeading: "동쪽",
     nextStep: {
       maneuver: "TURN_RIGHT",
@@ -288,12 +295,12 @@ test("following renders current heading, next maneuver, and total remaining dist
   }));
 
   assert.match(html, /class="navigation-guidance/);
-  assert.match(html, /현재 방향/);
-  assert.match(html, /동쪽/);
+  assert.match(html, /class="compass-shell"/);
+  assert.match(html, /compass-needle is-pointing/);
   assert.match(html, /오른쪽/);
   assert.match(html, /120m/);
   assert.match(html, /680m/);
-  assert.doesNotMatch(html, /compass-shell|compass-needle/);
+  assert.doesNotMatch(html, /현재 방향/);
   assert.doesNotMatch(html, /destination-name|서울시 테스트로/);
 });
 
@@ -319,7 +326,10 @@ test("recovery and pause render status without an active maneuver", () => {
   assert.match(paused, /안내 일시정지/);
   assert.doesNotMatch(recovery, /오른쪽|왼쪽|직진/);
   assert.doesNotMatch(paused, /오른쪽|왼쪽|직진/);
-  assert.doesNotMatch(recovery + paused, /compass-shell|compass-needle/);
+  assert.match(recovery, /class="compass-shell"/);
+  assert.match(recovery, /compass-needle is-searching/);
+  assert.match(paused, /class="compass-shell"/);
+  assert.match(paused, /compass-needle is-paused/);
 });
 
 test("recovery guidance never invents a maneuver from a missing route", () => {
@@ -332,8 +342,10 @@ test("recovery guidance never invents a maneuver from a missing route", () => {
       routeStatus: phase === "following" ? "unavailable" : "recovery",
     }));
     assert.match(html, /navigation-guidance is-unavailable/);
-    assert.doesNotMatch(html, /--bearing:0deg|compass-shell|compass-needle/);
-    assert.match(html, /방향 확인|경로를 다시 계산하고 있어요/);
+    assert.doesNotMatch(html, /--bearing:0deg/);
+    assert.match(html, /compass-shell/);
+    assert.match(html, /compass-needle is-searching/);
+    assert.match(html, /방향 확인|경로 안내를 준비하고 있어요|경로를 다시 계산하고 있어요/);
   }
 });
 
@@ -343,7 +355,9 @@ test("paused guidance has no active maneuver or directional claim", () => {
     routeStatus: "paused", remainingDistanceM: 70,
   }));
   assert.match(html, /navigation-guidance is-unavailable/);
-  assert.doesNotMatch(html, /is-pointing|is-searching|--bearing|compass-shell|compass-needle/);
+  assert.match(html, /compass-shell/);
+  assert.match(html, /compass-needle is-paused/);
+  assert.doesNotMatch(html, /is-pointing|is-searching|--bearing/);
   assert.match(html, /안내 일시정지/);
 });
 
@@ -372,8 +386,10 @@ test("route recovery keeps recalculation copy accurate and preserves the Stop ex
     routeStatus: "recovery",
   }));
   assert.match(html, /navigation-guidance is-unavailable/);
+  assert.match(html, /compass-shell/);
+  assert.match(html, /compass-needle is-searching/);
   assert.match(html, /경로를 다시 계산하고 있어요/);
-  assert.doesNotMatch(html, /compass-shell|compass-needle|바늘을 멈췄어요/);
+  assert.doesNotMatch(html, /바늘을 멈췄어요/);
   assert.match(html, /data-action="stop"/);
 });
 
