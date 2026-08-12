@@ -21,7 +21,7 @@ The user approved the sequence represented in the visual companion on 2026-07-26
 
 All other approved vNext rules remain active: one destination, no candidate list, no active Reroll, immediate Stop pause, skippable reasons, guarded recommendation recovery, route-aware guidance, and delayed place reaction.
 
-The 2026-08-12 constraint-screen amendment fixes the category to restaurant for this prototype, moves walking time and budget into the primary condition area, uses wheel-adjustable numeric sliders, and reserves the final budget value for `상관없음`. Budget stops start at 4,000 KRW, use 2,000 KRW increments through 20,000 KRW, then 30,000/40,000/50,000 KRW and unlimited. The 4,000 KRW floor is a product hypothesis rounded up from official Seoul reference prices near 3,700–3,800 KRW for a kimbap serving; it is not a guarantee that every area has a qualifying venue. Wheel input is treated as a 1,000 KRW directional intent but settles on even-thousand valid stops, so an odd legacy value such as 11,000 KRW moves to 10,000 KRW when scrolling down and 12,000 KRW when scrolling up. Minimum disclosure (walking time, budget, and main menu) is the default with optional private mode. Dietary and allergy choices are collected during first-use profile setup and edited later through Profile search/list multi-select, not in the recurring constraints form.
+The 2026-08-12 constraint-screen amendment fixes the category to restaurant for this prototype, adds a 1–5+ party-size selector above walking time, moves walking time and budget into the primary condition area, uses wheel-adjustable numeric sliders, and reserves the final budget value for `상관없음`. The default party size is two; `5` represents `5명 이상`. Party size is passed as a required recommendation input but does not yet calculate menu quantity or group totals. Budget remains per-person. Budget stops start at 4,000 KRW, use 2,000 KRW increments through 20,000 KRW, then 30,000/40,000/50,000 KRW and unlimited. The 4,000 KRW floor is a product hypothesis rounded up from official Seoul reference prices near 3,700–3,800 KRW for a kimbap serving; it is not a guarantee that every area has a qualifying venue. Wheel input is treated as a 1,000 KRW directional intent but settles on even-thousand valid stops, so an odd legacy value such as 11,000 KRW moves to 10,000 KRW when scrolling down and 12,000 KRW when scrolling up. Minimum disclosure (walking time, budget, and main menu) is the default with optional private mode. Dietary and allergy choices are collected during first-use profile setup and edited later through the top-right Profile → Settings search/list multi-select, not in the recurring constraints form. The prototype menu includes a non-functional logout placeholder because authentication is out of scope.
 
 ## Prototype Scope
 
@@ -58,6 +58,7 @@ The 2026-08-12 constraint-screen amendment fixes the category to restaurant for 
 Visible by default:
 
 - category: restaurant (cafe deferred);
+- party size: 1, 2, 3, 4, or 5+ with arrow controls and repeated pawn silhouettes;
 - maximum walking time on a 5-minute-step slider;
 - budget on a slider starting at 4,000 KRW, using 2,000 KRW steps through 20,000 KRW and ending with coarse stops plus `상관없음`;
 - primary action: `이 조건으로 바로 출발`.
@@ -67,7 +68,7 @@ Collapsed under `고급 조건`:
 - accessibility requirements;
 - destination disclosure preference.
 
-The default disclosure is minimum information (walking time, budget, and main menu), with an optional private setting. Dietary and allergy values are shown as applied profile conditions but edited only in the searchable multi-select Profile screen. When advanced constraints are active, the collapsed row summarizes their count or types, such as `추가 조건 2개 적용 중`. Safety-relevant conditions are never silently hidden from the user or ignored by selection logic.
+The default disclosure is minimum information (walking time, budget, and main menu), with an optional private setting. Dietary and allergy values are shown as applied profile conditions but edited only in the searchable multi-select Settings screen opened from the top-right profile menu. The constraints screen keeps the single `이 조건으로 바로 출발` CTA and does not show a profile-edit CTA. When advanced constraints are active, the collapsed row summarizes their count or types, such as `추가 조건 2개 적용 중`. Safety-relevant conditions are never silently hidden from the user or ignored by selection logic.
 
 ### Compass Screen
 

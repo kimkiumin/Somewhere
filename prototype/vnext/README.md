@@ -8,7 +8,7 @@ Open `prototype/vnext/index.html` directly in a modern browser. No install or se
 
 ## Product Path
 
-Use the product canvas for onboarding, first-use dietary/allergy profile setup, restaurant-only conditions, wheel-adjustable walking-time and budget sliders, one-action start, compass guidance, Stop, Reveal reason, confirmed Stop, arrival details, and place reaction.
+Use the product canvas for onboarding, first-use dietary/allergy profile setup, restaurant-only conditions, top-right profile menu and settings, a 1–5+ party-size selector with pawn silhouettes, wheel-adjustable walking-time and budget sliders, one-action start, compass guidance, Stop, Reveal reason, confirmed Stop, arrival details, and place reaction.
 
 Budget stops start at 4,000 KRW, use 2,000 KRW increments through 20,000 KRW, then 30,000/40,000/50,000 KRW and the final `상관없음` value. Wheel input is handled as a 1,000 KRW directional intent but snaps to even-thousand stops, so 11,000 KRW settles at 10,000 or 12,000 KRW. Minimum destination disclosure (walking time, budget, and main menu) is the default, with an optional private mode under the collapsed settings.
 
@@ -22,4 +22,4 @@ The runnable prototype is published at <https://kimkiumin.github.io/Somewhere/> 
 
 ## Limitations
 
-All destinations, routes, sensor states, timing, and external-map behavior are deterministic mock evidence. Passing this prototype does not establish provider, iPhone, outdoor-navigation, legal, or field feasibility.
+All destinations, routes, sensor states, timing, and external-map behavior are deterministic mock evidence. Party size is an input contract only; it does not yet calculate shared-menu quantities or group totals. The profile menu's logout item is a UI placeholder because authentication is not implemented. Passing this prototype does not establish provider, iPhone, outdoor-navigation, legal, or field feasibility.
