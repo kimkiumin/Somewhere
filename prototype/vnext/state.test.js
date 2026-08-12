@@ -16,6 +16,49 @@ function validConstraints() {
   };
 }
 
+function followingWithSteps() {
+  const finding = stateApi.reduce(
+    stateApi.createInitialState({ firstUse: false }),
+    { type: "START", constraints: validConstraints() },
+  );
+  return stateApi.reduce(finding, {
+    type: "FIND_SUCCESS",
+    destination: {
+      id: "step-fixture",
+      name: "Hidden restaurant",
+      address: "Seoul test road 1",
+      building: "Test building",
+      floorUnit: "2F",
+      entrance: "East entrance",
+      menu: "noodles",
+      priceBand: "mid",
+    },
+    route: {
+      id: "step-route",
+      distanceM: 400,
+      bearingDeg: 90,
+      steps: [
+        {
+          id: "step-1",
+          maneuver: "STRAIGHT",
+          instruction: "현재 길로 280m 직진해요",
+          distanceM: 280,
+          heading: "동쪽",
+          road: "테스트로",
+        },
+        {
+          id: "step-2",
+          maneuver: "TURN_RIGHT",
+          instruction: "120m 뒤 오른쪽으로 돌아요",
+          distanceM: 120,
+          heading: "남쪽",
+          road: "테스트길",
+        },
+      ],
+    },
+  });
+}
+
 test("defaults to two people for group-aware restaurant discovery", () => {
   const initial = stateApi.createInitialState({ firstUse: false });
   assert.equal(initial.constraints.partySize, 2);
@@ -187,6 +230,34 @@ test("finding success begins guidance without a ready or second commit state", (
   assert.equal(following.committed, true);
   assert.equal(stateApi.PHASES.includes("ready"), false);
   assert.equal(stateApi.PHASES.includes("committed"), false);
+});
+
+test("public view derives the active turn and total remaining distance from route steps", () => {
+  const following = followingWithSteps();
+  const initial = stateApi.toPublicView(following);
+  const afterFirstStep = stateApi.toPublicView(
+    stateApi.reduce(following, { type: "WALK", distanceM: 120 }),
+  );
+
+  assert.equal(initial.remainingDistanceM, 400);
+  assert.equal(initial.currentHeading, "동쪽");
+  assert.equal(initial.nextStep.maneuver, "STRAIGHT");
+  assert.equal(initial.distanceToNextM, 280);
+  assert.equal(afterFirstStep.remainingDistanceM, 120);
+  assert.equal(afterFirstStep.currentHeading, "남쪽");
+  assert.equal(afterFirstStep.nextStep.maneuver, "TURN_RIGHT");
+  assert.equal(afterFirstStep.distanceToNextM, 120);
+});
+
+test("route recovery and pause suppress stale turn claims but keep last known distance", () => {
+  const following = followingWithSteps();
+  const recovery = stateApi.reduce(following, { type: "LOW_CONFIDENCE", reason: "route" });
+  const paused = stateApi.reduce(following, { type: "STOP" });
+
+  assert.equal(stateApi.toPublicView(recovery).nextStep, null);
+  assert.equal(stateApi.toPublicView(recovery).remainingDistanceM, 400);
+  assert.equal(stateApi.toPublicView(paused).nextStep, null);
+  assert.equal(stateApi.toPublicView(paused).remainingDistanceM, 400);
 });
 
 function followingState({ revealed = false } = {}) {

@@ -8,7 +8,7 @@ Status: approved written blueprint (2026-07-21)
 - Safety exits end guidance before any feedback question.
 - Exact venue identity is hidden by default, not made impossible to access.
 - Recovery from a failed recommendation is a new decision process, not Reroll.
-- The active compass carries only direction plus a fixed three-row information display.
+- The active guidance surface carries current heading, next action, action distance, and total remaining distance without a visible map.
 
 ## Main State Flow
 
@@ -19,9 +19,9 @@ Status: approved written blueprint (2026-07-21)
 | `S2 Finding` | Build and validate the candidate pool | calm progress state; no candidates | success or recoverable failure |
 | `S3 One Place Ready` | Present one evidence-qualified hidden place | distance, representative menu, price band | commit or stop |
 | `S4 Committed` | Mark explicit acceptance | short transition into guidance | following |
-| `S5 Following` | Guide without a visible map | route-aware compass and three-row display | near, reveal, route recovery, or stop |
+| `S5 Following` | Guide without a visible map | route-aware turn-by-turn display and total remaining distance | near, reveal, route recovery, or stop |
 | `S6 Route Recovery` | Handle technical guidance failure | recalibration, reroute, cached route, or user-selected external map | following or stop |
-| `S7 Near` | Indicate proximity | compass, remaining distance, near signal | arrived or recovery |
+| `S7 Near` | Indicate proximity | turn-by-turn guidance, remaining distance, near signal | arrived or recovery |
 | `S8 Arrived` | Confirm arrival without demanding immediate rating | arrival confirmation | feedback pending |
 | `S9 Feedback Pending` | Wait until the visit can be judged | no blocking UI | notification or next launch after 60 minutes |
 | `S10 Place Reaction` | Collect one place-level response | dislike, like, love, did not visit | complete |
@@ -53,28 +53,29 @@ Always hidden by default:
 
 Distinctive menu names are normalized to a supported broad dish category. If no faithful broad category can be derived from source data, the menu row falls back to the venue's broad category. The LLM may classify supported source text but may not invent a replacement menu. This disclosure rule applies consistently to the app, physical display, notifications, logs, study screenshots, and map-handoff warnings.
 
-## Compass Display
+## Guidance Display
 
 ```text
-distance
+current heading
+next maneuver and distance to maneuver
+total remaining distance
 representative menu 1 · representative menu 2
 price band
 ```
 
-- The row positions never change.
-- The menu row moves continuously in one direction and loops without reversing.
-- One menu remains the priority; a second menu is optional.
-- Text speed, pixel density, Korean readability, and power impact are hardware-test variables.
-- Continuous movement is the prototype baseline. Final hardware use remains conditional on legibility, walking safety, reduced-motion, display-technology, and power tests.
+- The current heading, next maneuver, and total remaining distance remain visible together.
+- The destination name, address, and coordinate remain hidden until the approved reveal or arrival path.
+- The menu row remains a broad category or representative menu; a second menu is optional.
+- A physical compass remains a separate final-product hardware hypothesis; the current iOS/browser guidance surface is turn-by-turn and map-free.
 
 ## Connection and Direction Status
 
 - Use familiar cellular-antenna and Wi-Fi icons for network state.
 - Use the familiar Bluetooth icon for the phone-to-compass connection.
 - Keep these icons in a small status area separate from the three information rows.
-- If network, device connection, or direction calculation is unavailable, suppress the directional claim and rotate the compass slowly without pointing to a bearing.
-- When trustworthy data returns, recompute the route-relative direction before the needle points again.
-- During a user-requested pause or confirmed stop, the needle stays still or is hidden. It does not use the error rotation.
+- If network, device connection, route, or direction calculation is unavailable, suppress the next maneuver claim and show a recalculation status.
+- When trustworthy data returns, recompute the current step before showing a maneuver again.
+- During a user-requested pause or confirmed stop, the next maneuver is hidden and the last known distance may remain as a non-directional reference.
 - Do not invent a novel icon when a conventional platform symbol communicates the state.
 
 ## Destination Reveal

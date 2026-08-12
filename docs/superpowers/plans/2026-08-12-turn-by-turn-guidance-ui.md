@@ -191,6 +191,7 @@ git commit -m "style: make turn guidance mobile readable"
 
 **Files:**
 - Modify: docs/blueprint/app_sequence.md
+- Modify: docs/blueprint/ux_state_model.md
 - Modify: docs/superpowers/specs/2026-07-26-somewhere-app-sequence-prototype-design.md
 - Modify: prototype/vnext/README.md
 - Create: docs/research/route_guidance_api_validation.md
@@ -252,4 +253,3 @@ git status --short
 git diff --check
 git log -1 --oneline
 ~~~
-

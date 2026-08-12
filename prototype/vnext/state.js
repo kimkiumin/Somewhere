@@ -135,6 +135,51 @@
     return `${(distanceM / 1000).toFixed(1)} km`;
   }
 
+  function normalizeRoute(route) {
+    const value = structuredClone(route);
+    const rawSteps = Array.isArray(value.steps)
+      ? value.steps.filter((step) => step && Number.isFinite(step.distanceM) && step.distanceM >= 0)
+      : [];
+    value.steps = rawSteps.length > 0
+      ? rawSteps
+      : [{
+        id: `${value.id || "route"}-straight`,
+        maneuver: "STRAIGHT",
+        instruction: "현재 길로 계속 이동해요",
+        distanceM: value.distanceM,
+        heading: typeof value.currentHeading === "string" ? value.currentHeading : null,
+        road: null,
+      }];
+    return value;
+  }
+
+  function deriveRouteGuidance(route, remainingDistanceM) {
+    if (!route || !Array.isArray(route.steps) || !Number.isFinite(route.distanceM)) return null;
+    const progressM = Math.min(
+      route.distanceM,
+      Math.max(0, route.distanceM - remainingDistanceM),
+    );
+    let traversedM = 0;
+    for (let index = 0; index < route.steps.length; index += 1) {
+      const step = route.steps[index];
+      const stepDistanceM = Number.isFinite(step.distanceM) ? Math.max(0, step.distanceM) : 0;
+      const isLast = index === route.steps.length - 1;
+      if (progressM < traversedM + stepDistanceM || isLast) {
+        return {
+          currentHeading: typeof step.heading === "string" ? step.heading : null,
+          nextStep: {
+            maneuver: typeof step.maneuver === "string" ? step.maneuver : "STRAIGHT",
+            instruction: typeof step.instruction === "string" ? step.instruction : "현재 길로 계속 이동해요",
+            road: typeof step.road === "string" ? step.road : null,
+          },
+          distanceToNextM: Math.max(0, Math.round(traversedM + stepDistanceM - progressM)),
+        };
+      }
+      traversedM += stepDistanceM;
+    }
+    return null;
+  }
+
   function reduce(state, action) {
     if (!state || !action || typeof action.type !== "string") return state;
     if (action.type === "CONTINUE_ONBOARDING" && state.phase === "onboarding") {
@@ -217,13 +262,14 @@
           errors: { finding: "장소와 경로를 준비하지 못했습니다. 조건을 다시 확인해 주세요." },
         };
       }
+      const route = normalizeRoute(action.route);
       return {
         ...state,
         phase: "following",
         destination: structuredClone(action.destination),
-        route: structuredClone(action.route),
-        distanceM: action.route.distanceM,
-        bearingDeg: action.route.bearingDeg,
+        route,
+        distanceM: route.distanceM,
+        bearingDeg: route.bearingDeg,
         confidence: "ready",
       };
     }
@@ -410,6 +456,16 @@
   function toPublicView(state) {
     const identityVisible = state.revealed && !state.guidanceEnded;
     const hasTrustedBearing = state.confidence === "ready" && Number.isFinite(state.bearingDeg);
+    const routeStatus = state.confidence === "ready" && state.route && Number.isFinite(state.distanceM)
+      ? "ready"
+      : state.confidence === "paused" || ["paused", "stop_confirm", "stop_reason", "stopped"].includes(state.phase)
+        ? "paused"
+        : ["route_recovery", "recomputing"].includes(state.phase)
+          ? "recovery"
+          : "unavailable";
+    const guidance = routeStatus === "ready"
+      ? deriveRouteGuidance(state.route, state.distanceM)
+      : null;
     const needleMode = state.confidence === "paused" || ["paused", "stop_confirm", "stop_reason", "stopped"].includes(state.phase)
       ? "paused"
       : hasTrustedBearing
@@ -425,8 +481,13 @@
       permission: state.permission,
       committed: state.committed,
       distanceM: state.distanceM,
+      remainingDistanceM: Number.isFinite(state.distanceM) ? state.distanceM : null,
       bearingDeg: hasTrustedBearing ? state.bearingDeg : null,
       needleMode,
+      currentHeading: guidance?.currentHeading ?? null,
+      nextStep: guidance?.nextStep ?? null,
+      distanceToNextM: guidance?.distanceToNextM ?? null,
+      routeStatus,
       confidence: state.confidence,
       recoveryReason: state.recoveryReason,
       menu: state.destination?.menu ?? null,

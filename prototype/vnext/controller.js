@@ -15,6 +15,40 @@
     id: "mock-route-01",
     distanceM: 850,
     bearingDeg: 40,
+    steps: Object.freeze([
+      Object.freeze({
+        id: "mock-step-1",
+        maneuver: "STRAIGHT",
+        instruction: "현재 길로 180m 직진해요",
+        distanceM: 180,
+        heading: "동쪽",
+        road: "테스트로",
+      }),
+      Object.freeze({
+        id: "mock-step-2",
+        maneuver: "TURN_RIGHT",
+        instruction: "260m 뒤 오른쪽으로 돌아 테스트길로 들어가요",
+        distanceM: 260,
+        heading: "남쪽",
+        road: "테스트길",
+      }),
+      Object.freeze({
+        id: "mock-step-3",
+        maneuver: "TURN_LEFT",
+        instruction: "210m 뒤 왼쪽으로 돌아 골목으로 들어가요",
+        distanceM: 210,
+        heading: "동쪽",
+        road: "안내 골목",
+      }),
+      Object.freeze({
+        id: "mock-step-4",
+        maneuver: "ARRIVE",
+        instruction: "200m 뒤 목적지 근처에 도착해요",
+        distanceM: 200,
+        heading: "동쪽",
+        road: null,
+      }),
+    ]),
   });
 
   const TIMED_ACTIONS = new Set([

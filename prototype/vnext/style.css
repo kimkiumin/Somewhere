@@ -3,7 +3,6 @@
   --ink: #111;
   --paper: #fff;
   --line: #b7b7b7;
-  --compass-size: min(58vw, 240px);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -355,79 +354,86 @@ summary {
   font-weight: 700;
 }
 
-.compass-shell {
-  position: relative;
-  width: var(--compass-size);
-  height: var(--compass-size);
-  margin: 4px auto;
-  border: 2px solid var(--ink);
-  border-radius: 50%;
+.navigation-guidance {
+  display: grid;
+  gap: 14px;
+  padding-block: 4px 8px;
+  border-block: 2px solid var(--ink);
 }
 
-.compass-shell::before {
-  content: "N";
-  position: absolute;
-  top: 8px;
-  left: 50%;
-  translate: -50% 0;
-  font-size: 0.75rem;
+.navigation-guidance.is-unavailable {
+  border-color: var(--line);
+}
+
+.guidance-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.current-heading,
+.remaining-distance {
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid var(--line);
+}
+
+.current-heading span,
+.remaining-distance span,
+.next-maneuver-label {
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.current-heading strong,
+.remaining-distance strong {
+  font-size: clamp(1.15rem, 5vw, 1.55rem);
+  line-height: 1.1;
+}
+
+.next-maneuver {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 2px solid var(--ink);
+}
+
+.next-maneuver.is-unavailable {
+  grid-template-columns: minmax(0, 1fr);
+  border-color: var(--line);
+}
+
+.turn-arrow {
+  display: grid;
+  place-items: center;
+  min-height: 56px;
+  border-right: 1px solid var(--line);
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.next-maneuver-title {
+  font-size: clamp(1.35rem, 6vw, 1.9rem);
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.next-maneuver-distance {
+  margin-top: 2px;
   font-weight: 700;
 }
 
-[data-phase="following"] .compass-shell,
-[data-phase="following_revealed"] .compass-shell,
-[data-phase="near"] .compass-shell {
-  width: var(--compass-size);
-  height: var(--compass-size);
+.next-maneuver-instruction,
+.next-maneuver-road {
+  overflow-wrap: anywhere;
 }
 
-.compass-needle.is-pointing {
-  position: absolute;
-  top: 14%;
-  left: 50%;
-  width: 3px;
-  height: 36%;
-  background: var(--ink);
-  transform: translateX(-50%) rotate(var(--bearing));
-  transform-origin: 50% 100%;
-}
-
-.compass-needle.is-pointing::before {
-  content: "";
-  position: absolute;
-  top: -7px;
-  left: 50%;
-  width: 9px;
-  height: 9px;
-  border-top: 2px solid var(--ink);
-  border-left: 2px solid var(--ink);
-  transform: translateX(-50%) rotate(45deg);
-}
-
-.compass-needle.is-searching {
-  position: absolute;
-  inset: 24%;
-  border: 2px dashed var(--ink);
-  border-radius: 50%;
-  animation: searching-direction 2.4s linear infinite;
-  transform-origin: center;
-}
-
-.compass-needle.is-paused {
-  position: absolute;
-  top: calc(50% - 1px);
-  left: 32%;
-  width: 36%;
-  height: 2px;
-  background: var(--line);
-  animation: none;
-  transform: none;
-}
-
-@keyframes searching-direction {
-  to {
-    transform: rotate(360deg);
-  }
+.next-maneuver-road {
+  color: #555;
+  font-size: 0.875rem;
 }
 
 .guidance-details,
@@ -524,6 +530,21 @@ dd {
   .party-selector-controls > button {
     min-width: 40px;
   }
+
+  .guidance-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .next-maneuver {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .turn-arrow {
+    min-height: 48px;
+    font-size: 2.5rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -533,8 +554,8 @@ dd {
     transition-duration: 0.001ms !important;
   }
 
-  .compass-needle.is-searching {
-    animation: none !important;
-    border-style: dashed;
+  .navigation-guidance,
+  .next-maneuver {
+    transition: none !important;
   }
 }

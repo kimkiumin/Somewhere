@@ -20,31 +20,68 @@
     return `${(distanceM / 1000).toFixed(1)} km`;
   }
 
-  function renderCompassShell(view) {
-    const canPoint = view.needleMode === "pointing" && Number.isFinite(view.bearingDeg);
-    const needleClass = canPoint
-      ? "compass-needle is-pointing"
-      : view.needleMode === "paused"
-        ? "compass-needle is-paused"
-        : "compass-needle is-searching";
-    const needleStyle = canPoint ? ` style="--bearing:${view.bearingDeg}deg"` : "";
-    const status = canPoint
-      ? `경로 방향 ${Math.round(view.bearingDeg)}도 안내 중이에요`
-      : view.needleMode === "paused"
-        ? "안내 일시정지"
-        : ["route_recovery", "recomputing"].includes(view.phase)
-          ? "정확한 방향을 확인하고 있어요"
-        : "방향을 확인하고 있어요";
+  const MANEUVER_LABELS = Object.freeze({
+    STRAIGHT: "직진",
+    TURN_LEFT: "왼쪽",
+    TURN_RIGHT: "오른쪽",
+    U_TURN: "유턴",
+    ARRIVE: "도착",
+  });
 
-    return `<p class="guidance-status">${escapeHtml(status)}</p>
-      <div class="compass-shell" role="img" aria-label="${escapeHtml(status)}">
-        <div class="${needleClass}"${needleStyle} aria-hidden="true"></div>
-      </div>`;
+  function formatGuidanceDistance(distanceM) {
+    if (!Number.isFinite(distanceM)) return "거리 확인 중";
+    if (distanceM < 1000) return `${Math.round(distanceM)}m`;
+    return `${(distanceM / 1000).toFixed(1)}km`;
+  }
+
+  function maneuverLabel(maneuver) {
+    return MANEUVER_LABELS[maneuver] || "다음 안내";
+  }
+
+  function navigationStatus(view) {
+    if (view.routeStatus === "paused" || view.needleMode === "paused") return "안내 일시정지";
+    if (view.routeStatus === "recovery" || ["route_recovery", "recomputing"].includes(view.phase)) {
+      return "경로를 다시 계산하고 있어요";
+    }
+    if (view.routeStatus !== "ready") return "경로 안내를 준비하고 있어요";
+    if (view.phase === "near") return "목적지 근처를 안내하고 있어요";
+    return "길을 따라가고 있어요";
+  }
+
+  function renderNavigationGuidance(view) {
+    const status = navigationStatus(view);
+    const ready = view.routeStatus === "ready" && view.nextStep && Number.isFinite(view.distanceToNextM);
+    const remaining = Number.isFinite(view.remainingDistanceM) ? formatGuidanceDistance(view.remainingDistanceM) : "거리 확인 중";
+    const heading = ready ? (view.currentHeading || "방향 확인 중") : "방향 확인 중";
+    const nextStep = ready
+      ? `<div class="next-maneuver" data-maneuver="${escapeHtml(view.nextStep.maneuver)}">
+          <span class="turn-arrow" aria-hidden="true">${escapeHtml(view.nextStep.maneuver === "TURN_LEFT" ? "←" : view.nextStep.maneuver === "TURN_RIGHT" ? "→" : view.nextStep.maneuver === "U_TURN" ? "↶" : view.nextStep.maneuver === "ARRIVE" ? "◎" : "↑")}</span>
+          <div>
+            <p class="next-maneuver-label">다음 행동</p>
+            <p class="next-maneuver-title">${escapeHtml(maneuverLabel(view.nextStep.maneuver))}</p>
+            <p class="next-maneuver-distance">${escapeHtml(formatGuidanceDistance(view.distanceToNextM))} 뒤</p>
+            <p class="next-maneuver-instruction">${escapeHtml(view.nextStep.instruction || "다음 안내를 확인해 주세요.")}</p>
+            ${view.nextStep.road ? `<p class="next-maneuver-road">${escapeHtml(view.nextStep.road)}</p>` : ""}
+          </div>
+        </div>`
+      : `<div class="next-maneuver is-unavailable" aria-live="polite">
+          <p class="next-maneuver-label">다음 행동</p>
+          <p class="next-maneuver-title">${escapeHtml(status)}</p>
+          <p class="next-maneuver-instruction">새로운 방향을 확인하기 전까지 이동 경로를 추정하지 않아요.</p>
+        </div>`;
+
+    return `<section class="navigation-guidance${ready ? " is-ready" : " is-unavailable"}" aria-label="도보 경로 안내">
+      <p class="guidance-status" aria-live="polite">${escapeHtml(status)}</p>
+      <div class="guidance-summary">
+        <div class="current-heading"><span>현재 방향</span><strong>${escapeHtml(heading)}</strong></div>
+        <div class="remaining-distance"><span>${view.routeStatus === "paused" ? "마지막 확인 거리" : "목적지까지"}</span><strong>${escapeHtml(remaining)}</strong></div>
+      </div>
+      ${nextStep}
+    </section>`;
   }
 
   function renderGuidanceRows(view) {
     return `<dl class="guidance-details">
-      <div><dt>남은 거리</dt><dd>${escapeHtml(formatDistance(view.distanceM))}</dd></div>
       <div><dt>대표 메뉴</dt><dd>${escapeHtml(view.menu ?? "정보 없음")}</dd></div>
       <div><dt>가격대</dt><dd>${escapeHtml(view.priceBand ?? "정보 없음")}</dd></div>
     </dl>`;
@@ -335,7 +372,7 @@
       : view.phase === "near" ? "거의 다 왔어요" : "방향을 따라가요";
     return `<h1>${heading}</h1>
       ${renderDisclosedIdentity(view)}
-      ${renderCompassShell(view)}
+      ${renderNavigationGuidance(view)}
       ${view.constraints?.disclosure === "private" ? '<p class="private-guidance">정보 비공개 상태로 안내 중이에요</p>' : renderGuidanceRows(view)}
       ${action("안내 멈추기", "stop")}`;
   }
@@ -343,7 +380,7 @@
   function renderPaused(view) {
     return `<h1>안내 일시정지</h1>
       <p>언제든 다시 이어갈 수 있어요.</p>
-      ${renderCompassShell({ ...view, needleMode: "paused" })}
+      ${renderNavigationGuidance({ ...view, routeStatus: "paused", needleMode: "paused" })}
       ${action("안내 계속", "continue-guidance")}
       ${action("목적지 정보 확인", "open-destination-info")}
       ${action("안내 종료", "request-end")}`;
@@ -423,7 +460,7 @@
     return `<h1>안내를 다시 확인해야 해요</h1>
       ${renderDisclosedIdentity(view)}
       <p>현재 방향을 신뢰하기 어려워서 정확한 방향을 확인하고 있어요.</p>
-      ${renderCompassShell({ ...view, needleMode: "searching" })}
+      ${renderNavigationGuidance({ ...view, routeStatus: "recovery", needleMode: "searching" })}
       ${action("안내 다시 시도", "retry-guidance")}
       ${action("저장된 경로 사용", "use-cached-route")}
       ${action("안내 멈추기", "stop")}
@@ -433,7 +470,7 @@
   function renderRecomputing(view) {
     return `<h1>경로를 다시 계산하고 있어요</h1>
       ${renderDisclosedIdentity(view)}
-      ${renderCompassShell({ ...view, needleMode: "searching" })}`;
+      ${renderNavigationGuidance({ ...view, routeStatus: "recovery", needleMode: "searching" })}`;
   }
 
   function renderExternalMapWarning() {

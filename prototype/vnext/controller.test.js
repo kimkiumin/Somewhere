@@ -119,6 +119,16 @@ test("mock destination is complete for arrival but is not exposed on the browser
   assert.equal(globalThis.SomewhereVNextController.MOCK_ROUTE, undefined);
 });
 
+test("mock route contains ordered turn steps for the navigation prototype", () => {
+  assert.equal(Array.isArray(MOCK_ROUTE.steps), true);
+  assert.equal(MOCK_ROUTE.steps.length, 4);
+  assert.equal(
+    MOCK_ROUTE.steps.reduce((total, step) => total + step.distanceM, 0),
+    MOCK_ROUTE.distanceM,
+  );
+  assert.equal(MOCK_ROUTE.steps[1].maneuver, "TURN_RIGHT");
+});
+
 test("render receives only public views and getState returns a deep copy", () => {
   const rendered = [];
   const timer = createScheduler();
