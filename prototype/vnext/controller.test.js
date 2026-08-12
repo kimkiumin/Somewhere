@@ -114,6 +114,9 @@ test("destroy cancels a pending finding completion", () => {
 test("mock destination is complete for arrival but is not exposed on the browser API", () => {
   assert.equal(typeof MOCK_DESTINATION.name, "string");
   assert.equal(typeof MOCK_DESTINATION.floorUnit, "string");
+  assert.match(MOCK_DESTINATION.photoUrl, /^data:image\//);
+  assert.equal(typeof MOCK_DESTINATION.recommendationReason, "string");
+  assert.equal(typeof MOCK_DESTINATION.reviewSummary, "string");
   assert.equal(Number.isFinite(MOCK_ROUTE.distanceM), true);
   assert.equal(globalThis.SomewhereVNextController.MOCK_DESTINATION, undefined);
   assert.equal(globalThis.SomewhereVNextController.MOCK_ROUTE, undefined);

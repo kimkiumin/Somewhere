@@ -515,6 +515,46 @@ dd {
   gap: 10px;
 }
 
+.destination-name {
+  margin: 0;
+  font-size: clamp(2rem, 9vw, 3.4rem);
+  font-weight: 800;
+  line-height: 0.98;
+  overflow-wrap: anywhere;
+}
+
+.destination-photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+}
+
+.photo-unavailable {
+  margin: 0;
+  padding: 18px 12px;
+  border: 1px dashed var(--line);
+  color: #555;
+}
+
+.destination-note {
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.destination-note h2 {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.destination-note p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .prototype-controls {
   margin-top: 20px;
   padding: 16px;

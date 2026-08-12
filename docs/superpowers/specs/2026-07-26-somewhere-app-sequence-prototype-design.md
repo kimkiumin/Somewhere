@@ -17,7 +17,7 @@ The user approved the sequence represented in the visual companion on 2026-07-26
 1. `S3 One Place Ready` and `S4 Committed` no longer require a second product button. The constraint-screen action `이 조건으로 바로 출발` is both the selection request and explicit consent to begin guidance when a qualified place and route are ready.
 2. The main turn-by-turn guidance screen has no directly visible Reveal control and no Reveal item in its ordinary secondary menu. Pre-arrival destination information is reached only after the user presses Stop and guidance pauses.
 3. Selecting `목적지 정보 확인` after Stop does not confirm Stop. The user first selects or skips a Reveal reason, sees exact destination information, and may resume the same journey.
-4. Confirmed arrival automatically reveals source-supported arrival details: venue name, exact address, building, floor/unit, and entrance guidance. Unknown details remain explicitly unavailable and are never inferred.
+4. Confirmed arrival automatically reveals source-supported arrival details: venue name, photo, building, floor/unit, recommendation rationale, and review summary. Street address and precise entrance guidance are intentionally omitted from the arrival surface. Unknown details remain explicitly unavailable and are never inferred.
 
 All other approved vNext rules remain active: one destination, no candidate list, no active Reroll, immediate Stop pause, skippable reasons, guarded recommendation recovery, route-aware guidance, and delayed place reaction.
 
@@ -95,14 +95,15 @@ The exact venue identity, address, building, floor, entrance, photo, review, rat
 Arrival ends directional pointing and automatically reveals every verified arrival-assistance field:
 
 - venue name;
-- exact address;
+- venue photo;
 - building name;
 - floor and unit;
-- entrance or final approach guidance;
+- algorithm recommendation rationale;
+- review summary;
 - external-map action;
 - completion action.
 
-Missing fields display a neutral unavailable state. The prototype fixture includes all fields so the intended hierarchy can be evaluated, while a separate simulation demonstrates one missing field.
+The arrival screen intentionally omits the street address and precise entrance guidance. Missing fields display a neutral unavailable state. The prototype fixture includes all fields so the intended hierarchy can be evaluated, while a separate simulation demonstrates one missing field.
 
 ## Main State Sequence
 
@@ -181,7 +182,7 @@ Reveal reasons are versioned and separate from Stop reasons:
 
 The reason screen states that continuing will reveal the venue name and exact location. `건너뛰고 확인` is always visible. No free-text reason is collected.
 
-The revealed screen contains exact arrival information and offers:
+The revealed screen contains the approved destination details and offers:
 
 - `나침반 안내 계속`;
 - `외부 지도 열기`;
@@ -262,7 +263,7 @@ The prototype uses plain HTML, CSS, and JavaScript with Node's built-in test run
 ## Low-Fidelity Presentation Rules
 
 - monochrome background, borders, and system text;
-- no gradients, shadows, images, logos, decorative icons, material simulation, or branded motion;
+- no gradients, shadows, logos, decorative icons, material simulation, or branded motion; the arrival photo is functional destination content, not decoration;
 - stable phone-sized central canvas with responsive desktop framing;
 - real Korean labels where wording affects sequence comprehension;
 - guidance represented by text, direction arrows, and distance hierarchy;
@@ -310,7 +311,7 @@ The prototype is acceptable when automated tests and a manual walkthrough demons
 12. confirmed Stop asks a skippable reason only after ending;
 13. no active Reroll appears;
 14. low-confidence and recomputing states do not point;
-15. arrival automatically shows verified name, address, building, floor/unit, and entrance information;
+15. arrival automatically shows verified name, photo, building, floor/unit, recommendation rationale, and review summary while omitting address and entrance information;
 16. simulated feedback appears only after eligibility advances;
 17. all main and branch sequences can be completed using keyboard controls;
 18. the existing v0.1 and repository verification suites remain unchanged and passing.

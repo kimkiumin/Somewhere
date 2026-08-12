@@ -23,7 +23,7 @@
     "disclosure",
   ]);
   const ARRIVAL_DETAIL_FIELDS = Object.freeze([
-    "name", "address", "building", "floorUnit", "entrance",
+    "name", "photoUrl", "building", "floorUnit", "recommendationReason", "reviewSummary",
   ]);
 
   function defaultConstraints() {
@@ -122,10 +122,11 @@
     );
     return {
       name: valueOrNull(destination.name),
-      address: valueOrNull(destination.address),
+      photoUrl: valueOrNull(destination.photoUrl),
       building: valueOrNull(destination.building),
       floorUnit: valueOrNull(destination.floorUnit),
-      entrance: valueOrNull(destination.entrance),
+      recommendationReason: valueOrNull(destination.recommendationReason),
+      reviewSummary: valueOrNull(destination.reviewSummary),
     };
   }
 

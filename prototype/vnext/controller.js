@@ -4,10 +4,11 @@
   const MOCK_DESTINATION = Object.freeze({
     id: "pilot-restaurant-01",
     name: "온담식당",
-    address: "서울시 성동구 테스트로 12",
     building: "해빛가 빌딩",
     floorUnit: "2층 201호",
-    entrance: "건물 오른쪽 유리문으로 들어가 계단을 이용하세요.",
+    photoUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23ece8df'/%3E%3Crect x='88' y='76' width='464' height='220' rx='8' fill='%23fff' stroke='%23111111' stroke-width='6'/%3E%3Cpath d='M88 158h464' stroke='%23111111' stroke-width='6'/%3E%3Ccircle cx='178' cy='118' r='20' fill='%23111111'/%3E%3Cpath d='M125 272l110-98 86 70 67-52 128 80' fill='none' stroke='%23111111' stroke-width='9'/%3E%3C/svg%3E",
+    recommendationReason: "도보 시간과 예산 안에서 일행의 조건 충돌이 적은 곳으로 판단했어요.",
+    reviewSummary: "담백한 메뉴와 빠른 식사 동선이 좋다는 후기가 많아요.",
     menu: "국수",
     priceBand: "₩₩",
   });

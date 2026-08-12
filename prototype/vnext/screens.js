@@ -425,18 +425,34 @@
     return escapeHtml(value == null || value === "" ? unknown : value);
   }
 
+  function renderDestinationPhoto(destination) {
+    const source = typeof destination.photoUrl === "string" && destination.photoUrl.trim() !== ""
+      ? destination.photoUrl.trim()
+      : null;
+    if (!source) return `<p class="photo-unavailable">사진 정보 없음</p>`;
+    const altName = detailOrUnknown(destination.name, "목적지") + " 사진";
+    return `<img class="destination-photo" src="${escapeHtml(source)}" alt="${altName}" loading="lazy">`;
+  }
+
   function renderDestinationDetails(destination) {
     if (!destination) {
       return `<p class="destination-unavailable">목적지 정보를 불러올 수 없어요.</p>`;
     }
     return `<div class="destination-details">
       <p class="destination-name">${detailOrUnknown(destination.name, "상호명 정보 없음")}</p>
+      ${renderDestinationPhoto(destination)}
       <dl>
-        <div><dt>주소</dt><dd>${detailOrUnknown(destination.address, "주소 정보 없음")}</dd></div>
         <div><dt>건물</dt><dd>${detailOrUnknown(destination.building, "건물 정보 없음")}</dd></div>
         <div><dt>층</dt><dd>${detailOrUnknown(destination.floorUnit, "층 정보 없음")}</dd></div>
-        <div><dt>입구</dt><dd>${detailOrUnknown(destination.entrance, "입구 정보 없음")}</dd></div>
       </dl>
+      <section class="destination-note recommendation-reason">
+        <h2>추천한 이유</h2>
+        <p>${detailOrUnknown(destination.recommendationReason, "추천 이유 정보 없음")}</p>
+      </section>
+      <section class="destination-note review-summary">
+        <h2>후기 요약</h2>
+        <p>${detailOrUnknown(destination.reviewSummary, "후기 요약 정보 없음")}</p>
+      </section>
     </div>`;
   }
 

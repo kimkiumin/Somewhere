@@ -434,35 +434,46 @@ test("external map warning requires explicit confirmation", () => {
   assert.match(html, /data-action="confirm-external-map"/);
 });
 
-test("arrival renders escaped exact assistance fields", () => {
+test("arrival renders escaped curated destination details", () => {
   const html = screens.renderProductScreen(view({
     phase: "arrived",
     revealed: true,
     destination: {
       name: "식당 <script>", address: "서울시 테스트로 1",
+      photoUrl: "data:image/svg+xml,%3Csvg%3E%3C/svg%3E",
       building: "테스트 빌딩", floorUnit: null, entrance: "동쪽 출입구",
+      recommendationReason: "조건 균형이 좋아요 <script>",
+      reviewSummary: "담백하다는 후기가 많아요.",
     },
   }));
   assert.doesNotMatch(html, /<script>/);
   assert.match(html, /식당 &lt;script&gt;/);
+  assert.match(html, /class="destination-photo"/);
+  assert.match(html, /alt="식당 &lt;script&gt; 사진"/);
   assert.match(html, /층 정보 없음/);
-  assert.match(html, /동쪽 출입구/);
+  assert.match(html, /조건 균형이 좋아요 &lt;script&gt;/);
+  assert.match(html, /담백하다는 후기가 많아요\./);
+  assert.doesNotMatch(html, /서울시 테스트로 1|동쪽 출입구/);
 });
 
-test("every missing arrival assistance field has an independent unknown label", () => {
+test("every missing curated arrival field has an independent unknown label", () => {
   const complete = {
     name: "바람식당",
     address: "서울시 테스트로 1",
+    photoUrl: "data:image/svg+xml,%3Csvg%3E%3C/svg%3E",
     building: "테스트 빌딩",
     floorUnit: "2층",
     entrance: "동쪽 출입구",
+    recommendationReason: "조건 균형이 좋아요.",
+    reviewSummary: "후기가 좋아요.",
   };
   const cases = [
     ["name", "상호명 정보 없음"],
-    ["address", "주소 정보 없음"],
+    ["photoUrl", "사진 정보 없음"],
     ["building", "건물 정보 없음"],
     ["floorUnit", "층 정보 없음"],
-    ["entrance", "입구 정보 없음"],
+    ["recommendationReason", "추천 이유 정보 없음"],
+    ["reviewSummary", "후기 요약 정보 없음"],
   ];
 
   for (const [field, expected] of cases) {

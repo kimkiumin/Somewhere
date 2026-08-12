@@ -270,6 +270,9 @@ function followingState({ revealed = false } = {}) {
     destination: {
       id: "fixture-1", name: "Hidden restaurant", address: "Seoul test road 1",
       building: "Test building", floorUnit: "2F", entrance: "East entrance",
+      photoUrl: "data:image/svg+xml,%3Csvg%3E%3C/svg%3E",
+      recommendationReason: "예산과 일행 조건의 균형이 좋아요.",
+      reviewSummary: "담백한 메뉴와 빠른 식사 동선이 좋다는 후기가 많아요.",
       menu: "noodles", priceBand: "mid",
     },
     route: { id: "route-1", distanceM: 850, bearingDeg: 40 },
@@ -325,11 +328,14 @@ test("public view exposes exact fields only after reveal or arrival", () => {
   assert.equal(JSON.stringify(hidden).includes("Test building"), false);
   assert.deepEqual(publicRevealed.destination, {
     name: "Hidden restaurant",
-    address: "Seoul test road 1",
+    photoUrl: "data:image/svg+xml,%3Csvg%3E%3C/svg%3E",
     building: "Test building",
     floorUnit: "2F",
-    entrance: "East entrance",
+    recommendationReason: "예산과 일행 조건의 균형이 좋아요.",
+    reviewSummary: "담백한 메뉴와 빠른 식사 동선이 좋다는 후기가 많아요.",
   });
+  assert.equal(publicRevealed.destination.address, undefined);
+  assert.equal(publicRevealed.destination.entrance, undefined);
 });
 
 test("confirmed end asks a distinct skippable Stop reason after ending", () => {
@@ -399,6 +405,11 @@ test("arrival automatically reveals verified arrival details and schedules feedb
   assert.equal(arrived.feedbackEligibleAtMs, 3_610_000);
   assert.equal(view.bearingDeg, null);
   assert.equal(view.destination.floorUnit, "2F");
+  assert.equal(view.destination.photoUrl, "data:image/svg+xml,%3Csvg%3E%3C/svg%3E");
+  assert.equal(view.destination.recommendationReason, "예산과 일행 조건의 균형이 좋아요.");
+  assert.equal(view.destination.reviewSummary, "담백한 메뉴와 빠른 식사 동선이 좋다는 후기가 많아요.");
+  assert.equal(view.destination.address, undefined);
+  assert.equal(view.destination.entrance, undefined);
 });
 
 test("missing arrival assistance is an explicit reducer transition", () => {
