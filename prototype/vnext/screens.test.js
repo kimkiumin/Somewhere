@@ -9,6 +9,7 @@ function view(overrides = {}) {
     phase: "constraints",
     constraints: {
       category: "restaurant",
+      partySize: 2,
       maxWalkMinutes: 20,
       budget: null,
       dietary: [],
@@ -26,6 +27,7 @@ function view(overrides = {}) {
     priceBand: null,
     destination: null,
     revealed: false,
+    profileMenuOpen: false,
     ...overrides,
   };
 }
@@ -51,6 +53,35 @@ test("constraints fix the category to restaurant and expose time and budget slid
     constraints: { ...view().constraints, budget: 4_000 },
   }));
   assert.match(withBudget, /4,000원 이하/);
+});
+
+test("constraints render the party selector before walking time", () => {
+  const html = screens.renderProductScreen(view({
+    constraints: { ...view().constraints, partySize: 3 },
+  }));
+  assert.ok(html.indexOf("함께 가는 인원") < html.indexOf("도보 시간"));
+  assert.match(html, /data-action="party-decrement"/);
+  assert.match(html, /data-action="party-increment"/);
+  assert.match(html, /aria-live="polite"[^>]*>3명/);
+  assert.equal((html.match(/data-party-pawn/g) || []).length, 3);
+});
+
+test("five or more renders five pawns and disables the increment control", () => {
+  const html = screens.renderProductScreen(view({
+    constraints: { ...view().constraints, partySize: 5 },
+  }));
+  assert.match(html, /5명 이상/);
+  assert.equal((html.match(/data-party-pawn/g) || []).length, 5);
+  assert.match(html, /data-action="party-increment"[^>]*disabled/);
+});
+
+test("profile edit is removed from constraints and exposed through the profile menu", () => {
+  const closed = screens.renderProductScreen(view({ profileMenuOpen: false }));
+  assert.doesNotMatch(closed, /프로필 수정/);
+  assert.match(closed, /data-action="open-profile-menu"/);
+  const open = screens.renderProductScreen(view({ profileMenuOpen: true }));
+  assert.match(open, /환경설정/);
+  assert.match(open, /로그아웃/);
 });
 
 test("budget slider uses dense low stops, coarse high stops, and a final unlimited stop", () => {

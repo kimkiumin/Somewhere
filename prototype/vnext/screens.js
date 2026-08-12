@@ -214,6 +214,46 @@
       </form>`;
   }
 
+  function partyLabel(partySize) {
+    return partySize === 5 ? "5명 이상" : `${partySize}명`;
+  }
+
+  function renderPartyPawn() {
+    return `<svg class="party-pawn" data-party-pawn viewBox="0 0 32 40" aria-hidden="true" focusable="false">
+      <circle cx="16" cy="9" r="6"></circle>
+      <path d="M7 34c0-8 3-13 9-13s9 5 9 13H7Z"></path>
+    </svg>`;
+  }
+
+  function renderProfileMenu(view) {
+    const open = Boolean(view.profileMenuOpen);
+    return `<div class="profile-menu-wrap">
+      ${action("프로필", open ? "close-profile-menu" : "open-profile-menu", ' aria-label="프로필 및 앱 메뉴" class="profile-menu-button"')}
+      ${open ? `<div class="profile-menu" role="menu" aria-label="앱 메뉴">
+        ${action("환경설정", "open-profile-settings", ' role="menuitem"')}
+        ${action("로그아웃", "logout-placeholder", ' role="menuitem" aria-disabled="true"')}
+      </div>` : ""}
+    </div>`;
+  }
+
+  function renderPartySelector(constraints) {
+    const rawPartySize = Number(constraints.partySize);
+    const partySize = Number.isInteger(rawPartySize) && rawPartySize >= 1 && rawPartySize <= 5 ? rawPartySize : 2;
+    const pawns = Array.from({ length: partySize }, () => renderPartyPawn()).join("");
+    return `<section class="party-selector" aria-labelledby="party-size-label">
+      <div class="party-selector-heading">
+        <h2 id="party-size-label">함께 가는 인원</h2>
+        <output class="party-count" aria-live="polite">${escapeHtml(partyLabel(partySize))}</output>
+      </div>
+      <div class="party-selector-controls">
+        ${action("‹", "party-decrement", ` aria-label="인원 줄이기"${partySize === 1 ? " disabled" : ""}`)}
+        <div class="party-pawns" aria-hidden="true">${pawns}</div>
+        ${action("›", "party-increment", ` aria-label="인원 늘리기"${partySize === 5 ? " disabled" : ""}`)}
+      </div>
+      <input type="hidden" name="partySize" value="${escapeHtml(partySize)}">
+    </section>`;
+  }
+
   function renderConstraints(view) {
     const constraints = view.constraints || {};
     const minutes = Number.isFinite(constraints.maxWalkMinutes) ? constraints.maxWalkMinutes : 20;
@@ -222,12 +262,16 @@
     const budgetAmount = budgetAmountForIndex(budgetStep);
     const disclosure = constraints.disclosure === "private" ? "private" : "minimal";
     const advancedSummary = summarizeAdvancedConditions(constraints);
-    return `<h1>지금 필요한 조건</h1>
+    return `<header class="screen-header">
+        <h1>지금 필요한 조건</h1>
+        ${renderProfileMenu(view)}
+      </header>
       <p>최소 조건만 정하면 한 곳으로 바로 출발해요.</p>
       ${renderConstraintErrors(view.errors)}
       ${renderAffectedConditions(view.affectedConditions)}
       <form data-form="constraints">
         <input type="hidden" name="category" value="restaurant">
+        ${renderPartySelector(constraints)}
         <div class="slider-field"><label for="walk-time-slider">도보 시간 <output id="walk-time-value">${escapeHtml(minutes)}분</output></label><input id="walk-time-slider" name="maxWalkMinutes" type="range" min="5" max="60" step="5" value="${escapeHtml(minutes)}" data-slider="walk" aria-label="최대 도보 시간"></div>
         <div class="slider-field"><label for="budget-slider">예산 <output id="budget-value"${budgetAmount == null ? " data-budget-unlimited" : ""}>${budgetAmount == null ? "상관없음" : `${escapeHtml(budgetAmount.toLocaleString("ko-KR"))}원 이하`}</output></label><input id="budget-slider" name="budget" type="range" min="0" max="12" step="1" value="${escapeHtml(budgetStep)}" data-slider="budget" data-budget-amount="${budgetAmount == null ? "" : escapeHtml(budgetAmount)}" aria-label="1인 예산"></div>
         <details data-advanced-conditions>
@@ -238,7 +282,6 @@
             <option value="private"${disclosure === "private" ? " selected" : ""}>비공개</option>
           </select></label>
         </details>
-        ${action("프로필 수정", "open-profile")}
         ${renderGuardedRecovery(view)}
         ${action("이 조건으로 바로 출발", "start")}
       </form>`;
