@@ -14,14 +14,15 @@ Date: 2026-07-27
 
 GitHub Pages의 사용자 지정 GitHub Actions 워크플로를 사용한다.
 
-- 저장소: `kimkiumin/Somewhere`
+- 원본 저장소: `kimkiumin/Somewhere`
+- 공개 저장소: `kimkiumin/Somewhere-wireframe-sequence`
 - 배포 소스 브랜치: `codex/vnext-sequence-prototype`
 - 배포 입력 폴더: `prototype/vnext/`
-- 공개 주소: `https://kimkiumin.github.io/Somewhere/wireframe-sequence/`
+- 공개 주소: `https://kimkiumin.github.io/Somewhere-wireframe-sequence/`
 - Pages 빌드 방식: `workflow`
 - Pages 환경: `github-pages`
 
-저장소 전체를 체크아웃하더라도 Pages artifact에는 `prototype/vnext/`의 실행 파일만 `wireframe-sequence/` 하위 경로에 담는다. 과거 v0.1 배포와 같은 루트 URL을 재사용하지 않으므로 브라우저·CDN 캐시가 두 프로토타입을 혼동하지 않는다.
+원본 저장소의 `prototype/vnext/`만 공개 저장소의 루트로 분리해 게시한다. 과거 v0.1 앱과 저장소, Pages origin, 브라우저 캐시, 서비스 워커 범위를 공유하지 않는다.
 
 ## 저장소 경계
 
