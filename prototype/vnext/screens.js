@@ -154,6 +154,47 @@
   const ALLERGY_OPTIONS = Object.freeze([
     ["peanut", "땅콩"], ["tree_nut", "견과류"], ["shellfish", "갑각류"], ["milk", "유제품"], ["egg", "달걀"], ["wheat", "밀"],
   ]);
+  const BUDGET_STOPS = Object.freeze([
+    2_000, 4_000, 6_000, 8_000, 10_000, 12_000, 14_000, 16_000, 18_000, 20_000,
+    30_000, 40_000, 50_000, null,
+  ]);
+
+  function parseBudgetAmount(value) {
+    const numeric = Number.isFinite(value)
+      ? value
+      : Number(String(value ?? "").replace(/[^0-9]/g, ""));
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  }
+
+  function budgetIndexForAmount(value) {
+    const amount = parseBudgetAmount(value);
+    if (amount == null) return BUDGET_STOPS.length - 1;
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < BUDGET_STOPS.length - 1; index += 1) {
+      const distance = Math.abs(BUDGET_STOPS[index] - amount);
+      if (distance < nearestDistance) {
+        nearestIndex = index;
+        nearestDistance = distance;
+      }
+    }
+    return nearestIndex;
+  }
+
+  function budgetAmountForIndex(value) {
+    const index = Math.max(0, Math.min(BUDGET_STOPS.length - 1, Math.round(Number(value))));
+    return BUDGET_STOPS[index] ?? null;
+  }
+
+  function budgetWheelAmount(value, direction) {
+    const amount = parseBudgetAmount(value);
+    if (amount == null) return direction < 0 ? BUDGET_STOPS[BUDGET_STOPS.length - 2] : null;
+    if (direction > 0) {
+      return BUDGET_STOPS.find((stop) => Number.isFinite(stop) && stop > amount) ?? null;
+    }
+    const lower = BUDGET_STOPS.filter((stop) => Number.isFinite(stop) && stop < amount);
+    return lower.at(-1) ?? BUDGET_STOPS[0];
+  }
 
   function renderProfile(view, setup = false) {
     const profile = view.profile || { dietary: [], allergies: [] };
@@ -176,13 +217,9 @@
   function renderConstraints(view) {
     const constraints = view.constraints || {};
     const minutes = Number.isFinite(constraints.maxWalkMinutes) ? constraints.maxWalkMinutes : 20;
-    const parsedBudget = Number.isFinite(constraints.budget)
-      ? constraints.budget
-      : Number(String(constraints.budget ?? "").replace(/[^0-9]/g, ""));
-    const budgetStep = Number.isFinite(parsedBudget) && parsedBudget > 0
-      ? Math.max(1, Math.min(25, Math.round(parsedBudget / 2_000)))
-      : 26;
-    const budgetAmount = budgetStep * 2_000;
+    const parsedBudget = parseBudgetAmount(constraints.budget);
+    const budgetStep = budgetIndexForAmount(parsedBudget);
+    const budgetAmount = budgetAmountForIndex(budgetStep);
     const disclosure = constraints.disclosure === "private" ? "private" : "minimal";
     const advancedSummary = summarizeAdvancedConditions(constraints);
     return `<h1>지금 필요한 조건</h1>
@@ -192,7 +229,7 @@
       <form data-form="constraints">
         <input type="hidden" name="category" value="restaurant">
         <div class="slider-field"><label for="walk-time-slider">도보 시간 <output id="walk-time-value">${escapeHtml(minutes)}분</output></label><input id="walk-time-slider" name="maxWalkMinutes" type="range" min="5" max="60" step="5" value="${escapeHtml(minutes)}" data-slider="walk" aria-label="최대 도보 시간"></div>
-        <div class="slider-field"><label for="budget-slider">예산 <output id="budget-value"${budgetStep === 26 ? " data-budget-unlimited" : ""}>${budgetStep === 26 ? "상관없음" : `${escapeHtml(budgetAmount.toLocaleString("ko-KR"))}원 이하`}</output></label><input id="budget-slider" name="budget" type="range" min="1" max="26" step="1" value="${escapeHtml(budgetStep)}" data-slider="budget" aria-label="1인 예산"></div>
+        <div class="slider-field"><label for="budget-slider">예산 <output id="budget-value"${budgetAmount == null ? " data-budget-unlimited" : ""}>${budgetAmount == null ? "상관없음" : `${escapeHtml(budgetAmount.toLocaleString("ko-KR"))}원 이하`}</output></label><input id="budget-slider" name="budget" type="range" min="0" max="13" step="1" value="${escapeHtml(budgetStep)}" data-slider="budget" data-budget-amount="${budgetAmount == null ? "" : escapeHtml(budgetAmount)}" aria-label="1인 예산"></div>
         <details data-advanced-conditions>
           <summary>${escapeHtml(advancedSummary)}</summary>
           <label>접근성 조건 <input name="accessibility" value="${escapeHtml((constraints.accessibility || []).join(", "))}"></label>
@@ -420,6 +457,7 @@
   }
 
   const api = {
+    BUDGET_STOPS, budgetIndexForAmount, budgetAmountForIndex, budgetWheelAmount,
     escapeHtml, summarizeAdvancedConditions, renderProductScreen,
     renderPrototypeControls, renderApp,
   };

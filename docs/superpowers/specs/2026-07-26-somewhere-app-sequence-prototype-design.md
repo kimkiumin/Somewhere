@@ -21,7 +21,7 @@ The user approved the sequence represented in the visual companion on 2026-07-26
 
 All other approved vNext rules remain active: one destination, no candidate list, no active Reroll, immediate Stop pause, skippable reasons, guarded recommendation recovery, route-aware guidance, and delayed place reaction.
 
-The 2026-08-12 constraint-screen amendment fixes the category to restaurant for this prototype, moves walking time and budget into the primary condition area, uses wheel-adjustable numeric sliders, and reserves the final budget value for `상관없음` after 2,000 KRW increments. Minimum disclosure (walking time, budget, and main menu) is the default with optional private mode. Dietary and allergy choices are collected during first-use profile setup and edited later through Profile search/list multi-select, not in the recurring constraints form.
+The 2026-08-12 constraint-screen amendment fixes the category to restaurant for this prototype, moves walking time and budget into the primary condition area, uses wheel-adjustable numeric sliders, and reserves the final budget value for `상관없음`. Budget stops are 2,000 KRW increments through 20,000 KRW, then 30,000/40,000/50,000 KRW and unlimited. Wheel input is treated as a 1,000 KRW directional intent but settles on even-thousand valid stops, so an odd legacy value such as 11,000 KRW moves to 10,000 KRW when scrolling down and 12,000 KRW when scrolling up. Minimum disclosure (walking time, budget, and main menu) is the default with optional private mode. Dietary and allergy choices are collected during first-use profile setup and edited later through Profile search/list multi-select, not in the recurring constraints form.
 
 ## Prototype Scope
 

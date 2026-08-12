@@ -249,12 +249,15 @@
 
     function readConstraints(form) {
       const data = new FormDataType(form);
-      const budgetStep = Number(data.get("budget"));
+      const rawBudget = data.get("budget");
+      const budgetStep = rawBudget == null || String(rawBudget).trim() === "" ? null : Number(rawBudget);
       const disclosure = data.get("disclosure") === "private" ? "private" : "minimal";
       return {
         category: "restaurant",
         maxWalkMinutes: Number(data.get("maxWalkMinutes")),
-        budget: Number.isFinite(budgetStep) && budgetStep >= 1 && budgetStep <= 25 ? budgetStep * 2_000 : null,
+        budget: budgetStep == null || typeof screens.budgetAmountForIndex !== "function"
+          ? null
+          : screens.budgetAmountForIndex(budgetStep),
         dietary: clone(currentView?.profile?.dietary || []),
         allergies: clone(currentView?.profile?.allergies || []),
         accessibility: splitList(data.get("accessibility")),
@@ -336,8 +339,12 @@
       const budget = form.querySelector?.('[name="budget"]');
       const budgetOutput = form.querySelector?.("#budget-value");
       if (budget && budgetOutput) {
-        const unlimited = Number(budget.value) >= 26;
-        budgetOutput.textContent = unlimited ? "상관없음" : `${(Number(budget.value) * 2_000).toLocaleString("ko-KR")}원 이하`;
+        const amount = typeof screens.budgetAmountForIndex === "function"
+          ? screens.budgetAmountForIndex(budget.value)
+          : null;
+        const unlimited = amount == null;
+        budget.dataset.budgetAmount = unlimited ? "" : String(amount);
+        budgetOutput.textContent = unlimited ? "상관없음" : `${amount.toLocaleString("ko-KR")}원 이하`;
         if (unlimited) budgetOutput.setAttribute?.("data-budget-unlimited", "");
         else budgetOutput.removeAttribute?.("data-budget-unlimited");
       }
@@ -358,6 +365,24 @@
       const slider = event.target?.closest?.('input[type="range"][data-slider]');
       if (!slider || !inside(root, slider)) return;
       const direction = event.deltaY < 0 ? 1 : -1;
+      if (slider.dataset?.slider === "budget" && typeof screens.budgetWheelAmount === "function") {
+        const rawAmount = String(slider.dataset.budgetAmount ?? "");
+        const currentAmount = rawAmount === "" ? null : Number(rawAmount);
+        const nextAmount = screens.budgetWheelAmount(
+          currentAmount == null || !Number.isFinite(currentAmount)
+            ? screens.budgetAmountForIndex(slider.value)
+            : currentAmount,
+          direction,
+        );
+        if (nextAmount === null && currentAmount == null) return;
+        const nextIndex = screens.budgetIndexForAmount(nextAmount);
+        if (nextIndex === Number(slider.value) && String(nextAmount ?? "") === String(slider.dataset.budgetAmount ?? "")) return;
+        event.preventDefault?.();
+        slider.value = String(nextIndex);
+        slider.dataset.budgetAmount = nextAmount == null ? "" : String(nextAmount);
+        onConstraintsInput({ target: slider });
+        return;
+      }
       const step = Number(slider.step) || 1;
       const min = Number(slider.min);
       const max = Number(slider.max);
