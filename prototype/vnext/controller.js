@@ -51,9 +51,6 @@
     if (Array.isArray(constraints?.allergies) && constraints.allergies.length > 0) {
       affected.push({ field: "allergies", label: "알레르기" });
     }
-    if (Array.isArray(constraints?.accessibility) && constraints.accessibility.length > 0) {
-      affected.push({ field: "accessibility", label: "접근성 조건" });
-    }
     if (constraints?.disclosure === "private") {
       affected.push({ field: "disclosure", label: "목적지 공개 수준" });
     }
@@ -191,13 +188,6 @@
     return createControllerCore(options, true);
   }
 
-  function splitList(value) {
-    return String(value ?? "")
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-  }
-
   function mountController(root, controlsRoot, options = {}, inspectable = false) {
     if (!root || !controlsRoot) throw new Error("Product and prototype-control roots are required.");
     const screens = options.screens || loadApi(globalScope.SomewhereVNextScreens, "./screens.js");
@@ -262,7 +252,6 @@
           : screens.budgetAmountForIndex(budgetStep),
         dietary: clone(currentView?.profile?.dietary || []),
         allergies: clone(currentView?.profile?.allergies || []),
-        accessibility: splitList(data.get("accessibility")),
         disclosure,
       };
     }

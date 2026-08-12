@@ -72,7 +72,6 @@ constraints: {
   budget: null,
   dietary: [],
   allergies: [],
-  accessibility: [],
   disclosure: "minimal"
 }
 ```

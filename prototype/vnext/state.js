@@ -20,7 +20,7 @@
   const REACTIONS = Object.freeze(["dislike", "like", "love", "did_not_visit"]);
   const NO_FIT_FIELDS = Object.freeze([
     "category", "partySize", "maxWalkMinutes", "budget", "dietary", "allergies",
-    "accessibility", "disclosure",
+    "disclosure",
   ]);
   const ARRIVAL_DETAIL_FIELDS = Object.freeze([
     "name", "address", "building", "floorUnit", "entrance",
@@ -34,7 +34,6 @@
       budget: null,
       dietary: [],
       allergies: [],
-      accessibility: [],
       disclosure: "minimal",
     };
   }

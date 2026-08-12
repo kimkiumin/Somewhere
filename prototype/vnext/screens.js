@@ -136,7 +136,6 @@
     const active = [];
     if (Array.isArray(constraints.dietary) && constraints.dietary.length > 0) active.push("식이 조건");
     if (Array.isArray(constraints.allergies) && constraints.allergies.length > 0) active.push("알레르기");
-    if (Array.isArray(constraints.accessibility) && constraints.accessibility.length > 0) active.push("접근성 조건");
     if (constraints.disclosure === "private") active.push("목적지 공개 수준");
     return active;
   }
@@ -307,7 +306,6 @@
         <div class="slider-field"><label for="budget-slider">예산 <output id="budget-value"${budgetAmount == null ? " data-budget-unlimited" : ""}>${budgetAmount == null ? "상관없음" : `${escapeHtml(budgetAmount.toLocaleString("ko-KR"))}원 이하`}</output></label><input id="budget-slider" name="budget" type="range" min="0" max="12" step="1" value="${escapeHtml(budgetStep)}" data-slider="budget" data-budget-amount="${budgetAmount == null ? "" : escapeHtml(budgetAmount)}" aria-label="1인 예산"></div>
         <details data-advanced-conditions>
           <summary>${escapeHtml(advancedSummary)}</summary>
-          <label>접근성 조건 <input name="accessibility" value="${escapeHtml((constraints.accessibility || []).join(", "))}"></label>
           <label>목적지 공개 수준 <select name="disclosure">
             <option value="minimal"${disclosure === "minimal" ? " selected" : ""}>최소 정보 공개 (도보시간 · 예산 · 주요 메뉴)</option>
             <option value="private"${disclosure === "private" ? " selected" : ""}>비공개</option>

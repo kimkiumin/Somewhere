@@ -65,8 +65,9 @@ Visible by default:
 
 Collapsed under `고급 조건`:
 
-- accessibility requirements;
 - destination disclosure preference.
+
+Accessibility-condition input is deferred from this prototype. It can return only after venue and route data support a reliable verification contract.
 
 The default disclosure is minimum information (walking time, budget, and main menu), with an optional private setting. Dietary and allergy values are shown as applied profile conditions but edited only in the searchable multi-select Settings screen opened from the top-right profile menu. The constraints screen keeps the single `이 조건으로 바로 출발` CTA and does not show a profile-edit CTA. When advanced constraints are active, the collapsed row summarizes their count or types, such as `추가 조건 2개 적용 중`. Safety-relevant conditions are never silently hidden from the user or ignored by selection logic.
 

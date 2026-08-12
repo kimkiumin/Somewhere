@@ -14,7 +14,7 @@
 - Preserve every file directly under `prototype/`; the historical v0.1 prototype and its tests must remain unchanged.
 - Create the new prototype only under `prototype/vnext/` except for the project-contract test that records its existence.
 - Use plain HTML, CSS, and JavaScript with no new runtime or test dependency.
-- Show category and maximum walking distance/time by default; keep budget, dietary/allergy, accessibility, and disclosure preferences in a collapsed `고급 조건` control.
+- Show category and maximum walking distance/time by default; keep budget, dietary/allergy, and disclosure preferences in a collapsed `고급 조건` control. Accessibility-condition input is deferred until it can be verified reliably.
 - Use one product action, `이 조건으로 바로 출발`; do not add `한 곳 준비`, `이 장소로 출발`, another commit button, or active Reroll.
 - Do not render a compass during constraints or finding. Render it at one unchanged size in following and near states.
 - Keep destination identity and exact location out of all public pre-Reveal view models and rendered HTML.
@@ -115,7 +115,6 @@ function validConstraints() {
     maxWalkMinutes: 20,
     budget: null,
     dietary: [],
-    accessibility: [],
     disclosure: "standard",
   };
 }
@@ -204,7 +203,6 @@ Create `prototype/vnext/state.js` with a browser/CommonJS wrapper and these exac
       maxWalkMinutes: 20,
       budget: null,
       dietary: [],
-      accessibility: [],
       disclosure: "standard",
     };
   }
@@ -347,7 +345,7 @@ function followingState({ revealed = false } = {}) {
       type: "START",
       constraints: {
         category: "restaurant", maxWalkMinutes: 20, budget: null,
-        dietary: [], accessibility: [], disclosure: "standard",
+        dietary: [], disclosure: "standard",
       },
     },
   );
@@ -575,7 +573,6 @@ function view(overrides = {}) {
       maxWalkMinutes: 20,
       budget: null,
       dietary: [],
-      accessibility: [],
       disclosure: "standard",
     },
     errors: {},
@@ -799,11 +796,11 @@ test("start schedules one automatic finding completion and no second commit", ()
 
   controller.start({
     category: "restaurant", maxWalkMinutes: 20, budget: null,
-    dietary: [], accessibility: [], disclosure: "standard",
+    dietary: [], disclosure: "standard",
   });
   controller.start({
     category: "restaurant", maxWalkMinutes: 20, budget: null,
-    dietary: [], accessibility: [], disclosure: "standard",
+    dietary: [], disclosure: "standard",
   });
 
   assert.equal(controller.getState().phase, "finding");
@@ -823,7 +820,7 @@ test("destroy cancels a pending finding completion", () => {
   });
   controller.start({
     category: "cafe", maxWalkMinutes: 15, budget: null,
-    dietary: [], accessibility: [], disclosure: "standard",
+    dietary: [], disclosure: "standard",
   });
   controller.destroy();
   assert.deepEqual(cancelled, [91]);

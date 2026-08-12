@@ -14,7 +14,6 @@ function view(overrides = {}) {
       budget: null,
       dietary: [],
       allergies: [],
-      accessibility: [],
       disclosure: "standard",
     },
     errors: {},
@@ -39,6 +38,14 @@ test("constraints show one start action and collapsed advanced settings", () => 
   assert.doesNotMatch(html, /<details[^>]*data-advanced-conditions[^>]*\sopen(?:\s|>)/);
   assert.equal((html.match(/data-action="start"/g) || []).length, 1);
   assert.doesNotMatch(html, /Reroll|다시 추천/);
+});
+
+test("constraints no longer expose accessibility as an active condition", () => {
+  const html = screens.renderProductScreen(view({
+    constraints: { ...view().constraints, accessibility: ["계단 없는 입구"] },
+  }));
+  assert.doesNotMatch(html, /접근성 조건/);
+  assert.doesNotMatch(html, /name="accessibility"/);
 });
 
 test("constraints fix the category to restaurant and expose time and budget sliders", () => {
@@ -189,13 +196,12 @@ test("collapsed advanced conditions summarize every active type and preserve dis
       budget: "20,000원 이하",
       dietary: ["채식"],
       allergies: ["견과류"],
-      accessibility: ["계단 없는 입구"],
       disclosure: "minimal",
     },
   }));
 
-  assert.match(html, /추가 조건 3개 적용 중/);
-  for (const label of ["식이 조건", "알레르기", "접근성 조건"]) {
+  assert.match(html, /추가 조건 2개 적용 중/);
+  for (const label of ["식이 조건", "알레르기"]) {
     assert.match(html, new RegExp(label));
   }
   assert.doesNotMatch(html, /추가 조건[^<]*목적지 공개 수준/);
@@ -394,14 +400,12 @@ test("no-fit identifies affected fields and escapes their labels", () => {
     errors: { finding: "필수 조건을 모두 충족하는 장소를 찾지 못했습니다." },
     affectedConditions: [
       { field: "allergies", label: "견과류 <script>" },
-      { field: "accessibility", label: "계단 없는 입구" },
     ],
   }));
 
   assert.match(html, /다시 확인할 조건/);
   assert.match(html, /data-condition="allergies"/);
   assert.match(html, /견과류 &lt;script&gt;/);
-  assert.match(html, /계단 없는 입구/);
   assert.doesNotMatch(html, /<script>/);
 });
 

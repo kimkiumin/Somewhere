@@ -12,7 +12,6 @@ function validConstraints() {
     budget: null,
     dietary: [],
     allergies: [],
-    accessibility: [],
     disclosure: "standard",
   };
 }
@@ -89,6 +88,11 @@ test("default constraints use restaurant, minimum disclosure, and unlimited budg
   assert.equal(initial.constraints.budget, null);
   assert.deepEqual(initial.profile, { dietary: [], allergies: [] });
   assert.equal(stateApi.validateConstraints({ ...initial.constraints, category: "cafe" }).valid, false);
+});
+
+test("default constraints no longer include the deferred accessibility condition", () => {
+  const initial = stateApi.createInitialState({ firstUse: false });
+  assert.equal(Object.hasOwn(initial.constraints, "accessibility"), false);
 });
 
 test("budget validation rejects the unsupported 2,000 won floor", () => {
@@ -394,14 +398,12 @@ test("walks, guarded recovery, permissions, and feedback actions obey phase guar
 test("no-fit returns exact affected conditions without relaxing constraints", () => {
   const constraints = validConstraints();
   constraints.allergies = ["견과류"];
-  constraints.accessibility = ["계단 없는 입구"];
   const finding = stateApi.reduce(
     stateApi.createInitialState({ firstUse: false }),
     { type: "START", constraints },
   );
   const affectedConditions = [
     { field: "allergies", label: "견과류 알레르기" },
-    { field: "accessibility", label: "계단 없는 입구" },
   ];
   const noFit = stateApi.reduce(finding, {
     type: "FIND_NO_FIT", affectedConditions,
@@ -414,7 +416,6 @@ test("no-fit returns exact affected conditions without relaxing constraints", ()
   assert.deepEqual(noFit.constraints, constraints);
   assert.deepEqual(noFit.affectedConditions, [
     { field: "allergies", label: "견과류 알레르기" },
-    { field: "accessibility", label: "계단 없는 입구" },
   ]);
   assert.deepEqual(stateApi.toPublicView(noFit).affectedConditions, noFit.affectedConditions);
   assert.match(noFit.errors.finding, /충족하는 장소를 찾지 못했습니다/);

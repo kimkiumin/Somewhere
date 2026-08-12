@@ -23,7 +23,6 @@ function validConstraints(overrides = {}) {
     budget: null,
     dietary: [],
     allergies: [],
-    accessibility: [],
     disclosure: "standard",
     ...overrides,
   };
@@ -156,7 +155,6 @@ test("no-fit simulation reports the active advanced conditions without changing 
     budget: "20,000원 이하",
     dietary: ["채식"],
     allergies: ["견과류"],
-    accessibility: ["계단 없는 입구"],
     disclosure: "private",
   });
 
@@ -169,7 +167,6 @@ test("no-fit simulation reports the active advanced conditions without changing 
     { field: "budget", label: "예산" },
     { field: "dietary", label: "식이 조건" },
     { field: "allergies", label: "알레르기" },
-    { field: "accessibility", label: "접근성 조건" },
     { field: "disclosure", label: "목적지 공개 수준" },
   ]);
   assert.deepEqual(rendered.at(-1).affectedConditions, controller.getState().affectedConditions);
@@ -281,7 +278,6 @@ test("mount delegates product and prototype controls through the reducer", () =>
       budget: "10000",
       dietary: "vegan, shellfish-free",
       allergies: "peanut, sesame",
-      accessibility: "step-free",
       disclosure: "minimal",
     },
   };
@@ -676,8 +672,7 @@ test("advanced input updates its collapsed summary without rerendering or moving
       partySize: "2",
       maxWalkMinutes: "20",
       budget: "20000",
-      accessibility: "계단 없는 입구",
-      disclosure: "minimal",
+      disclosure: "private",
     },
   };
   const input = {
@@ -697,7 +692,7 @@ test("advanced input updates its collapsed summary without rerendering or moving
 
   assert.equal(
     summary.textContent,
-    "추가 조건 1개 적용 중 — 접근성 조건",
+    "추가 조건 1개 적용 중 — 목적지 공개 수준",
   );
   assert.equal(root.focusCount(), focusBeforeInput);
   mounted.destroy();
