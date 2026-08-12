@@ -19,7 +19,7 @@
   ]);
   const REACTIONS = Object.freeze(["dislike", "like", "love", "did_not_visit"]);
   const NO_FIT_FIELDS = Object.freeze([
-    "category", "maxWalkMinutes", "budget", "dietary", "allergies",
+    "category", "partySize", "maxWalkMinutes", "budget", "dietary", "allergies",
     "accessibility", "disclosure",
   ]);
   const ARRIVAL_DETAIL_FIELDS = Object.freeze([
@@ -29,6 +29,7 @@
   function defaultConstraints() {
     return {
       category: "restaurant",
+      partySize: 2,
       maxWalkMinutes: 20,
       budget: null,
       dietary: [],
@@ -63,6 +64,7 @@
       recoveryReviewed: false,
       feedbackEligibleAtMs: null,
       reaction: null,
+      profileMenuOpen: false,
     };
   }
 
@@ -70,6 +72,9 @@
     const errors = {};
     if (!value || value.category !== "restaurant") {
       errors.category = "식당 조건을 확인해 주세요.";
+    }
+    if (!Number.isInteger(value?.partySize) || value.partySize < 1 || value.partySize > 5) {
+      errors.partySize = "함께 가는 인원은 1명 이상 5명 이하로 선택해 주세요.";
     }
     if (!Number.isFinite(value?.maxWalkMinutes) || value.maxWalkMinutes < 1) {
       errors.maxWalkMinutes = "도보 시간은 1분 이상이어야 합니다.";
@@ -136,11 +141,26 @@
     if (action.type === "CONTINUE_ONBOARDING" && state.phase === "onboarding") {
       return { ...state, phase: "profile_setup" };
     }
+    if (action.type === "SET_PARTY_SIZE" && state.phase === "constraints") {
+      if (!Number.isInteger(action.partySize) || action.partySize < 1 || action.partySize > 5) return state;
+      const { partySize: _partySizeError, ...remainingErrors } = state.errors;
+      return {
+        ...state,
+        constraints: { ...state.constraints, partySize: action.partySize },
+        errors: remainingErrors,
+      };
+    }
+    if (action.type === "OPEN_PROFILE_MENU" && state.phase === "constraints") {
+      return { ...state, profileMenuOpen: true };
+    }
+    if (action.type === "CLOSE_PROFILE_MENU" && state.phase === "constraints") {
+      return { ...state, profileMenuOpen: false };
+    }
     if (action.type === "OPEN_PROFILE" && state.phase === "constraints") {
-      return { ...state, phase: "profile" };
+      return { ...state, phase: "profile", profileMenuOpen: false };
     }
     if (action.type === "CANCEL_PROFILE" && state.phase === "profile") {
-      return { ...state, phase: "constraints" };
+      return { ...state, phase: "constraints", profileMenuOpen: false };
     }
     if (
       action.type === "SAVE_PROFILE"
@@ -154,6 +174,7 @@
       return {
         ...state,
         phase: "constraints",
+        profileMenuOpen: false,
         profile,
         constraints: {
           ...state.constraints,
@@ -180,6 +201,7 @@
       return {
         ...state,
         phase: "finding",
+        profileMenuOpen: false,
         constraints: structuredClone(action.constraints),
         errors: {},
         affectedConditions: [],
@@ -398,6 +420,7 @@
       phase: state.phase,
       constraints: structuredClone(state.constraints),
       profile: structuredClone(state.profile),
+      profileMenuOpen: Boolean(state.profileMenuOpen),
       errors: structuredClone(state.errors),
       affectedConditions: structuredClone(state.affectedConditions),
       permission: state.permission,

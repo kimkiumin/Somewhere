@@ -7,6 +7,7 @@ const stateApi = require("./state.js");
 function validConstraints() {
   return {
     category: "restaurant",
+    partySize: 2,
     maxWalkMinutes: 20,
     budget: null,
     dietary: [],
@@ -15,6 +16,45 @@ function validConstraints() {
     disclosure: "standard",
   };
 }
+
+test("defaults to two people for group-aware restaurant discovery", () => {
+  const initial = stateApi.createInitialState({ firstUse: false });
+  assert.equal(initial.constraints.partySize, 2);
+});
+
+test("accepts party sizes one through five and rejects out-of-range values", () => {
+  const initial = stateApi.createInitialState({ firstUse: false });
+  for (const partySize of [1, 2, 3, 4, 5]) {
+    assert.equal(
+      stateApi.validateConstraints({ ...initial.constraints, partySize }).valid,
+      true,
+    );
+  }
+  const invalidLow = stateApi.validateConstraints({ ...initial.constraints, partySize: 0 });
+  const invalidHigh = stateApi.validateConstraints({ ...initial.constraints, partySize: 6 });
+  const invalidType = stateApi.validateConstraints({ ...initial.constraints, partySize: "2" });
+  assert.equal(invalidLow.errors.partySize, "함께 가는 인원은 1명 이상 5명 이하로 선택해 주세요.");
+  assert.equal(invalidHigh.errors.partySize, "함께 가는 인원은 1명 이상 5명 이하로 선택해 주세요.");
+  assert.equal(invalidType.valid, false);
+});
+
+test("sets party size only while editing constraints", () => {
+  const initial = stateApi.createInitialState({ firstUse: false });
+  const changed = stateApi.reduce(initial, { type: "SET_PARTY_SIZE", partySize: 4 });
+  assert.equal(changed.constraints.partySize, 4);
+  const following = { ...initial, phase: "following" };
+  assert.equal(stateApi.reduce(following, { type: "SET_PARTY_SIZE", partySize: 4 }), following);
+});
+
+test("opens and closes the profile menu without leaving constraints", () => {
+  const initial = stateApi.createInitialState({ firstUse: false });
+  const opened = stateApi.reduce(initial, { type: "OPEN_PROFILE_MENU" });
+  assert.equal(opened.phase, "constraints");
+  assert.equal(opened.profileMenuOpen, true);
+  const closed = stateApi.reduce(opened, { type: "CLOSE_PROFILE_MENU" });
+  assert.equal(closed.phase, "constraints");
+  assert.equal(closed.profileMenuOpen, false);
+});
 
 test("one start action moves valid constraints directly into finding", () => {
   const initial = stateApi.createInitialState({ firstUse: false });
