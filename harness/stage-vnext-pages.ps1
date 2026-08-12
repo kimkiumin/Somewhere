@@ -4,7 +4,11 @@ param(
   [string]$SourceDirectory,
 
   [Parameter(Mandatory = $true)]
-  [string]$DestinationDirectory
+  [string]$DestinationDirectory,
+
+  [Parameter(Mandatory = $true)]
+  [ValidatePattern('^[a-z0-9][a-z0-9-]*$')]
+  [string]$PublicSubpath
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,6 +25,7 @@ $runtimeFiles = @(
 
 $source = [System.IO.Path]::GetFullPath($SourceDirectory)
 $destination = [System.IO.Path]::GetFullPath($DestinationDirectory)
+$publicDirectory = Join-Path $destination $PublicSubpath
 
 if (-not (Test-Path -LiteralPath $source -PathType Container)) {
   throw "Prototype source directory does not exist: $source"
@@ -41,6 +46,7 @@ if (
 }
 
 New-Item -ItemType Directory -Path $destination | Out-Null
+New-Item -ItemType Directory -Path $publicDirectory | Out-Null
 
 foreach ($file in $runtimeFiles) {
   $sourceFile = Join-Path $source $file
@@ -48,11 +54,11 @@ foreach ($file in $runtimeFiles) {
     throw "Required prototype runtime file is missing: $file"
   }
 
-  Copy-Item -LiteralPath $sourceFile -Destination (Join-Path $destination $file)
+  Copy-Item -LiteralPath $sourceFile -Destination (Join-Path $publicDirectory $file)
 }
 
 $publishedFiles = @(
-  Get-ChildItem -LiteralPath $destination -File |
+  Get-ChildItem -LiteralPath $publicDirectory -File |
     Select-Object -ExpandProperty Name |
     Sort-Object
 )
@@ -60,4 +66,12 @@ $expectedFiles = @($runtimeFiles | Sort-Object)
 
 if (Compare-Object $expectedFiles $publishedFiles) {
   throw "Pages artifact does not match the runtime-file allowlist"
+}
+
+$publishedRootEntries = @(
+  Get-ChildItem -LiteralPath $destination |
+    Select-Object -ExpandProperty Name
+)
+if (Compare-Object @($PublicSubpath) $publishedRootEntries) {
+  throw "Pages artifact root must contain only the isolated public subpath"
 }

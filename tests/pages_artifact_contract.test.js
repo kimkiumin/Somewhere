@@ -18,7 +18,7 @@ const runtimeFiles = [
   "style.css",
 ];
 
-test("Pages artifact contains only the runnable vNext prototype", () => {
+test("Pages artifact isolates the runnable vNext prototype under its own public path", () => {
   const tempRoot = fs.realpathSync(os.tmpdir());
   const workspace = fs.mkdtempSync(path.join(tempRoot, "somewhere-pages-contract-"));
   const source = path.join(workspace, "source");
@@ -46,15 +46,20 @@ test("Pages artifact contains only the runnable vNext prototype", () => {
         source,
         "-DestinationDirectory",
         destination,
+        "-PublicSubpath",
+        "wireframe-sequence",
       ],
       { cwd: root, encoding: "utf8", stdio: "pipe" },
     );
 
-    const published = fs.readdirSync(destination).sort();
+    const publishedRoot = fs.readdirSync(destination).sort();
+    assert.deepEqual(publishedRoot, ["wireframe-sequence"]);
+    const publicDirectory = path.join(destination, "wireframe-sequence");
+    const published = fs.readdirSync(publicDirectory).sort();
     assert.deepEqual(published, runtimeFiles);
     for (const file of runtimeFiles) {
       assert.equal(
-        fs.readFileSync(path.join(destination, file), "utf8"),
+        fs.readFileSync(path.join(publicDirectory, file), "utf8"),
         `runtime:${file}`,
       );
     }

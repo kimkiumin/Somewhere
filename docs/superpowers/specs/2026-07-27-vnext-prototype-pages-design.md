@@ -17,11 +17,11 @@ GitHub Pages의 사용자 지정 GitHub Actions 워크플로를 사용한다.
 - 저장소: `kimkiumin/Somewhere`
 - 배포 소스 브랜치: `codex/vnext-sequence-prototype`
 - 배포 입력 폴더: `prototype/vnext/`
-- 예상 공개 주소: `https://kimkiumin.github.io/Somewhere/`
+- 공개 주소: `https://kimkiumin.github.io/Somewhere/wireframe-sequence/`
 - Pages 빌드 방식: `workflow`
 - Pages 환경: `github-pages`
 
-저장소 전체를 체크아웃하더라도 Pages artifact에는 `prototype/vnext/`만 담는다. 따라서 공개 사이트의 루트는 곧 vNext 프로토타입의 `index.html`이며 다른 저장소 파일은 웹사이트에서 제공되지 않는다.
+저장소 전체를 체크아웃하더라도 Pages artifact에는 `prototype/vnext/`의 실행 파일만 `wireframe-sequence/` 하위 경로에 담는다. 과거 v0.1 배포와 같은 루트 URL을 재사용하지 않으므로 브라우저·CDN 캐시가 두 프로토타입을 혼동하지 않는다.
 
 ## 저장소 경계
 
@@ -52,6 +52,18 @@ prototype/vnext/
 - 저장소 설정, Git 이력, 작업 보고서와 로컬 비밀 정보
 
 Pages artifact를 만들기 전에 전용 임시 staging 디렉터리에 실행 파일 여섯 개만 복사한다. `prototype/vnext/` 안에 테스트나 README가 함께 존재하더라도 공개 artifact에는 포함되지 않게 허용 목록 방식으로 고정한다.
+
+공개 artifact 구조는 다음과 같다.
+
+```text
+wireframe-sequence/
+  index.html
+  style.css
+  state.js
+  screens.js
+  controller.js
+  app.js
+```
 
 ## 프로토타입 표시
 

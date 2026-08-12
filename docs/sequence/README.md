@@ -11,7 +11,6 @@
 ## 실행본
 
 - [vNext 프로토타입 소스](../../prototype/vnext/README.md)
-- [온라인 프로토타입](https://kimkiumin.github.io/Somewhere/)
+- [온라인 프로토타입](https://kimkiumin.github.io/Somewhere/wireframe-sequence/)
 
-온라인 프로토타입은 `prototype/vnext/`의 실행 파일만 별도 Pages artifact로 배포합니다. 청사진, 연구 문서, 테스트, 과거 v0.1 프로토타입은 실행 사이트에 섞이지 않습니다.
-
+온라인 프로토타입은 `prototype/vnext/`의 실행 파일만 `wireframe-sequence/` 전용 공개 경로로 배포합니다. 청사진, 연구 문서, 테스트, 과거 v0.1 프로토타입은 실행 사이트와 URL에 섞이지 않습니다.

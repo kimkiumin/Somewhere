@@ -18,7 +18,7 @@ The separately labeled prototype panel simulates finding, walking, near, arrival
 
 ## GitHub Pages Prototype
 
-The runnable prototype is published at <https://kimkiumin.github.io/Somewhere/> by the `Prototype — vNext Sequence` workflow. The Pages artifact contains only the six browser runtime files from this directory; tests, this README, project documents, and the historical v0.1 prototype are not published with the site.
+The runnable prototype is published at <https://kimkiumin.github.io/Somewhere/wireframe-sequence/> by the `Prototype — vNext Sequence` workflow. The dedicated public path prevents the current wireframe from sharing a URL with the historical v0.1 site. The Pages artifact contains only the `wireframe-sequence/` directory and the six browser runtime files from this directory; tests, this README, project documents, and the historical v0.1 prototype are not published with the site.
 
 ## Limitations
 
