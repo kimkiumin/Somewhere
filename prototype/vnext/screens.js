@@ -105,7 +105,7 @@
   }
 
   function renderOnboarding() {
-    return `<h1>Somewhere</h1>
+    return `<h1>Roll the compass!</h1>
       <p>한 곳을 정하고, 비교 없이 출발해요. 목적지는 도착하거나 직접 확인할 때까지 숨겨져 있어요.</p>
       ${action("시작하기", "continue-onboarding")}`;
   }

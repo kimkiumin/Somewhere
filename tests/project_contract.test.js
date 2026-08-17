@@ -80,11 +80,11 @@ test("vNext sequence prototype is isolated from historical v0.1", () => {
 
   const vnextHtml = read("prototype/vnext/index.html");
   const historicalHtml = read("prototype/index.html");
-  assert.equal(extractTitle(vnextHtml), "Somewhere vNext 시퀀스 프로토타입");
+  assert.equal(extractTitle(vnextHtml), "Roll the compass! vNext 시퀀스 프로토타입");
   assert.equal(extractTitle(historicalHtml), "Blind Compass Prototype");
   assert.doesNotMatch(vnextHtml, /prototype\/app\.js/);
 });
 
 test("vNext title extraction rejects a body-only occurrence", () => {
-  assert.equal(extractTitle("<body>Somewhere vNext</body>"), null);
+  assert.equal(extractTitle("<body>Roll the compass! vNext</body>"), null);
 });

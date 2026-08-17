@@ -190,6 +190,7 @@ test("private disclosure hides guidance detail rows", () => {
 
 test("onboarding explicitly says the destination stays hidden", () => {
   const html = screens.renderProductScreen(view({ phase: "onboarding" }));
+  assert.match(html, /<h1[^>]*>Roll the compass!<\/h1>/);
   assert.match(html, /목적지는 도착하거나 직접 확인할 때까지 숨겨져 있어요/);
 });
 
