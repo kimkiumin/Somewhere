@@ -612,7 +612,9 @@
 
   function renderApp(root, controlsRoot, view) {
     if (root) {
+      const previousPhase = root.querySelector?.(".product-screen")?.dataset?.phase;
       root.innerHTML = renderProductScreen(view);
+      if (previousPhase !== view?.phase) root.scrollIntoView?.({ block: "start" });
       root.querySelector?.("[data-screen-heading]")?.focus?.({ preventScroll: true });
     }
     if (controlsRoot) controlsRoot.innerHTML = renderPrototypeControls(view);

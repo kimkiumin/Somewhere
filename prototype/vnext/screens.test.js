@@ -589,3 +589,27 @@ test("screen headings are programmatically focusable and renderApp moves focus",
 
   assert.deepEqual(focused, [{ preventScroll: true }]);
 });
+
+test("renderApp returns to the app top only when the product phase changes", () => {
+  const scrolls = [];
+  const root = {
+    innerHTML: screens.renderProductScreen(view({ phase: "profile" })),
+    querySelector(selector) {
+      if (selector === ".product-screen") {
+        const phase = this.innerHTML.match(/data-phase="([^"]+)"/)?.[1];
+        return phase ? { dataset: { phase } } : null;
+      }
+      if (selector === "[data-screen-heading]") return { focus() {} };
+      return null;
+    },
+    scrollIntoView(options) {
+      scrolls.push(options);
+    },
+  };
+  const controlsRoot = { innerHTML: "" };
+
+  screens.renderApp(root, controlsRoot, view({ phase: "constraints" }));
+  screens.renderApp(root, controlsRoot, view({ phase: "constraints", profileMenuOpen: true }));
+
+  assert.deepEqual(scrolls, [{ block: "start" }]);
+});
