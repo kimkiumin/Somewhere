@@ -8,13 +8,17 @@ Open `prototype/vnext/index.html` directly in a modern browser. No install or se
 
 ## Product Path
 
-Use the product canvas for onboarding, first-use dietary/allergy profile setup, restaurant-only conditions, top-right profile menu and settings, researched dietary/allergy pickers with a top `없음` option and four-item internal scrolling, a 1–5+ party-size selector with pawn silhouettes, wheel-adjustable walking-time and budget sliders, one-action start, map-free turn-by-turn guidance, Stop, Reveal reason, confirmed Stop, arrival details, and place reaction. The arrival hierarchy makes the restaurant name prominent, then shows a photo, building/floor, the recommendation rationale, and a review summary; it omits street address and precise entrance guidance.
+Use the product canvas for onboarding, first-use dietary/allergy profile setup, a first-viewport compass Start button, below-fold restaurant conditions, top-right profile menu and settings, researched dietary/allergy pickers with a top `없음` option and four-item internal scrolling, a 1–5+ party-size selector with pawn silhouettes, wheel-adjustable walking-time and budget sliders, one-action start, map-free turn-by-turn guidance, Stop, Reveal reason, confirmed Stop, arrival details, and place reaction. The same compass face and needle structure continues from Start through rotating search into pointing guidance. The arrival hierarchy makes the restaurant name prominent, then shows a photo, building/floor, the recommendation rationale, and a review summary; it omits street address and precise entrance guidance.
 
 Budget stops start at 4,000 KRW, use 2,000 KRW increments through 20,000 KRW, then 30,000/40,000/50,000 KRW and the final `상관없음` value. Wheel input is handled as a 1,000 KRW directional intent but snaps to even-thousand stops, so 11,000 KRW settles at 10,000 or 12,000 KRW. Minimum destination disclosure (walking time, budget, and main menu) is the default, with an optional private mode under the collapsed settings. Accessibility-condition input is intentionally deferred until venue and route data can verify it reliably.
 
 ## Prototype Controls
 
 The separately labeled prototype panel simulates finding, walking, near, arrival, no-fit, low confidence, permission denial, a missing arrival field, feedback eligibility, and reset. These controls are not proposed product UI.
+
+## Current Interaction Hypothesis
+
+Keeping one compass visually continuous across launch, search, and guidance will make the one-action transition from setting conditions to beginning movement easier to understand. This prototype demonstrates the transition but does not yet establish that users understand it better; that remains a supervised usability question.
 
 ## GitHub Pages Prototype
 

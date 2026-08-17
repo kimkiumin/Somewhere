@@ -55,13 +55,14 @@ The 2026-08-12 constraint-screen amendment fixes the category to restaurant for 
 
 ### Constraint Screen
 
-Visible by default:
+The first constraints viewport contains only the Roll the compass! heading, the top-right profile menu, one centered compass Start button, and a `조건 설정` scroll link. The compass button has the visible label `출발` and the accessible name `이 조건으로 바로 출발`.
+
+Below the initial viewport, in the same constraints form:
 
 - category: restaurant (cafe deferred);
 - party size: 1, 2, 3, 4, or 5+ with arrow controls and repeated pawn silhouettes;
 - maximum walking time on a 5-minute-step slider;
 - budget on a slider starting at 4,000 KRW, using 2,000 KRW steps through 20,000 KRW and ending with coarse stops plus `상관없음`;
-- primary action: `이 조건으로 바로 출발`.
 
 Collapsed under `고급 조건`:
 
@@ -69,7 +70,7 @@ Collapsed under `고급 조건`:
 
 Accessibility-condition input is deferred from this prototype. It can return only after venue and route data support a reliable verification contract.
 
-The default disclosure is minimum information (walking time, budget, and main menu), with an optional private setting. Dietary and allergy values are shown as applied profile conditions but edited only in the searchable multi-select Settings screen opened from the top-right profile menu. The constraints screen keeps the single `이 조건으로 바로 출발` CTA and does not show a profile-edit CTA. When advanced constraints are active, the collapsed row summarizes their count or types, such as `추가 조건 2개 적용 중`. Safety-relevant conditions are never silently hidden from the user or ignored by selection logic.
+The default disclosure is minimum information (walking time, budget, and main menu), with an optional private setting. Dietary and allergy values are shown as applied profile conditions but edited only in the searchable multi-select Settings screen opened from the top-right profile menu. The constraints screen keeps one compass-shaped Start CTA and does not show a profile-edit CTA or a second Start control below the settings. When advanced constraints are active, the collapsed row summarizes their count or types, such as `추가 조건 2개 적용 중`. Safety-relevant conditions are never silently hidden from the user or ignored by selection logic.
 
 ### Turn-by-Turn Guidance Screen
 
@@ -134,7 +135,7 @@ There is no `한 곳 준비`, `이 장소로 출발`, or equivalent second butto
 
 ### Finding
 
-The screen shows calm progress and no candidates, destination identity, or guidance surface. Success enters `following` automatically. A deterministic no-fit simulation returns to constraints with the affected conditions identified and never substitutes an unqualified place.
+The screen reuses the same compass face, north marker, size, and needle structure as the Start control. The needle rotates continuously to communicate search without claiming a route direction. The screen shows no candidates, destination identity, or guidance instructions. Success turns that same compass into the pointing guidance state and enters `following` automatically. A deterministic no-fit simulation returns to constraints with the affected conditions identified and never substitutes an unqualified place.
 
 ### Following and Near
 
