@@ -1,4 +1,4 @@
-# Somewhere vNext Foundation and Feasibility Implementation Plan
+# Roll the compass! vNext Foundation and Feasibility Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -135,7 +135,7 @@ Expected: FAIL because `AGENTS.md`, `README.md`, and `docs/prototype_spec.md` st
 
 ```json
 {
-  "name": "somewhere-vnext",
+  "name": "roll-the-compass-vnext",
   "private": true,
   "version": "0.0.0",
   "engines": {
@@ -749,7 +749,7 @@ Expected: FAIL with missing-module errors.
 
   const api = { bearingDelta, trueBearing };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  globalScope.SomewhereGeometry = api;
+  globalScope.RollTheCompassGeometry = api;
 })(typeof globalThis !== "undefined" ? globalThis : window);
 ```
 
@@ -770,7 +770,7 @@ module.exports = { guidanceConfidence };
 // spikes/physical-display/display-state.js
 "use strict";
 (function initDisplayState(globalScope) {
-  const geometry = globalScope.SomewhereGeometry || require("../navigation/geometry.js");
+  const geometry = globalScope.RollTheCompassGeometry || require("../navigation/geometry.js");
 
   function deriveDisplayState(input) {
     if (input.sessionState === "paused" || input.sessionState === "stopped") {
@@ -830,7 +830,7 @@ git commit -m "spike: validate route and physical bearing states"
 <!-- spikes/web-sensors/index.html -->
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Somewhere Sensor Spike</title></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Roll the compass! Sensor Spike</title></head>
 <body>
   <button id="start" type="button">Start sensor diagnostic</button>
   <pre id="output">idle</pre>
@@ -866,7 +866,7 @@ In `docs/research/ios_sensor_spike_protocol.md`, define these exact runs: statio
 
 - [ ] **Step 3: Create the native Core Location project and model on macOS**
 
-In Xcode, create an iOS App named `SensorSpike` at `ios/SensorSpike`, with SwiftUI lifecycle, Swift language, bundle identifier `com.somewhere.sensorspike`, and minimum iOS 18. Add a unit-test target named `SensorSpikeTests`. Set `NSLocationWhenInUseUsageDescription` to `Somewhere uses location and heading only for this supervised sensor feasibility test.` Do not enable background location in this spike.
+In Xcode, create an iOS App named `SensorSpike` at `ios/SensorSpike`, with SwiftUI lifecycle, Swift language, bundle identifier `com.rollthecompass.sensorspike`, and minimum iOS 18. Add a unit-test target named `SensorSpikeTests`. Set `NSLocationWhenInUseUsageDescription` to `Roll the compass! uses location and heading only for this supervised sensor feasibility test.` Do not enable background location in this spike.
 
 ```swift
 // ios/SensorSpike/SensorSpike/LocationHeadingModel.swift

@@ -1,4 +1,4 @@
-# Somewhere 시퀀스 공유 묶음
+# Roll the compass! 시퀀스 공유 묶음
 
 이 폴더는 앱 시퀀스만 공유하기 위한 문서 묶음입니다. 실행 가능한 프로토타입 파일은 `prototype/vnext/`에 따로 있으며, 이 문서 묶음은 GitHub Pages artifact에 포함되지 않습니다.
 

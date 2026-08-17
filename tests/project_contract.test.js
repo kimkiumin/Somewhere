@@ -15,6 +15,27 @@ test("package metadata uses the Roll the compass technical name", () => {
   assert.equal(packageJson.name, "roll-the-compass-vnext");
 });
 
+test("active project surfaces use the Roll the compass public name", () => {
+  const brandedFiles = [
+    "README.md",
+    "BLUEPRINT.md",
+    "docs/blueprint/app_sequence.md",
+    "docs/blueprint/product_contract.md",
+    "docs/blueprint/validation_plan.md",
+    "docs/sequence/README.md",
+    "docs/sequence/sequence_share.md",
+    "docs/superpowers/specs/2026-07-22-feasibility-validation-design.md",
+    "docs/superpowers/specs/2026-07-26-somewhere-app-sequence-prototype-design.md",
+    "prototype/vnext/README.md",
+    "spikes/web-sensors/index.html",
+    "ios/SensorSpike/README.md",
+  ];
+
+  for (const file of brandedFiles) {
+    assert.match(read(file), /Roll the compass!/, `${file} is missing the public name`);
+  }
+});
+
 test("repository declares the approved vNext source hierarchy", () => {
   const agents = read("AGENTS.md");
   const readme = read("README.md");

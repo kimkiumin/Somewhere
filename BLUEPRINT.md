@@ -1,4 +1,4 @@
-# Somewhere Full Development Blueprint
+# Roll the compass! Full Development Blueprint
 
 Status: approved written blueprint (2026-07-21)
 
@@ -8,13 +8,13 @@ Scope: product, UX, recommendation, navigation, iOS, physical product, validatio
 
 ## 1. Product Definition
 
-> Somewhere는 사용자가 정한 최소 조건 안에서 갈 만한 장소 하나를 빠르게 확정해, 여러 후보를 비교하지 않고 출발하게 만드는 숨겨진 목적지 서비스다.
+> Roll the compass!는 사용자가 정한 최소 조건 안에서 갈 만한 장소 하나를 빠르게 확정해, 여러 후보를 비교하지 않고 출발하게 만드는 숨겨진 목적지 서비스다.
 
 The product is not defined by a fixed party size. The first field validation prioritizes two close participants choosing a restaurant or cafe because the existing survey most clearly exposes coordination and selection burden in that context.
 
 ## 2. Core Promise
 
-Somewhere is responsible for two outcomes:
+Roll the compass! is responsible for two outcomes:
 
 1. Select one evidence-qualified destination quickly within non-negotiable constraints.
 2. Move the user from comparison to departure without presenting a candidate list.

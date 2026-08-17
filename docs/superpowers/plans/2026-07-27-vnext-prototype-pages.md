@@ -1,4 +1,4 @@
-# Somewhere vNext Prototype Pages Implementation Plan
+# Roll the compass! vNext Prototype Pages Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -177,7 +177,7 @@ Run this PowerShell-only equivalent of the workflow staging step in a verified, 
 
 ```powershell
 $tempRoot = [System.IO.Path]::GetFullPath($env:TEMP)
-$stage = [System.IO.Path]::GetFullPath((Join-Path $tempRoot ('somewhere-vnext-pages-check-' + [guid]::NewGuid())))
+$stage = [System.IO.Path]::GetFullPath((Join-Path $tempRoot ('roll-the-compass-vnext-pages-check-' + [guid]::NewGuid())))
 if (-not $stage.StartsWith($tempRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
   throw 'Disposable stage escaped the temp root'
 }
@@ -305,17 +305,17 @@ Load the current CLI workflow, then open the site:
 
 ```powershell
 agent-browser.cmd skills get core
-agent-browser.cmd --session somewhere-pages open 'https://kimkiumin.github.io/Somewhere/'
-agent-browser.cmd --session somewhere-pages snapshot -i
+agent-browser.cmd --session roll-the-compass-pages open 'https://kimkiumin.github.io/Somewhere/'
+agent-browser.cmd --session roll-the-compass-pages snapshot -i
 ```
 
 Verify with fresh refs after every transition:
 
-- page title is `Somewhere vNext 시퀀스 프로토타입`;
+- page title is `Roll the compass! vNext 시퀀스 프로토타입`;
 - `시작하기` opens constraints;
 - the sole CTA `이 조건으로 바로 출발` enters finding and then following;
 - CSS is applied and JavaScript state transitions work;
-- `agent-browser.cmd --session somewhere-pages console` and `errors` are empty.
+- `agent-browser.cmd --session roll-the-compass-pages console` and `errors` are empty.
 
 Keep the session open only if the user is actively viewing it; otherwise close it.
 

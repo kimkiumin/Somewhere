@@ -1,8 +1,8 @@
-# Somewhere vNext Sequence Prototype Implementation Plan
+# Roll the compass! vNext Sequence Prototype Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build an isolated, monochrome browser prototype that demonstrates the approved single-action Somewhere vNext journey, fixed-size compass, Stop-gated destination Reveal with a skippable reason, arrival disclosure, recovery, and delayed reaction without modifying the historical v0.1 prototype.
+**Goal:** Build an isolated, monochrome browser prototype that demonstrates the approved single-action Roll the compass! vNext journey, fixed-size compass, Stop-gated destination Reveal with a skippable reason, arrival disclosure, recovery, and delayed reaction without modifying the historical v0.1 prototype.
 
 **Architecture:** Add a plain HTML/CSS/JavaScript application under `prototype/vnext/`. A pure reducer owns all legal transitions and produces a disclosure-safe public view model; pure screen renderers consume only that view model; a thin controller supplies deterministic mock destination, timer, distance, permission, confidence, and feedback effects. Existing `prototype/` files remain historical v0.1 evidence.
 
@@ -96,7 +96,7 @@ mount(root, controlsRoot, options?) -> Controller
 
 **Interfaces:**
 - Consumes: reducer actions `{ type: string, ...payload }` and plain JSON destination/route fixtures supplied by later controller code.
-- Produces: `createInitialState`, `validateConstraints`, `reduce`, and `toPublicView` in both `module.exports` and `globalThis.SomewhereVNextState`.
+- Produces: `createInitialState`, `validateConstraints`, `reduce`, and `toPublicView` in both `module.exports` and `globalThis.RollTheCompassVNextState`.
 
 - [ ] **Step 1: Write the failing foundation tests**
 
@@ -302,7 +302,7 @@ Create `prototype/vnext/state.js` with a browser/CommonJS wrapper and these exac
 
   const api = { PHASES, createInitialState, validateConstraints, reduce, toPublicView };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  globalScope.SomewhereVNextState = api;
+  globalScope.RollTheCompassVNextState = api;
 })(typeof globalThis !== "undefined" ? globalThis : window);
 ```
 
@@ -552,7 +552,7 @@ git commit -m "feat: add vnext safety and disclosure states"
 
 **Interfaces:**
 - Consumes: only the `PublicJourneyView` returned by `stateApi.toPublicView`.
-- Produces: `escapeHtml`, `renderProductScreen`, `renderPrototypeControls`, and `renderApp` in both CommonJS and `globalThis.SomewhereVNextScreens`.
+- Produces: `escapeHtml`, `renderProductScreen`, `renderPrototypeControls`, and `renderApp` in both CommonJS and `globalThis.RollTheCompassVNextScreens`.
 
 - [ ] **Step 1: Write failing renderer tests**
 
@@ -770,7 +770,7 @@ git commit -m "feat: render vnext sequence screens"
 
 **Interfaces:**
 - Consumes: Task 2 state API and Task 3 screen API.
-- Produces: `createController(options)` and `mount(root, controlsRoot, options?)` in CommonJS and `globalThis.SomewhereVNextController`; a directly openable browser prototype.
+- Produces: `createController(options)` and `mount(root, controlsRoot, options?)` in CommonJS and `globalThis.RollTheCompassVNextController`; a directly openable browser prototype.
 
 - [ ] **Step 1: Write failing controller-effect tests**
 
@@ -861,7 +861,7 @@ const MOCK_DESTINATION = Object.freeze({
 const MOCK_ROUTE = Object.freeze({ id: "mock-route-01", distanceM: 850, bearingDeg: 40 });
 ```
 
-Expose `{ createController, mount }` on `globalThis.SomewhereVNextController`. Export `{ createController, mount, MOCK_DESTINATION, MOCK_ROUTE }` through CommonJS for tests; do not attach the fixtures to the browser global.
+Expose `{ createController, mount }` on `globalThis.RollTheCompassVNextController`. Export `{ createController, mount, MOCK_DESTINATION, MOCK_ROUTE }` through CommonJS for tests; do not attach the fixtures to the browser global.
 
 `createController` must:
 
@@ -913,10 +913,10 @@ Create `app.js` as bootstrap only:
     const root = globalScope.document?.querySelector("#app");
     const controls = globalScope.document?.querySelector("#prototype-controls");
     if (!root || !controls) return null;
-    return globalScope.SomewhereVNextController.mount(root, controls);
+    return globalScope.RollTheCompassVNextController.mount(root, controls);
   }
   if (typeof module !== "undefined" && module.exports) module.exports = { boot };
-  globalScope.SomewhereVNextApp = { boot };
+  globalScope.RollTheCompassVNextApp = { boot };
   if (globalScope.document) boot();
 })(typeof globalThis !== "undefined" ? globalThis : window);
 ```
@@ -1005,7 +1005,7 @@ test("vNext sequence prototype is isolated from historical v0.1", () => {
 
   const vnextHtml = read("prototype/vnext/index.html");
   const historicalHtml = read("prototype/index.html");
-  assert.match(vnextHtml, /Somewhere vNext/i);
+  assert.match(vnextHtml, /Roll the compass! vNext/i);
   assert.match(historicalHtml, /Blind Compass Prototype/i);
   assert.doesNotMatch(vnextHtml, /prototype\/app\.js/);
 });
@@ -1026,7 +1026,7 @@ Expected: FAIL with `prototype/vnext/README.md is missing`.
 Create `prototype/vnext/README.md` with these exact sections and facts:
 
 ```markdown
-# Somewhere vNext Sequence Prototype
+# Roll the compass! vNext Sequence Prototype
 
 This low-fidelity browser prototype demonstrates the approved vNext sequence. It is not the historical v0.1 prototype and does not use real location, provider, route, notification, BLE, account, or backend services.
 

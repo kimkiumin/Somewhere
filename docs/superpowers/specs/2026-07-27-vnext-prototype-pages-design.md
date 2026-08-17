@@ -1,4 +1,4 @@
-# Somewhere vNext 프로토타입 GitHub Pages 배포 설계
+# Roll the compass! vNext 프로토타입 GitHub Pages 배포 설계
 
 Status: 사용자 승인 설계 — 문서 최종 확인 대기
 
@@ -6,7 +6,7 @@ Date: 2026-07-27
 
 ## 목적
 
-완성된 Somewhere vNext 저충실도 시퀀스 프로토타입을 GitHub에서 링크 하나로 실행할 수 있게 한다. 공개 사이트에는 `prototype/vnext/`의 정적 파일만 포함하고, 청사진·검증 자료·테스트·기존 v0.1 프로토타입과 섞이지 않게 한다.
+완성된 Roll the compass! vNext 저충실도 시퀀스 프로토타입을 GitHub에서 링크 하나로 실행할 수 있게 한다. 공개 사이트에는 `prototype/vnext/`의 정적 파일만 포함하고, 청사진·검증 자료·테스트·기존 v0.1 프로토타입과 섞이지 않게 한다.
 
 이 배포는 프로토타입 접근성을 위한 것이다. 실제 앱, 운영 서비스, 추천 품질, 위치·경로 데이터, iOS, BLE 또는 물리 제품의 구현·배포를 의미하지 않는다.
 
@@ -71,7 +71,7 @@ wireframe-sequence/
 GitHub에서 다음 세 위치가 이 결과물이 프로토타입임을 명시한다.
 
 1. Pages 워크플로 이름: `Prototype — vNext Sequence`
-2. 브라우저 문서 제목: `Somewhere vNext 시퀀스 프로토타입`
+2. 브라우저 문서 제목: `Roll the compass! vNext 시퀀스 프로토타입`
 3. `prototype/vnext/README.md`의 첫 설명과 공개 URL
 
 제품 화면 안에는 새로운 배지나 장식 요소를 넣지 않는다. 제품 캔버스와 별도로 존재하는 현재 `프로토타입 제어 — 실제 앱 UI 아님` 표시를 유지한다.
@@ -134,7 +134,7 @@ permissions:
 - GitHub Actions run이 성공했는지 확인
 - GitHub Pages API가 `build_type: workflow`과 공개 URL을 반환하는지 확인
 - 공개 URL이 HTTP 200을 반환하는지 확인
-- 문서 제목이 `Somewhere vNext 시퀀스 프로토타입`인지 확인
+- 문서 제목이 `Roll the compass! vNext 시퀀스 프로토타입`인지 확인
 - CSS와 JavaScript가 200으로 로드되는지 확인
 - 첫 화면과 한 단계 이상의 상호작용이 동작하는지 브라우저에서 확인
 - 브라우저 콘솔 오류가 없는지 확인

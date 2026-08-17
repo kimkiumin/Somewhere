@@ -1,4 +1,4 @@
-# Somewhere vNext App Sequence Prototype Design
+# Roll the compass! vNext App Sequence Prototype Design
 
 Status: approved sequence captured for final written review
 
@@ -8,7 +8,7 @@ Constraint-screen amendment: 2026-08-12
 
 ## Purpose
 
-Build a low-fidelity browser prototype that makes the approved Somewhere vNext app sequence tangible before visual styling or native implementation. The prototype demonstrates screen order, disclosure timing, state transitions, and safety/recovery branches. It does not test brand design, recommendation quality, real location, provider data, iOS behavior, or physical hardware.
+Build a low-fidelity browser prototype that makes the approved Roll the compass! vNext app sequence tangible before visual styling or native implementation. The prototype demonstrates screen order, disclosure timing, state transitions, and safety/recovery branches. It does not test brand design, recommendation quality, real location, provider data, iOS behavior, or physical hardware.
 
 ## Authority and Blueprint Amendments
 

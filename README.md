@@ -1,4 +1,4 @@
-# Blind Compass Discovery
+# Roll the compass!
 
 ## vNext Source Priority
 
