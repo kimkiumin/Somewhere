@@ -20,7 +20,7 @@ const runtimeFiles = [
 
 test("Pages artifact isolates the runnable vNext prototype under its own public path", () => {
   const tempRoot = fs.realpathSync(os.tmpdir());
-  const workspace = fs.mkdtempSync(path.join(tempRoot, "somewhere-pages-contract-"));
+  const workspace = fs.mkdtempSync(path.join(tempRoot, "roll-the-compass-pages-contract-"));
   const source = path.join(workspace, "source");
   const destination = path.join(workspace, "site");
 

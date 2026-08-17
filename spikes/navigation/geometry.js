@@ -74,5 +74,5 @@
 
   const api = { bearingDelta, trueBearing };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  globalScope.SomewhereGeometry = api;
+  globalScope.RollTheCompassGeometry = api;
 })(typeof globalThis !== "undefined" ? globalThis : window);

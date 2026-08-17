@@ -118,8 +118,8 @@ test("mock destination is complete for arrival but is not exposed on the browser
   assert.equal(typeof MOCK_DESTINATION.recommendationReason, "string");
   assert.equal(typeof MOCK_DESTINATION.reviewSummary, "string");
   assert.equal(Number.isFinite(MOCK_ROUTE.distanceM), true);
-  assert.equal(globalThis.SomewhereVNextController.MOCK_DESTINATION, undefined);
-  assert.equal(globalThis.SomewhereVNextController.MOCK_ROUTE, undefined);
+  assert.equal(globalThis.RollTheCompassVNextController.MOCK_DESTINATION, undefined);
+  assert.equal(globalThis.RollTheCompassVNextController.MOCK_ROUTE, undefined);
 });
 
 test("mock route contains ordered turn steps for the navigation prototype", () => {
@@ -718,7 +718,7 @@ test("CommonJS test inspection is separate from browser and mounted production A
   const rendered = [];
   const scheduled = [];
   let interceptedDestination = null;
-  const browserController = globalThis.SomewhereVNextController.createController({
+  const browserController = globalThis.RollTheCompassVNextController.createController({
     initialState: stateApi.createInitialState({ firstUse: false }),
     render: (publicView) => rendered.push(publicView),
     schedule: (callback) => { scheduled.push(callback); return scheduled.length; },
@@ -738,7 +738,7 @@ test("CommonJS test inspection is separate from browser and mounted production A
 
   const root = createEventRoot();
   const controlsRoot = createEventRoot();
-  const mounted = globalThis.SomewhereVNextController.mount(root, controlsRoot, {
+  const mounted = globalThis.RollTheCompassVNextController.mount(root, controlsRoot, {
     initialState: stateApi.createInitialState({ firstUse: false }),
   });
   assert.equal(mounted.controller.getState, undefined);
@@ -760,6 +760,8 @@ test("app boot return value cannot inspect private controller state", () => {
     delete globalThis.document;
     delete require.cache[require.resolve("./app.js")];
     const { boot } = require("./app.js");
+    assert.equal(globalThis.RollTheCompassVNextApp.boot, boot);
+    assert.equal(globalThis.SomewhereVNextApp, undefined);
     globalThis.document = {
       querySelector(selector) {
         if (selector === "#app") return root;

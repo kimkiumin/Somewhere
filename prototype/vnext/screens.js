@@ -604,5 +604,5 @@
     renderPrototypeControls, renderApp,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  globalScope.SomewhereVNextScreens = api;
+  globalScope.RollTheCompassVNextScreens = api;
 })(typeof globalThis !== "undefined" ? globalThis : window);

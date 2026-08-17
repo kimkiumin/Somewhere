@@ -95,8 +95,8 @@
   }
 
   function createControllerCore(options = {}, inspectable = false) {
-    const stateApi = options.stateApi || loadApi(globalScope.SomewhereVNextState, "./state.js");
-    if (!stateApi) throw new Error("Somewhere vNext state API is required.");
+    const stateApi = options.stateApi || loadApi(globalScope.RollTheCompassVNextState, "./state.js");
+    if (!stateApi) throw new Error("Roll the compass! vNext state API is required.");
 
     const render = typeof options.render === "function" ? options.render : () => {};
     const schedule = typeof options.schedule === "function" ? options.schedule : globalScope.setTimeout.bind(globalScope);
@@ -215,7 +215,7 @@
   function createController(options = {}) {
     return createControllerCore({
       ...options,
-      stateApi: loadApi(globalScope.SomewhereVNextState, "./state.js"),
+      stateApi: loadApi(globalScope.RollTheCompassVNextState, "./state.js"),
     });
   }
 
@@ -225,8 +225,8 @@
 
   function mountController(root, controlsRoot, options = {}, inspectable = false) {
     if (!root || !controlsRoot) throw new Error("Product and prototype-control roots are required.");
-    const screens = options.screens || loadApi(globalScope.SomewhereVNextScreens, "./screens.js");
-    if (!screens) throw new Error("Somewhere vNext screen API is required.");
+    const screens = options.screens || loadApi(globalScope.RollTheCompassVNextScreens, "./screens.js");
+    if (!screens) throw new Error("Roll the compass! vNext screen API is required.");
 
     const FormDataType = options.FormData || globalScope.FormData;
     const controllerFactory = inspectable ? createTestController : createController;
@@ -491,5 +491,5 @@
       MOCK_ROUTE,
     };
   }
-  globalScope.SomewhereVNextController = browserApi;
+  globalScope.RollTheCompassVNextController = browserApi;
 })(typeof globalThis !== "undefined" ? globalThis : window);

@@ -4,6 +4,11 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const stateApi = require("./state.js");
 
+test("state exposes the CommonJS API under the Roll the compass browser namespace", () => {
+  assert.equal(globalThis.RollTheCompassVNextState, stateApi);
+  assert.equal(globalThis.SomewhereVNextState, undefined);
+});
+
 function validConstraints() {
   return {
     category: "restaurant",

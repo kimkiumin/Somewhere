@@ -4,6 +4,11 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const screens = require("./screens.js");
 
+test("screens expose the CommonJS API under the Roll the compass browser namespace", () => {
+  assert.equal(globalThis.RollTheCompassVNextScreens, screens);
+  assert.equal(globalThis.SomewhereVNextScreens, undefined);
+});
+
 function view(overrides = {}) {
   return {
     phase: "constraints",

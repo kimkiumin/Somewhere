@@ -507,5 +507,5 @@
     reduce, toPublicView, formatDistance,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  globalScope.SomewhereVNextState = api;
+  globalScope.RollTheCompassVNextState = api;
 })(typeof globalThis !== "undefined" ? globalThis : window);

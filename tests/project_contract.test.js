@@ -10,6 +10,11 @@ const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const extractTitle = (html) => html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1].trim() ?? null;
 
+test("package metadata uses the Roll the compass technical name", () => {
+  const packageJson = JSON.parse(read("package.json"));
+  assert.equal(packageJson.name, "roll-the-compass-vnext");
+});
+
 test("repository declares the approved vNext source hierarchy", () => {
   const agents = read("AGENTS.md");
   const readme = read("README.md");
