@@ -56,6 +56,10 @@ h2 {
   font-size: 1rem;
 }
 
+[data-screen-heading]:focus {
+  outline: none;
+}
+
 button,
 input,
 summary {
@@ -106,7 +110,7 @@ form {
 }
 
 .constraints-launch {
-  min-height: max(600px, calc(100svh - 48px));
+  min-height: max(600px, 100svh);
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 20px;
@@ -123,7 +127,10 @@ form {
 .launch-header h1 {
   max-width: 15ch;
   min-width: 0;
+  font-size: clamp(1.35rem, 6.5vw, 1.75rem);
+  line-height: 1;
   overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .launch-action {
@@ -491,7 +498,8 @@ summary {
 }
 
 .compass-needle.is-pointing,
-.compass-needle.is-ready {
+.compass-needle.is-ready,
+.compass-needle.is-searching {
   position: absolute;
   top: 14%;
   left: 50%;
@@ -507,7 +515,8 @@ summary {
 }
 
 .compass-needle.is-pointing::before,
-.compass-needle.is-ready::before {
+.compass-needle.is-ready::before,
+.compass-needle.is-searching::before {
   content: "";
   position: absolute;
   top: -7px;
@@ -545,12 +554,7 @@ summary {
 }
 
 .compass-needle.is-searching {
-  position: absolute;
-  inset: 24%;
-  border: 2px dashed var(--ink);
-  border-radius: 50%;
   animation: searching-direction 2.4s linear infinite;
-  transform-origin: center;
 }
 
 .compass-needle.is-paused {
@@ -565,7 +569,8 @@ summary {
 }
 
 @keyframes searching-direction {
-  to { transform: rotate(360deg); }
+  from { transform: translateX(-50%) rotate(0deg); }
+  to { transform: translateX(-50%) rotate(360deg); }
 }
 
 .guidance-details,
