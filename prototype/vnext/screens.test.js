@@ -41,13 +41,25 @@ function view(overrides = {}) {
   };
 }
 
-test("constraints show one start action and collapsed advanced settings", () => {
+test("constraints show one compass start action and collapsed advanced settings", () => {
   const html = screens.renderProductScreen(view());
-  assert.match(html, />이 조건으로 바로 출발<\/button>/);
+  assert.match(html, /<button[^>]*class="compass-shell compass-action"[^>]*data-action="start"/);
+  assert.match(html, /aria-label="이 조건으로 바로 출발"/);
+  assert.match(html, /compass-needle is-ready/);
+  assert.match(html, /<span class="compass-action-label">출발<\/span>/);
+  assert.doesNotMatch(html, />이 조건으로 바로 출발<\/button>/);
   assert.match(html, /<details[^>]*data-advanced-conditions/);
   assert.doesNotMatch(html, /<details[^>]*data-advanced-conditions[^>]*\sopen(?:\s|>)/);
   assert.equal((html.match(/data-action="start"/g) || []).length, 1);
   assert.doesNotMatch(html, /Reroll|다시 추천/);
+});
+
+test("constraints keep the launch viewport before the below-fold settings", () => {
+  const html = screens.renderProductScreen(view());
+  assert.ok(html.indexOf("constraints-launch") < html.indexOf("지금 필요한 조건"));
+  assert.match(html, /<section[^>]*class="condition-settings"[^>]*id="condition-settings"/);
+  assert.match(html, /href="#condition-settings"[^>]*>조건 설정<\/a>/);
+  assert.ok(html.indexOf('data-action="start"') < html.indexOf('id="condition-settings"'));
 });
 
 test("constraints no longer expose accessibility as an active condition", () => {
@@ -243,16 +255,16 @@ test("guarded recovery renders a distinct review for every preserved Stop reason
     assert.match(html, instruction, reason);
     assert.equal((html.match(/name="recoveryReviewed"/g) || []).length, 1, reason);
     assert.equal((html.match(/data-action="start"/g) || []).length, 1, reason);
-    assert.match(html, />이 조건으로 바로 출발<\/button>/, reason);
+    assert.match(html, /class="compass-shell compass-action"/, reason);
+    assert.match(html, /aria-label="이 조건으로 바로 출발"/, reason);
   }
 });
 
-test("constraints and finding do not render a compass", () => {
-  assert.doesNotMatch(screens.renderProductScreen(view()), /compass-shell/);
-  assert.doesNotMatch(
-    screens.renderProductScreen(view({ phase: "finding" })),
-    /compass-shell/,
-  );
+test("finding reuses the compass shell with a searching needle", () => {
+  const html = screens.renderProductScreen(view({ phase: "finding" }));
+  assert.match(html, /class="compass-shell"/);
+  assert.match(html, /compass-needle is-searching/);
+  assert.doesNotMatch(html, /compass-needle is-pointing|data-action="start"/);
 });
 
 test("following and near keep the compass needle with concise navigation guidance", () => {

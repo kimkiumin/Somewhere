@@ -42,22 +42,32 @@
     }[maneuver] || "다음 안내";
   }
 
-  function renderCompassShell(view) {
+  function renderCompassShell(view, options = {}) {
     const canPoint = view.needleMode === "pointing" && Number.isFinite(view.bearingDeg);
-    const needleClass = canPoint
-      ? "compass-needle is-pointing"
+    const needleState = canPoint
+      ? "is-pointing"
       : view.needleMode === "paused"
-        ? "compass-needle is-paused"
-        : "compass-needle is-searching";
+        ? "is-paused"
+        : view.needleMode === "ready"
+          ? "is-ready"
+          : "is-searching";
     const needleStyle = canPoint ? ` style="--bearing:${view.bearingDeg}deg"` : "";
     const status = canPoint
       ? "검증된 경로 방향을 가리키고 있어요"
       : view.needleMode === "paused"
         ? "안내 일시정지"
-        : "방향을 확인하고 있어요";
-    return `<div class="compass-shell" role="img" aria-label="${escapeHtml(status)}">
-      <div class="compass-needle ${needleClass.replace("compass-needle ", "")}"${needleStyle} aria-hidden="true"></div>
-    </div>`;
+        : view.needleMode === "ready"
+          ? "이 조건으로 바로 출발"
+          : "방향을 확인하고 있어요";
+    const compassContent = `<span class="compass-north" aria-hidden="true">N</span>
+      <span class="compass-needle ${needleState}"${needleStyle} aria-hidden="true"></span>`;
+    if (options.action === "start") {
+      return `<button type="button" class="compass-shell compass-action" data-action="start" aria-label="이 조건으로 바로 출발">
+        ${compassContent}
+        <span class="compass-action-label">출발</span>
+      </button>`;
+    }
+    return `<div class="compass-shell" role="img" aria-label="${escapeHtml(status)}">${compassContent}</div>`;
   }
 
   function navigationStatus(view) {
@@ -346,14 +356,23 @@
     const budgetAmount = budgetAmountForIndex(budgetStep);
     const disclosure = constraints.disclosure === "private" ? "private" : "minimal";
     const advancedSummary = summarizeAdvancedConditions(constraints);
-    return `<header class="screen-header">
-        <h1>지금 필요한 조건</h1>
-        ${renderProfileMenu(view)}
-      </header>
-      <p>최소 조건만 정하면 한 곳으로 바로 출발해요.</p>
-      ${renderConstraintErrors(view.errors)}
-      ${renderAffectedConditions(view.affectedConditions)}
-      <form data-form="constraints">
+    return `<form data-form="constraints" class="constraints-home">
+      <section class="constraints-launch">
+        <header class="launch-header">
+          <h1>Roll the compass!</h1>
+          ${renderProfileMenu(view)}
+        </header>
+        <div class="launch-action">
+          <p>나침반을 눌러 한 곳으로 출발해요.</p>
+          ${renderCompassShell({ needleMode: "ready" }, { action: "start" })}
+        </div>
+        <a class="condition-scroll-cue" href="#condition-settings">조건 설정</a>
+      </section>
+      <section class="condition-settings" id="condition-settings" aria-labelledby="condition-settings-title">
+        <h2 id="condition-settings-title">지금 필요한 조건</h2>
+        <p>출발 전에 필요한 값을 조정할 수 있어요.</p>
+        ${renderConstraintErrors(view.errors)}
+        ${renderAffectedConditions(view.affectedConditions)}
         <input type="hidden" name="category" value="restaurant">
         ${renderPartySelector(constraints)}
         <div class="slider-field"><label for="walk-time-slider">도보 시간 <output id="walk-time-value">${escapeHtml(minutes)}분</output></label><input id="walk-time-slider" name="maxWalkMinutes" type="range" min="5" max="60" step="5" value="${escapeHtml(minutes)}" data-slider="walk" aria-label="최대 도보 시간"></div>
@@ -366,13 +385,14 @@
           </select></label>
         </details>
         ${renderGuardedRecovery(view)}
-        ${action("이 조건으로 바로 출발", "start")}
-      </form>`;
+      </section>
+    </form>`;
   }
 
   function renderFinding() {
     return `<h1>한 곳을 고르고 있어요</h1>
-      <p>조건에 맞는 목적지와 걸을 길을 확인 중이에요.</p>`;
+      ${renderCompassShell({ needleMode: "searching" })}
+      <p aria-live="polite">조건에 맞는 목적지와 걸을 길을 확인 중이에요.</p>`;
   }
 
   function renderDisclosedIdentity(view) {
