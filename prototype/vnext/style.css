@@ -94,17 +94,71 @@ form {
   margin-top: 8px;
 }
 
-.screen-header {
+.product-screen[data-phase="constraints"] {
+  display: block;
+  min-height: 0;
+  padding: 0;
+}
+
+.constraints-home {
+  display: block;
+  margin: 0;
+}
+
+.constraints-launch {
+  min-height: max(600px, calc(100svh - 48px));
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 20px;
+  padding: clamp(24px, 7vw, 40px);
+}
+
+.launch-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
 
-.screen-header h1 {
+.launch-header h1 {
   max-width: 15ch;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.launch-action {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.launch-action > p {
+  max-width: 22ch;
+}
+
+.condition-scroll-cue {
+  justify-self: center;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink);
+  font-weight: 700;
+  text-underline-offset: 4px;
+}
+
+.condition-settings {
+  display: grid;
+  gap: 16px;
+  padding: clamp(32px, 8vw, 48px) clamp(24px, 7vw, 40px);
+  border-top: 1px solid var(--ink);
+}
+
+.condition-settings h2 {
+  font-size: clamp(1.5rem, 6vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
 }
 
 .profile-menu-wrap {
@@ -416,15 +470,18 @@ summary {
 
 .compass-shell {
   position: relative;
+  display: block;
   width: var(--compass-size);
   height: var(--compass-size);
   margin: 2px auto;
+  padding: 0;
   border: 2px solid var(--ink);
   border-radius: 50%;
+  color: var(--ink);
+  background: var(--paper);
 }
 
-.compass-shell::before {
-  content: "N";
+.compass-north {
   position: absolute;
   top: 8px;
   left: 50%;
@@ -433,7 +490,8 @@ summary {
   font-weight: 700;
 }
 
-.compass-needle.is-pointing {
+.compass-needle.is-pointing,
+.compass-needle.is-ready {
   position: absolute;
   top: 14%;
   left: 50%;
@@ -444,7 +502,12 @@ summary {
   transform-origin: 50% 100%;
 }
 
-.compass-needle.is-pointing::before {
+.compass-needle.is-ready {
+  transform: translateX(-50%) rotate(-18deg);
+}
+
+.compass-needle.is-pointing::before,
+.compass-needle.is-ready::before {
   content: "";
   position: absolute;
   top: -7px;
@@ -454,6 +517,31 @@ summary {
   border-top: 2px solid var(--ink);
   border-left: 2px solid var(--ink);
   transform: translateX(-50%) rotate(45deg);
+}
+
+.compass-action {
+  min-height: 0;
+  cursor: pointer;
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.compass-action:hover {
+  background: var(--paper);
+  transform: scale(1.015);
+}
+
+.compass-action:active {
+  transform: scale(0.985);
+}
+
+.compass-action-label {
+  position: absolute;
+  bottom: 18%;
+  left: 50%;
+  translate: -50% 0;
+  padding: 2px 8px;
+  background: var(--paper);
+  font-weight: 800;
 }
 
 .compass-needle.is-searching {
@@ -630,6 +718,7 @@ dd {
 
   .navigation-guidance,
   .next-action,
+  .compass-action,
   .compass-needle.is-searching {
     transition: none !important;
   }
