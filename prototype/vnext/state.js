@@ -2,7 +2,7 @@
 
 (function initState(globalScope) {
   const PHASES = Object.freeze([
-    "onboarding", "profile_setup", "profile", "constraints", "finding", "following", "near",
+    "splash", "onboarding", "profile_setup", "profile", "constraints", "finding", "following", "near",
     "paused", "reveal_reason", "revealed", "following_revealed",
     "stop_confirm", "stop_reason", "stopped", "route_recovery",
     "recomputing", "external_map_warning", "external_map_handoff",
@@ -40,7 +40,7 @@
 
   function createInitialState({ firstUse = true, permission = "authorized" } = {}) {
     return {
-      phase: firstUse ? "onboarding" : "constraints",
+      phase: firstUse ? "splash" : "constraints",
       constraints: defaultConstraints(),
       profile: { dietary: [], allergies: [] },
       errors: {},
@@ -70,20 +70,20 @@
   function validateConstraints(value) {
     const errors = {};
     if (!value || value.category !== "restaurant") {
-      errors.category = "식당 조건을 확인해 주세요.";
+      errors.category = "Check the restaurant condition.";
     }
     if (!Number.isInteger(value?.partySize) || value.partySize < 1 || value.partySize > 5) {
-      errors.partySize = "함께 가는 인원은 1명 이상 5명 이하로 선택해 주세요.";
+      errors.partySize = "Choose a party size from 1 to 5 people.";
     }
     if (!Number.isFinite(value?.maxWalkMinutes) || value.maxWalkMinutes < 1) {
-      errors.maxWalkMinutes = "도보 시간은 1분 이상이어야 합니다.";
+      errors.maxWalkMinutes = "Walk time must be at least 1 minute.";
     }
     if (value?.budget != null) {
       const budget = Number.isFinite(value.budget)
         ? value.budget
         : Number(String(value.budget).replace(/[^0-9]/g, ""));
       if (!Number.isFinite(budget) || budget < 4_000) {
-        errors.budget = "예산은 4,000원 이상이어야 합니다.";
+        errors.budget = "Budget must be at least 4,000 KRW.";
       }
     }
     return { valid: Object.keys(errors).length === 0, errors };
@@ -146,7 +146,7 @@
       : [{
         id: `${value.id || "route"}-straight`,
         maneuver: "STRAIGHT",
-        instruction: "현재 길로 계속 이동해요",
+        instruction: "Continue on the current path",
         distanceM: value.distanceM,
         heading: typeof value.currentHeading === "string" ? value.currentHeading : null,
         road: null,
@@ -170,7 +170,7 @@
           currentHeading: typeof step.heading === "string" ? step.heading : null,
           nextStep: {
             maneuver: typeof step.maneuver === "string" ? step.maneuver : "STRAIGHT",
-            instruction: typeof step.instruction === "string" ? step.instruction : "현재 길로 계속 이동해요",
+            instruction: typeof step.instruction === "string" ? step.instruction : "Continue on the current path",
             road: typeof step.road === "string" ? step.road : null,
           },
           distanceToNextM: Math.max(0, Math.round(traversedM + stepDistanceM - progressM)),
@@ -183,6 +183,9 @@
 
   function reduce(state, action) {
     if (!state || !action || typeof action.type !== "string") return state;
+    if (action.type === "SPLASH_COMPLETE" && state.phase === "splash") {
+      return { ...state, phase: "profile_setup" };
+    }
     if (action.type === "CONTINUE_ONBOARDING" && state.phase === "onboarding") {
       return { ...state, phase: "profile_setup" };
     }
@@ -238,7 +241,7 @@
           errors: {
             ...result.errors,
             ...(requiresRecoveryReview ? {
-              recoveryReview: "최근 안내 종료 이유와 새 출발 조건을 확인해 주세요.",
+              recoveryReview: "Review the recent stop reason and new starting conditions.",
             } : {}),
           },
         };
@@ -260,7 +263,7 @@
           ...state,
           phase: "constraints",
           committed: false,
-          errors: { finding: "장소와 경로를 준비하지 못했습니다. 조건을 다시 확인해 주세요." },
+          errors: { finding: "The place and route could not be prepared. Review your conditions." },
         };
       }
       const route = normalizeRoute(action.route);
@@ -282,7 +285,7 @@
         phase: "constraints",
         committed: false,
         affectedConditions,
-        errors: { finding: "필수 조건을 모두 충족하는 장소를 찾지 못했습니다." },
+        errors: { finding: "No place matched all required conditions." },
       };
     }
     if (
@@ -295,7 +298,7 @@
         committed: false,
         errors: {
           ...state.errors,
-          locationPermission: "계속하려면 위치 권한이 필요합니다. 권한 설정을 확인해 주세요.",
+          locationPermission: "Location permission is required to continue. Check your permission settings.",
         },
       };
     }
@@ -507,5 +510,5 @@
     reduce, toPublicView, formatDistance,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  globalScope.SomewhereVNextState = api;
+  globalScope.RollTheCompassVNextState = api;
 })(typeof globalThis !== "undefined" ? globalThis : window);

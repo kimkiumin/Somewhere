@@ -3,13 +3,13 @@
 (function initController(globalScope) {
   const MOCK_DESTINATION = Object.freeze({
     id: "pilot-restaurant-01",
-    name: "온담식당",
-    building: "해빛가 빌딩",
-    floorUnit: "2층 201호",
+    name: "Ondam Kitchen",
+    building: "Haebitga Building",
+    floorUnit: "2F, Unit 201",
     photoUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Crect width='640' height='360' fill='%23ece8df'/%3E%3Crect x='88' y='76' width='464' height='220' rx='8' fill='%23fff' stroke='%23111111' stroke-width='6'/%3E%3Cpath d='M88 158h464' stroke='%23111111' stroke-width='6'/%3E%3Ccircle cx='178' cy='118' r='20' fill='%23111111'/%3E%3Cpath d='M125 272l110-98 86 70 67-52 128 80' fill='none' stroke='%23111111' stroke-width='9'/%3E%3C/svg%3E",
-    recommendationReason: "도보 시간과 예산 안에서 일행의 조건 충돌이 적은 곳으로 판단했어요.",
-    reviewSummary: "담백한 메뉴와 빠른 식사 동선이 좋다는 후기가 많아요.",
-    menu: "국수",
+    recommendationReason: "A balanced match for the party's dietary needs, walk time, and budget.",
+    reviewSummary: "Guests often mention the clean menu and quick, easy meal flow.",
+    menu: "Noodles",
     priceBand: "₩₩",
   });
   const MOCK_ROUTE = Object.freeze({
@@ -20,33 +20,33 @@
       Object.freeze({
         id: "mock-step-1",
         maneuver: "STRAIGHT",
-        instruction: "현재 길로 180m 직진해요",
+        instruction: "Continue straight for 180 m",
         distanceM: 180,
-        heading: "동쪽",
-        road: "테스트로",
+        heading: "East",
+        road: "Test Road",
       }),
       Object.freeze({
         id: "mock-step-2",
         maneuver: "TURN_RIGHT",
-        instruction: "260m 뒤 오른쪽으로 돌아 테스트길로 들어가요",
+        instruction: "Turn right in 260 m onto Test Road",
         distanceM: 260,
-        heading: "남쪽",
-        road: "테스트길",
+        heading: "South",
+        road: "Test Road",
       }),
       Object.freeze({
         id: "mock-step-3",
         maneuver: "TURN_LEFT",
-        instruction: "210m 뒤 왼쪽으로 돌아 골목으로 들어가요",
+        instruction: "Turn left in 210 m into the alley",
         distanceM: 210,
-        heading: "동쪽",
-        road: "안내 골목",
+        heading: "East",
+        road: "Guide Alley",
       }),
       Object.freeze({
         id: "mock-step-4",
         maneuver: "ARRIVE",
-        instruction: "200m 뒤 목적지 근처에 도착해요",
+        instruction: "Arrive near the destination in 200 m",
         distanceM: 200,
-        heading: "동쪽",
+        heading: "East",
         road: null,
       }),
     ]),
@@ -60,6 +60,7 @@
     "NEW_RECOMMENDATION",
     "CHECK_FEEDBACK",
   ]);
+  const SPLASH_DURATION_MS = 3_000;
 
   function loadApi(browserApi, modulePath) {
     if (browserApi) return browserApi;
@@ -78,25 +79,25 @@
       ? constraints.budget
       : Number(String(constraints?.budget ?? "").replace(/[^0-9]/g, ""));
     if (Number.isFinite(budget) && budget > 0) {
-      affected.push({ field: "budget", label: "예산" });
+      affected.push({ field: "budget", label: "Budget" });
     }
     if (Array.isArray(constraints?.dietary) && constraints.dietary.length > 0) {
-      affected.push({ field: "dietary", label: "식이 조건" });
+      affected.push({ field: "dietary", label: "Dietary preferences" });
     }
     if (Array.isArray(constraints?.allergies) && constraints.allergies.length > 0) {
-      affected.push({ field: "allergies", label: "알레르기" });
+      affected.push({ field: "allergies", label: "Allergies" });
     }
     if (constraints?.disclosure === "private") {
-      affected.push({ field: "disclosure", label: "목적지 공개 수준" });
+      affected.push({ field: "disclosure", label: "Destination disclosure" });
     }
     return affected.length > 0
       ? affected
-      : [{ field: "maxWalkMinutes", label: "최대 도보 시간" }];
+      : [{ field: "maxWalkMinutes", label: "Maximum walk time" }];
   }
 
   function createControllerCore(options = {}, inspectable = false) {
-    const stateApi = options.stateApi || loadApi(globalScope.SomewhereVNextState, "./state.js");
-    if (!stateApi) throw new Error("Somewhere vNext state API is required.");
+    const stateApi = options.stateApi || loadApi(globalScope.RollTheCompassVNextState, "./state.js");
+    if (!stateApi) throw new Error("Roll the compass! vNext state API is required.");
 
     const render = typeof options.render === "function" ? options.render : () => {};
     const schedule = typeof options.schedule === "function" ? options.schedule : globalScope.setTimeout.bind(globalScope);
@@ -128,7 +129,7 @@
       if (next === previous) return false;
 
       state = next;
-      if (previous.phase === "finding" && next.phase !== "finding") {
+      if (["finding", "splash"].includes(previous.phase) && next.phase !== previous.phase) {
         cancelPendingEffect();
       }
       renderCurrent();
@@ -149,6 +150,18 @@
           route: MOCK_ROUTE,
         });
       }, 700);
+    }
+
+    function scheduleSplashCompletion() {
+      if (pendingEffect || destroyed) return;
+      const effect = { active: true, id: null };
+      pendingEffect = effect;
+      effect.id = schedule(() => {
+        if (!effect.active || destroyed || pendingEffect !== effect) return;
+        effect.active = false;
+        pendingEffect = null;
+        dispatch({ type: "SPLASH_COMPLETE" });
+      }, SPLASH_DURATION_MS);
     }
 
     function start(constraints, { recoveryReviewed = false } = {}) {
@@ -207,6 +220,7 @@
     }
 
     renderCurrent();
+    if (state.phase === "splash") scheduleSplashCompletion();
     const controller = { dispatch, start, simulate, destroy };
     if (inspectable) controller.getState = getState;
     return controller;
@@ -215,7 +229,7 @@
   function createController(options = {}) {
     return createControllerCore({
       ...options,
-      stateApi: loadApi(globalScope.SomewhereVNextState, "./state.js"),
+      stateApi: loadApi(globalScope.RollTheCompassVNextState, "./state.js"),
     });
   }
 
@@ -225,8 +239,8 @@
 
   function mountController(root, controlsRoot, options = {}, inspectable = false) {
     if (!root || !controlsRoot) throw new Error("Product and prototype-control roots are required.");
-    const screens = options.screens || loadApi(globalScope.SomewhereVNextScreens, "./screens.js");
-    if (!screens) throw new Error("Somewhere vNext screen API is required.");
+    const screens = options.screens || loadApi(globalScope.RollTheCompassVNextScreens, "./screens.js");
+    if (!screens) throw new Error("Roll the compass! vNext screen API is required.");
 
     const FormDataType = options.FormData || globalScope.FormData;
     const controllerFactory = inspectable ? createTestController : createController;
@@ -291,8 +305,17 @@
       };
     }
 
+    function scrollToSection(selector) {
+      const target = root.querySelector?.(selector);
+      if (!target || typeof target.scrollIntoView !== "function") return;
+      const reducedMotion = globalScope.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+      target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+    }
+
     const productActions = {
       "continue-onboarding": () => controller.dispatch({ type: "CONTINUE_ONBOARDING" }),
+      "scroll-to-conditions": () => scrollToSection("#condition-settings"),
+      "scroll-to-launch": () => scrollToSection("#constraints-launch"),
       "open-profile-menu": () => controller.dispatch({ type: "OPEN_PROFILE_MENU" }),
       "close-profile-menu": () => controller.dispatch({ type: "CLOSE_PROFILE_MENU" }),
       "open-profile-settings": () => controller.dispatch({ type: "OPEN_PROFILE" }),
@@ -376,7 +399,7 @@
       }
       const time = form.querySelector?.('[name="maxWalkMinutes"]');
       const timeOutput = form.querySelector?.("#walk-time-value");
-      if (time && timeOutput) timeOutput.textContent = `${time.value}분`;
+      if (time && timeOutput) timeOutput.textContent = `${time.value} min`;
       const budget = form.querySelector?.('[name="budget"]');
       const budgetOutput = form.querySelector?.("#budget-value");
       if (budget && budgetOutput) {
@@ -385,7 +408,7 @@
           : null;
         const unlimited = amount == null;
         budget.dataset.budgetAmount = unlimited ? "" : String(amount);
-        budgetOutput.textContent = unlimited ? "상관없음" : `${amount.toLocaleString("ko-KR")}원 이하`;
+        budgetOutput.textContent = unlimited ? "Any budget" : `${amount.toLocaleString("en-US")} or less`;
         if (unlimited) budgetOutput.setAttribute?.("data-budget-unlimited", "");
         else budgetOutput.removeAttribute?.("data-budget-unlimited");
       }
@@ -491,5 +514,5 @@
       MOCK_ROUTE,
     };
   }
-  globalScope.SomewhereVNextController = browserApi;
+  globalScope.RollTheCompassVNextController = browserApi;
 })(typeof globalThis !== "undefined" ? globalThis : window);

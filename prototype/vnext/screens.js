@@ -14,22 +14,26 @@
     return `<button type="button" data-action="${escapeHtml(name)}"${attributes}>${escapeHtml(label)}</button>`;
   }
 
+  function screenHeading(label) {
+    return `<h1 class="screen-heading screen-heading-visually-hidden">${escapeHtml(label)}</h1>`;
+  }
+
   function formatDistance(distanceM) {
-    if (!Number.isFinite(distanceM)) return "거리 확인 중";
+    if (!Number.isFinite(distanceM)) return "Checking distance";
     if (distanceM < 1000) return `${Math.round(distanceM)} m`;
     return `${(distanceM / 1000).toFixed(1)} km`;
   }
 
   const MANEUVER_LABELS = Object.freeze({
-    STRAIGHT: "직진",
-    TURN_LEFT: "왼쪽",
-    TURN_RIGHT: "오른쪽",
-    U_TURN: "유턴",
-    ARRIVE: "도착",
+    STRAIGHT: "Straight",
+    TURN_LEFT: "Left",
+    TURN_RIGHT: "Right",
+    U_TURN: "U-turn",
+    ARRIVE: "Arrive",
   });
 
   function formatGuidanceDistance(distanceM) {
-    if (!Number.isFinite(distanceM)) return "거리 확인 중";
+    if (!Number.isFinite(distanceM)) return "Checking distance";
     if (distanceM < 1000) return `${Math.round(distanceM)}m`;
     return `${(distanceM / 1000).toFixed(1)}km`;
   }
@@ -37,77 +41,88 @@
   function maneuverLabel(maneuver) {
     return {
       ...MANEUVER_LABELS,
-      TURN_LEFT: "좌회전",
-      TURN_RIGHT: "우회전",
-    }[maneuver] || "다음 안내";
+      TURN_LEFT: "Turn left",
+      TURN_RIGHT: "Turn right",
+    }[maneuver] || "Next step";
   }
 
-  function renderCompassShell(view) {
+  function renderCompassShell(view, options = {}) {
     const canPoint = view.needleMode === "pointing" && Number.isFinite(view.bearingDeg);
-    const needleClass = canPoint
-      ? "compass-needle is-pointing"
+    const needleState = canPoint
+      ? "is-pointing"
       : view.needleMode === "paused"
-        ? "compass-needle is-paused"
-        : "compass-needle is-searching";
+        ? "is-paused"
+        : view.needleMode === "ready"
+          ? "is-ready"
+          : "is-searching";
     const needleStyle = canPoint ? ` style="--bearing:${view.bearingDeg}deg"` : "";
     const status = canPoint
-      ? "검증된 경로 방향을 가리키고 있어요"
+      ? "Pointing"
       : view.needleMode === "paused"
-        ? "안내 일시정지"
-        : "방향을 확인하고 있어요";
-    return `<div class="compass-shell" role="img" aria-label="${escapeHtml(status)}">
-      <div class="compass-needle ${needleClass.replace("compass-needle ", "")}"${needleStyle} aria-hidden="true"></div>
-    </div>`;
+        ? "Paused"
+        : view.needleMode === "ready"
+          ? "Ready to start"
+          : "Searching";
+    const compassContent = `<img class="compass-face" src="./assets/compass-body.png" alt="" aria-hidden="true">
+      <span class="compass-needle ${needleState}"${needleStyle} aria-hidden="true"><img class="compass-needle-image" src="./assets/compass-needle.png" alt=""></span>`;
+    if (options.action === "start") {
+      return `<button type="button" class="compass-shell compass-action" data-action="start" aria-label="Start with these conditions">
+        ${compassContent}
+      </button>`;
+    }
+    return `<div class="compass-shell" role="img" aria-label="${escapeHtml(status)}">${compassContent}</div>`;
   }
 
   function navigationStatus(view) {
-    if (view.routeStatus === "paused" || view.needleMode === "paused") return "안내 일시정지";
+    if (view.routeStatus === "paused" || view.needleMode === "paused") return "Paused";
     if (view.routeStatus === "recovery" || ["route_recovery", "recomputing"].includes(view.phase)) {
-      return "경로를 다시 계산하고 있어요";
+      return "Recalculating route";
     }
-    if (view.routeStatus !== "ready") return "경로 안내를 준비하고 있어요";
-    if (view.phase === "near") return "목적지 근처를 안내하고 있어요";
-    return "길을 따라가고 있어요";
+    if (view.routeStatus !== "ready") return "Checking route";
+    if (view.phase === "near") return "Near destination";
+    return "Following";
   }
 
   function renderNavigationGuidance(view) {
     const status = navigationStatus(view);
     const ready = view.routeStatus === "ready" && view.nextStep && Number.isFinite(view.distanceToNextM);
-    const remaining = Number.isFinite(view.remainingDistanceM) ? formatGuidanceDistance(view.remainingDistanceM) : "거리 확인 중";
+    const remaining = Number.isFinite(view.remainingDistanceM) ? formatGuidanceDistance(view.remainingDistanceM) : "Checking distance";
     const nextStep = ready
       ? `<div class="next-action" data-maneuver="${escapeHtml(view.nextStep.maneuver)}">
           <div>
-            <p class="next-action-label">다음 행동</p>
-            <p class="next-action-title">${escapeHtml(formatGuidanceDistance(view.distanceToNextM))} 뒤 ${escapeHtml(maneuverLabel(view.nextStep.maneuver))}</p>
-            <p class="next-action-instruction">${escapeHtml(view.nextStep.instruction || "다음 안내를 확인해 주세요.")}</p>
+            <p class="next-action-label">Next action</p>
+            <p class="next-action-title">${escapeHtml(formatGuidanceDistance(view.distanceToNextM))} ahead · ${escapeHtml(maneuverLabel(view.nextStep.maneuver))}</p>
           </div>
         </div>`
       : `<div class="next-action is-unavailable" aria-live="polite">
-          <p class="next-action-label">다음 행동</p>
+          <p class="next-action-label">Next action</p>
           <p class="next-action-title">${escapeHtml(status)}</p>
         </div>`;
 
-    return `<section class="navigation-guidance${ready ? " is-ready" : " is-unavailable"}" aria-label="도보 경로 안내">
-      <p class="guidance-status" aria-live="polite">${escapeHtml(status)}</p>
+    return `<section class="navigation-guidance${ready ? " is-ready" : " is-unavailable"}" aria-label="Walking guidance">
       ${nextStep}
       ${renderCompassShell(view)}
       <div class="guidance-summary">
-        <div class="remaining-distance"><span>${view.routeStatus === "paused" ? "마지막 확인 거리" : "목적지까지"}</span><strong>${escapeHtml(remaining)}</strong></div>
+        <div class="remaining-distance"><span>${view.routeStatus === "paused" ? "Last known distance" : "To destination"}</span><strong>${escapeHtml(remaining)}</strong></div>
       </div>
     </section>`;
   }
 
   function renderGuidanceRows(view) {
     return `<dl class="guidance-details">
-      <div><dt>대표 메뉴</dt><dd>${escapeHtml(view.menu ?? "정보 없음")}</dd></div>
-      <div><dt>가격대</dt><dd>${escapeHtml(view.priceBand ?? "정보 없음")}</dd></div>
+      <div><dt>Signature dish</dt><dd>${escapeHtml(view.menu ?? "Not available")}</dd></div>
+      <div><dt>Price range</dt><dd>${escapeHtml(view.priceBand ?? "Not available")}</dd></div>
     </dl>`;
   }
 
+  function renderSplash() {
+    return `<div class="splash-wordmark" aria-label="Roll the compass!">Roll the compass!</div>
+      <div class="splash-loader" role="status" aria-label="Preparing the app"></div>`;
+  }
+
   function renderOnboarding() {
-    return `<h1>Somewhere</h1>
-      <p>한 곳을 정하고, 비교 없이 출발해요. 목적지는 도착하거나 직접 확인할 때까지 숨겨져 있어요.</p>
-      ${action("시작하기", "continue-onboarding")}`;
+    return `<h1>Roll the compass!</h1>
+      ${action("Start", "continue-onboarding")}`;
   }
 
   function renderConstraintErrors(errors) {
@@ -126,107 +141,106 @@
       .join("");
     if (!items) return "";
     return `<section class="no-fit-review" aria-labelledby="no-fit-heading">
-      <h2 id="no-fit-heading">다시 확인할 조건</h2>
+      <h2 id="no-fit-heading">Review these conditions</h2>
       <ul>${items}</ul>
-      <p>조건은 자동으로 완화되지 않았어요.</p>
     </section>`;
   }
 
   const RECOVERY_REVIEWS = Object.freeze({
     safety: {
-      label: "안전 문제",
-      prompt: "안전 관련 조건과 지금 이동해도 괜찮은지 확인해 주세요.",
-      instruction: "자동으로 안내를 재개하지 않아요. 새 추천을 원하는지 직접 확인해 주세요.",
+      label: "Safety issue",
+      prompt: "Check the safety conditions before moving on.",
+      instruction: "Guidance will not resume automatically. Choose whether to get a new recommendation.",
     },
     route_sensor: {
-      label: "경로 또는 센서 문제",
-      prompt: "목적지를 바꾸기 전에 재보정, 경로 재계산, 저장 경로 또는 외부 지도 선택지를 검토해 주세요.",
-      instruction: "검토만으로 안내가 재개되거나 외부 지도가 열리지는 않아요.",
+      label: "Route or sensor issue",
+      prompt: "Review recalibration, route recalculation, a saved route, or an external map before changing the destination.",
+      instruction: "Reviewing options will not resume guidance or open an external map.",
     },
     condition_mismatch: {
-      label: "필수 조건 불일치",
-      prompt: "맞지 않았던 필수 조건을 직접 수정하거나 다시 확인해 주세요.",
-      instruction: "확인 전에는 조건을 완화하거나 새 추천을 시작하지 않아요.",
+      label: "Required condition mismatch",
+      prompt: "Edit or review the required condition before continuing.",
+      instruction: "Conditions will not be relaxed and a new recommendation will not start until you confirm.",
     },
     venue_problem: {
-      label: "장소 현장 문제",
-      prompt: "현장에서 문제가 된 사항과 관련 조건을 직접 수정하거나 다시 확인해 주세요.",
-      instruction: "확인 전에는 조건을 완화하거나 새 추천을 시작하지 않아요.",
+      label: "Venue issue",
+      prompt: "Review the issue at the venue and the related condition before continuing.",
+      instruction: "Conditions will not be relaxed and a new recommendation will not start until you confirm.",
     },
     change_of_mind: {
-      label: "단순 변심",
-      prompt: "새로 출발하기 전에 모든 조건을 짧게 다시 확인해 주세요.",
-      instruction: "확인 뒤에도 출발 버튼을 직접 눌러야 새 추천이 시작돼요.",
+      label: "Changed your mind",
+      prompt: "Review all conditions before starting again.",
+      instruction: "You must press Start to get a new recommendation.",
     },
     schedule_change: {
-      label: "일정 변경",
-      prompt: "이전 여정은 종료되었어요. 지금 일정과 새 출발 조건을 다시 확인해 주세요.",
-      instruction: "이 화면에 돌아와도 자동으로 새 추천을 시작하지 않아요.",
+      label: "Schedule change",
+      prompt: "Review your current schedule and new starting conditions.",
+      instruction: "Returning to this screen will not start a new recommendation automatically.",
     },
     skipped: {
-      label: "이유 건너뜀",
-      prompt: "종료 이유를 건너뛰었어요. 모든 새 출발 조건을 다시 확인해 주세요.",
-      instruction: "확인 뒤에도 출발 버튼을 직접 눌러야 새 추천이 시작돼요.",
+      label: "Reason skipped",
+      prompt: "The stop reason was skipped. Review all new starting conditions.",
+      instruction: "You must press Start to get a new recommendation.",
     },
   });
 
   function renderGuardedRecovery(view) {
     if (!view.guardedRecovery) return "";
     const review = RECOVERY_REVIEWS[view.recoveryReason] ?? {
-      label: "종료 이유 미확인",
-      prompt: "이전 안내 종료 이유와 모든 조건을 다시 확인해 주세요.",
-      instruction: "확인 뒤에도 출발 버튼을 직접 눌러야 새 추천이 시작돼요.",
+      label: "Stop reason not confirmed",
+      prompt: "Review the previous stop reason and all conditions.",
+      instruction: "You must press Start to get a new recommendation.",
     };
     return `<fieldset class="recovery-review">
-      <legend>최근 안내 종료 이유</legend>
+      <legend>Recent stop reason</legend>
       <p class="recovery-reason">${escapeHtml(review.label)}</p>
       <p>${escapeHtml(review.prompt)}</p>
       <p>${escapeHtml(review.instruction)}</p>
-      <label><input type="checkbox" name="recoveryReviewed" value="yes" required> 종료 이유와 새 출발 조건을 확인했어요.</label>
+      <label><input type="checkbox" name="recoveryReviewed" value="yes" required> I reviewed the stop reason and new starting conditions.</label>
     </fieldset>`;
   }
 
   function activeAdvancedConditions(constraints) {
     const active = [];
-    if (Array.isArray(constraints.dietary) && constraints.dietary.length > 0) active.push("식이 조건");
-    if (Array.isArray(constraints.allergies) && constraints.allergies.length > 0) active.push("알레르기");
-    if (constraints.disclosure === "private") active.push("목적지 공개 수준");
+    if (Array.isArray(constraints.dietary) && constraints.dietary.length > 0) active.push("Dietary");
+    if (Array.isArray(constraints.allergies) && constraints.allergies.length > 0) active.push("Allergies");
+    if (constraints.disclosure === "private") active.push("Disclosure");
     return active;
   }
 
   function summarizeAdvancedConditions(constraints) {
     const active = activeAdvancedConditions(constraints || {});
     return active.length === 0
-      ? "추가 조건 없음"
-      : `추가 조건 ${active.length}개 적용 중 — ${active.join(" · ")}`;
+      ? "No additional conditions"
+      : `${active.length} additional conditions · ${active.join(" · ")}`;
   }
 
   const DIETARY_OPTIONS = Object.freeze([
-    ["vegan", "비건", "동물성 식품을 먹지 않음"],
-    ["lacto", "락토", "유제품 허용 · 육류·생선·달걀 제외"],
-    ["ovo", "오보", "달걀 허용 · 유제품·육류·생선 제외"],
-    ["lacto_ovo", "락토-오보", "유제품·달걀 허용 · 육류·생선 제외"],
-    ["pesco", "페스코", "생선·어패류 허용 · 육류·가금류 제외"],
-    ["pollo_pesco", "폴로-페스코", "생선·어패류·가금류 허용 · 붉은 고기 제외"],
-    ["flexitarian", "플렉시테리언", "상황에 따라 육류 허용"],
-    ["halal", "할랄", "할랄 인증·조리 여부 확인 필요"],
-    ["kosher", "코셔", "코셔 기준·조리 여부 확인 필요"],
-    ["low_sodium", "저염", "나트륨 제한 메뉴 선호"],
+    ["vegan", "Vegan", "No animal products"],
+    ["lacto", "Lacto", "Dairy allowed · no meat, fish, or eggs"],
+    ["ovo", "Ovo", "Eggs allowed · no dairy, meat, or fish"],
+    ["lacto_ovo", "Lacto-ovo", "Dairy and eggs allowed · no meat or fish"],
+    ["pesco", "Pescatarian", "Fish and shellfish allowed · no meat or poultry"],
+    ["pollo_pesco", "Pollo-pescatarian", "Fish, shellfish, and poultry allowed · no red meat"],
+    ["flexitarian", "Flexitarian", "Meat allowed depending on context"],
+    ["halal", "Halal", "Check certification and preparation"],
+    ["kosher", "Kosher", "Check standards and preparation"],
+    ["low_sodium", "Low sodium", "Prefers low-sodium dishes"],
   ]);
   const ALLERGY_OPTIONS = Object.freeze([
-    ["egg", "난류", "가금류 알"], ["milk", "우유", "우유·유제품"], ["buckwheat", "메밀", "메밀 원재료"],
-    ["peanut", "땅콩", "땅콩 원재료"], ["soy", "대두", "콩·대두 원재료"], ["wheat", "밀", "밀·밀가루"],
-    ["mackerel", "고등어", "고등어 원재료"], ["crab", "게", "게 원재료"], ["shrimp", "새우", "새우 원재료"],
-    ["pork", "돼지고기", "돼지고기 원재료"], ["peach", "복숭아", "복숭아 원재료"], ["tomato", "토마토", "토마토 원재료"],
-    ["sulfites", "아황산류", "최종제품 이산화황 10mg/kg 이상"], ["walnut", "호두", "호두 원재료"],
-    ["chicken", "닭고기", "닭고기 원재료"], ["beef", "쇠고기", "쇠고기 원재료"], ["squid", "오징어", "오징어 원재료"],
-    ["shellfish", "조개류(굴·전복·홍합 포함)", "조개류 원재료"], ["pine_nut", "잣", "잣 원재료"],
+    ["egg", "Egg", "Poultry egg"], ["milk", "Milk", "Milk or dairy"], ["buckwheat", "Buckwheat", "Buckwheat ingredient"],
+    ["peanut", "Peanut", "Peanut ingredient"], ["soy", "Soy", "Soy ingredient"], ["wheat", "Wheat", "Wheat or flour"],
+    ["mackerel", "Mackerel", "Mackerel ingredient"], ["crab", "Crab", "Crab ingredient"], ["shrimp", "Shrimp", "Shrimp ingredient"],
+    ["pork", "Pork", "Pork ingredient"], ["peach", "Peach", "Peach ingredient"], ["tomato", "Tomato", "Tomato ingredient"],
+    ["sulfites", "Sulfites", "Sulfur dioxide ≥ 10 mg/kg in final product"], ["walnut", "Walnut", "Walnut ingredient"],
+    ["chicken", "Chicken", "Chicken ingredient"], ["beef", "Beef", "Beef ingredient"], ["squid", "Squid", "Squid ingredient"],
+    ["shellfish", "Shellfish (oyster, abalone, mussel)", "Shellfish ingredient"], ["pine_nut", "Pine nut", "Pine nut ingredient"],
   ]);
   const LEGACY_DIETARY_OPTIONS = Object.freeze([
-    ["vegetarian", "채식(세부 유형 미선택)", "기존 설정이에요. 비건·락토·오보 등으로 구체화해 주세요."],
+    ["vegetarian", "Vegetarian (specific type not selected)", "Existing setting. Choose vegan, lacto, ovo, or another specific type."],
   ]);
   const LEGACY_ALLERGY_OPTIONS = Object.freeze([
-    ["tree_nut", "기존 견과류 설정", "호두·잣을 각각 확인해 주세요."],
+    ["tree_nut", "Existing nut setting", "Check walnuts and pine nuts separately."],
   ]);
   const BUDGET_STOPS = Object.freeze([
     4_000, 6_000, 8_000, 10_000, 12_000, 14_000, 16_000, 18_000, 20_000,
@@ -273,12 +287,11 @@
   function renderProfile(view, setup = false) {
     const profile = view.profile || { dietary: [], allergies: [] };
     const selected = (name) => Array.isArray(profile[name]) ? profile[name] : [];
-    const picker = (name, label, options, note = "") => `<fieldset class="profile-picker" data-profile-picker="${name}">
+    const picker = (name, label, options) => `<fieldset class="profile-picker" data-profile-picker="${name}">
       <legend>${label}</legend>
-      ${note ? `<p class="picker-note">${note}</p>` : ""}
-      <label class="picker-search">검색해서 선택할 수 있어요<input type="search" data-picker-search="${name}" placeholder="${label} 검색"></label>
-      <div class="picker-options picker-options-scroll" data-picker-options="${name}" data-visible-items="4" tabindex="0" aria-label="${label} 선택 목록. 네 항목씩 보입니다.">
-        <label class="picker-option picker-option-none"><input class="profile-choice-input" type="checkbox" name="${name}" value="none" data-profile-none="${name}"${selected(name).length === 0 ? " checked" : ""}><span class="picker-option-text"><strong>없음</strong><small>이 조건을 적용하지 않음</small></span></label>
+      <label class="picker-search"><input type="search" data-picker-search="${name}" aria-label="${label} search" placeholder="${label} search"></label>
+      <div class="picker-options picker-options-scroll" data-picker-options="${name}" data-visible-items="4" tabindex="0" aria-label="${label} options. Four items visible.">
+        <label class="picker-option picker-option-none"><input class="profile-choice-input" type="checkbox" name="${name}" value="none" data-profile-none="${name}"${selected(name).length === 0 ? " checked" : ""}><span class="picker-option-text"><strong>None</strong><small>Do not apply this condition</small></span></label>
         ${options.map(([value, text, description]) => `<label class="picker-option"><input class="profile-choice-input" type="checkbox" name="${name}" value="${value}"${selected(name).includes(value) ? " checked" : ""}><span class="picker-option-text"><strong>${text}</strong>${description ? `<small>${description}</small>` : ""}</span></label>`).join("")}
       </div>
     </fieldset>`;
@@ -288,18 +301,17 @@
     const allergyOptions = selected("allergies").includes("tree_nut")
       ? [...LEGACY_ALLERGY_OPTIONS, ...ALLERGY_OPTIONS]
       : ALLERGY_OPTIONS;
-    return `<h1>${setup ? "나에게 맞는 조건을 설정해요" : "프로필 조건"}</h1>
-      <p>${setup ? "식이 조건과 알레르기는 여기서 한 번 설정하면 다음부터 자동으로 적용돼요." : "식이 조건과 알레르기는 프로필에서 수정할 수 있어요."}</p>
+    return `${screenHeading(setup ? "Set your preferences" : "Profile")}
       <form data-form="profile">
-        ${picker("dietary", "식이 조건", dietaryOptions, "채식 유형은 하나를 선택하고, 할랄·코셔·저염은 필요한 경우 추가로 선택해요.")}
-        ${picker("allergies", "알레르기", allergyOptions, "식약처 표시 대상 원재료 기준이에요. 조리시설의 교차오염·혼입 가능성은 장소에서 별도로 확인해야 해요.")}
-        ${action("저장하고 조건으로", "save-profile")}
-        ${setup ? "" : action("취소", "cancel-profile")}
+        ${picker("dietary", "Dietary preferences", dietaryOptions)}
+        ${picker("allergies", "Allergies", allergyOptions)}
+        ${action("Save and continue", "save-profile")}
+        ${setup ? "" : action("Cancel", "cancel-profile")}
       </form>`;
   }
 
   function partyLabel(partySize) {
-    return partySize === 5 ? "5명 이상" : `${partySize}명`;
+    return partySize === 5 ? "5+ people" : `${partySize} people`;
   }
 
   function renderPartyPawn() {
@@ -309,14 +321,13 @@
     </svg>`;
   }
 
-  function renderProfileMenu(view) {
-    const open = Boolean(view.profileMenuOpen);
-    return `<div class="profile-menu-wrap">
-      ${action("프로필", open ? "close-profile-menu" : "open-profile-menu", ' aria-label="프로필 및 앱 메뉴" class="profile-menu-button"')}
-      ${open ? `<div class="profile-menu" role="menu" aria-label="앱 메뉴">
-        ${action("환경설정", "open-profile-settings", ' role="menuitem"')}
-        ${action("로그아웃", "logout-placeholder", ' role="menuitem" aria-disabled="true"')}
-      </div>` : ""}
+  function renderSettingsButton() {
+    return `<div class="settings-button-wrap">
+      <button type="button" class="settings-button" data-action="open-profile-settings" aria-label="Settings">
+        <svg class="settings-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.7 7.7 0 0 0-1.69-.98l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.5.42l-.38 2.65c-.61.25-1.17.58-1.69.98l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64l2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65A.5.5 0 0 0 10 22h4a.5.5 0 0 0 .5-.42l.38-2.65a7.7 7.7 0 0 0 1.69-.98l2.49 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.11-1.65zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"></path>
+        </svg>
+      </button>
     </div>`;
   }
 
@@ -326,13 +337,13 @@
     const pawns = Array.from({ length: partySize }, () => renderPartyPawn()).join("");
     return `<section class="party-selector" aria-labelledby="party-size-label">
       <div class="party-selector-heading">
-        <h2 id="party-size-label">함께 가는 인원</h2>
+        <h2 id="party-size-label">Party size</h2>
         <output class="party-count" aria-live="polite">${escapeHtml(partyLabel(partySize))}</output>
       </div>
       <div class="party-selector-controls">
-        ${action("‹", "party-decrement", ` aria-label="인원 줄이기"${partySize === 1 ? " disabled" : ""}`)}
+        ${action("‹", "party-decrement", ` aria-label="Decrease party size"${partySize === 1 ? " disabled" : ""}`)}
         <div class="party-pawns" aria-hidden="true">${pawns}</div>
-        ${action("›", "party-increment", ` aria-label="인원 늘리기"${partySize === 5 ? " disabled" : ""}`)}
+        ${action("›", "party-increment", ` aria-label="Increase party size"${partySize === 5 ? " disabled" : ""}`)}
       </div>
       <input type="hidden" name="partySize" value="${escapeHtml(partySize)}">
     </section>`;
@@ -346,61 +357,68 @@
     const budgetAmount = budgetAmountForIndex(budgetStep);
     const disclosure = constraints.disclosure === "private" ? "private" : "minimal";
     const advancedSummary = summarizeAdvancedConditions(constraints);
-    return `<header class="screen-header">
-        <h1>지금 필요한 조건</h1>
-        ${renderProfileMenu(view)}
-      </header>
-      <p>최소 조건만 정하면 한 곳으로 바로 출발해요.</p>
-      ${renderConstraintErrors(view.errors)}
-      ${renderAffectedConditions(view.affectedConditions)}
-      <form data-form="constraints">
+    return `<form data-form="constraints" class="constraints-home">
+      <section class="constraints-launch" id="constraints-launch">
+        <header class="launch-header">
+          <h1>Roll the compass!</h1>
+          ${renderSettingsButton()}
+        </header>
+        <div class="launch-action">
+          ${renderCompassShell({ needleMode: "ready" }, { action: "start" })}
+        </div>
+        <a class="condition-scroll-cue" href="#condition-settings" data-action="scroll-to-conditions">Conditions</a>
+      </section>
+      <section class="condition-settings" id="condition-settings" aria-labelledby="condition-settings-title">
+        <h2 id="condition-settings-title">Conditions</h2>
+        ${renderConstraintErrors(view.errors)}
+        ${renderAffectedConditions(view.affectedConditions)}
         <input type="hidden" name="category" value="restaurant">
         ${renderPartySelector(constraints)}
-        <div class="slider-field"><label for="walk-time-slider">도보 시간 <output id="walk-time-value">${escapeHtml(minutes)}분</output></label><input id="walk-time-slider" name="maxWalkMinutes" type="range" min="5" max="60" step="5" value="${escapeHtml(minutes)}" data-slider="walk" aria-label="최대 도보 시간"></div>
-        <div class="slider-field"><label for="budget-slider">예산 <output id="budget-value"${budgetAmount == null ? " data-budget-unlimited" : ""}>${budgetAmount == null ? "상관없음" : `${escapeHtml(budgetAmount.toLocaleString("ko-KR"))}원 이하`}</output></label><input id="budget-slider" name="budget" type="range" min="0" max="12" step="1" value="${escapeHtml(budgetStep)}" data-slider="budget" data-budget-amount="${budgetAmount == null ? "" : escapeHtml(budgetAmount)}" aria-label="1인 예산"></div>
+        <div class="slider-field"><label for="walk-time-slider">Walk time <output id="walk-time-value">${escapeHtml(minutes)} min</output></label><input id="walk-time-slider" name="maxWalkMinutes" type="range" min="5" max="60" step="5" value="${escapeHtml(minutes)}" data-slider="walk" aria-label="Maximum walk time"></div>
+        <div class="slider-field"><label for="budget-slider">Budget <output id="budget-value"${budgetAmount == null ? " data-budget-unlimited" : ""}>${budgetAmount == null ? "Any budget" : `${escapeHtml(budgetAmount.toLocaleString("en-US"))} or less`}</output></label><input id="budget-slider" name="budget" type="range" min="0" max="12" step="1" value="${escapeHtml(budgetStep)}" data-slider="budget" data-budget-amount="${budgetAmount == null ? "" : escapeHtml(budgetAmount)}" aria-label="Budget per person"></div>
         <details data-advanced-conditions>
           <summary>${escapeHtml(advancedSummary)}</summary>
-          <label>목적지 공개 수준 <select name="disclosure">
-            <option value="minimal"${disclosure === "minimal" ? " selected" : ""}>최소 정보 공개 (도보시간 · 예산 · 주요 메뉴)</option>
-            <option value="private"${disclosure === "private" ? " selected" : ""}>비공개</option>
+          <label>Destination disclosure <select name="disclosure">
+            <option value="minimal"${disclosure === "minimal" ? " selected" : ""}>Minimal (walk time · budget · signature dish)</option>
+            <option value="private"${disclosure === "private" ? " selected" : ""}>Private</option>
           </select></label>
         </details>
         ${renderGuardedRecovery(view)}
-        ${action("이 조건으로 바로 출발", "start")}
-      </form>`;
+        ${action("Done", "scroll-to-launch", ' class="condition-complete-button" aria-label="Finish condition settings. Return to start."')}
+      </section>
+    </form>`;
   }
 
   function renderFinding() {
-    return `<h1>한 곳을 고르고 있어요</h1>
-      <p>조건에 맞는 목적지와 걸을 길을 확인 중이에요.</p>`;
+    return `${screenHeading("Choosing one place")}
+      ${renderCompassShell({ needleMode: "searching" })}`;
   }
 
   function renderDisclosedIdentity(view) {
     if (!view.revealed || !view.destination) return "";
     return `<div class="disclosed-identity">
-      <p class="disclosure-status">목적지 공개됨</p>
-      <p class="destination-name">${detailOrUnknown(view.destination.name, "상호명 정보 없음")}</p>
+      <p class="disclosure-status">Destination revealed</p>
+      <p class="destination-name">${detailOrUnknown(view.destination.name, "Place name unavailable")}</p>
     </div>`;
   }
 
   function renderCompass(view) {
     const heading = view.phase === "following_revealed"
-      ? "공개된 목적지로 안내해요"
-      : view.phase === "near" ? "거의 다 왔어요" : "방향을 따라가요";
-    return `<h1>${heading}</h1>
+      ? "Guiding to revealed destination"
+      : view.phase === "near" ? "Almost there" : "Follow the direction";
+    return `${screenHeading(heading)}
       ${renderDisclosedIdentity(view)}
       ${renderNavigationGuidance(view)}
-      ${view.constraints?.disclosure === "private" ? '<p class="private-guidance">정보 비공개 상태로 안내 중이에요</p>' : renderGuidanceRows(view)}
-      ${action("안내 멈추기", "stop")}`;
+      ${view.constraints?.disclosure === "private" ? "" : renderGuidanceRows(view)}
+      ${action("Stop", "stop")}`;
   }
 
   function renderPaused(view) {
-    return `<h1>안내 일시정지</h1>
-      <p>언제든 다시 이어갈 수 있어요.</p>
+    return `${screenHeading("Guidance paused")}
       ${renderNavigationGuidance({ ...view, routeStatus: "paused", needleMode: "paused" })}
-      ${action("안내 계속", "continue-guidance")}
-      ${action("목적지 정보 확인", "open-destination-info")}
-      ${action("안내 종료", "request-end")}`;
+      ${action("Resume", "continue-guidance")}
+      ${action("View destination", "open-destination-info")}
+      ${action("End guidance", "request-end")}`;
   }
 
   function reasonButton(reason, label) {
@@ -408,16 +426,15 @@
   }
 
   function renderRevealReason() {
-    return `<h1>목적지 정보를 확인할까요?</h1>
-      <p>정확한 위치가 공개됩니다. 이유를 남기면 다음 경험을 개선하는 데 도움이 돼요.</p>
+    return `${screenHeading("Reveal destination?")}
       <div class="reason-actions">
-        ${reasonButton("safety", "안전을 위해")}
-        ${reasonButton("route_difficulty", "길이 어려워서")}
-        ${reasonButton("sensor_problem", "방향 확인이 어려워서")}
-        ${reasonButton("condition_check", "조건을 확인하려고")}
-        ${reasonButton("companion_check", "동행과 확인하려고")}
-        ${reasonButton("curiosity", "궁금해서")}
-        ${reasonButton("skipped", "건너뛰고 확인")}
+        ${reasonButton("safety", "For safety")}
+        ${reasonButton("route_difficulty", "The route is difficult")}
+        ${reasonButton("sensor_problem", "Direction is unclear")}
+        ${reasonButton("condition_check", "To check the conditions")}
+        ${reasonButton("companion_check", "To check with my companion")}
+        ${reasonButton("curiosity", "I'm curious")}
+        ${reasonButton("skipped", "Skip and reveal")}
       </div>`;
   }
 
@@ -429,121 +446,116 @@
     const source = typeof destination.photoUrl === "string" && destination.photoUrl.trim() !== ""
       ? destination.photoUrl.trim()
       : null;
-    if (!source) return `<p class="photo-unavailable">사진 정보 없음</p>`;
-    const altName = detailOrUnknown(destination.name, "목적지") + " 사진";
+    if (!source) return `<p class="photo-unavailable">No photo available</p>`;
+    const altName = detailOrUnknown(destination.name, "Destination") + " photo";
     return `<img class="destination-photo" src="${escapeHtml(source)}" alt="${altName}" loading="lazy">`;
   }
 
   function renderDestinationDetails(destination) {
     if (!destination) {
-      return `<p class="destination-unavailable">목적지 정보를 불러올 수 없어요.</p>`;
+      return `<p class="destination-unavailable">Destination details unavailable.</p>`;
     }
     return `<div class="destination-details">
-      <p class="destination-name">${detailOrUnknown(destination.name, "상호명 정보 없음")}</p>
+      <p class="destination-name">${detailOrUnknown(destination.name, "Place name unavailable")}</p>
       ${renderDestinationPhoto(destination)}
       <dl>
-        <div><dt>건물</dt><dd>${detailOrUnknown(destination.building, "건물 정보 없음")}</dd></div>
-        <div><dt>층</dt><dd>${detailOrUnknown(destination.floorUnit, "층 정보 없음")}</dd></div>
+        <div><dt>Building</dt><dd>${detailOrUnknown(destination.building, "Building unavailable")}</dd></div>
+        <div><dt>Floor</dt><dd>${detailOrUnknown(destination.floorUnit, "Floor unavailable")}</dd></div>
       </dl>
       <section class="destination-note recommendation-reason">
-        <h2>추천한 이유</h2>
-        <p>${detailOrUnknown(destination.recommendationReason, "추천 이유 정보 없음")}</p>
+        <h2>Why it was recommended</h2>
+        <p>${detailOrUnknown(destination.recommendationReason, "Recommendation unavailable")}</p>
       </section>
       <section class="destination-note review-summary">
-        <h2>후기 요약</h2>
-        <p>${detailOrUnknown(destination.reviewSummary, "후기 요약 정보 없음")}</p>
+        <h2>Review summary</h2>
+        <p>${detailOrUnknown(destination.reviewSummary, "Review summary unavailable")}</p>
       </section>
     </div>`;
   }
 
   function renderDestination(view) {
-    const heading = view.phase === "arrived" ? "도착했어요" : "목적지 공개됨";
+    const heading = view.phase === "arrived" ? "Arrived" : "Destination revealed";
     const followUp = view.phase === "arrived"
-      ? `${action("도착 완료", "finish-arrival")}${action("외부 지도에서 보기", "request-external-map")}`
-      : `${action("안내 계속", "continue-after-reveal")}${action("안내 종료", "request-end")}${action("외부 지도에서 보기", "request-external-map")}`;
-    return `<h1>${heading}</h1>${renderDestinationDetails(view.destination)}${followUp}`;
+      ? `${action("Finish", "finish-arrival")}${action("Open in external map", "request-external-map")}`
+      : `${action("Resume", "continue-after-reveal")}${action("End guidance", "request-end")}${action("Open in external map", "request-external-map")}`;
+    return `${screenHeading(heading)}${renderDestinationDetails(view.destination)}${followUp}`;
   }
 
   function renderStopConfirm() {
-    return `<h1>안내를 종료할까요?</h1>
-      <p>종료한 뒤에 이유를 건너뛸 수 있어요.</p>
-      ${action("안내 계속", "continue-guidance")}
-      ${action("안내 종료 확인", "confirm-end")}`;
+    return `${screenHeading("End guidance?")}
+      ${action("Resume", "continue-guidance")}
+      ${action("Confirm end", "confirm-end")}`;
   }
 
   function renderStopReason() {
     const reasons = [
-      ["safety", "안전 문제"], ["route_sensor", "길 또는 센서 문제"],
-      ["condition_mismatch", "조건이 맞지 않음"], ["venue_problem", "장소 문제"],
-      ["change_of_mind", "마음이 바뀜"], ["schedule_change", "일정 변경"],
-      ["skipped", "건너뛰기"],
+      ["safety", "Safety issue"], ["route_sensor", "Route or sensor issue"],
+      ["condition_mismatch", "Condition mismatch"], ["venue_problem", "Venue issue"],
+      ["change_of_mind", "Changed my mind"], ["schedule_change", "Schedule changed"],
+      ["skipped", "Skip"],
     ];
-    return `<h1>안내를 종료했어요</h1>
-      <p>이유를 남기면 다음 추천을 더 안전하게 만들 수 있어요.</p>
+    return `${screenHeading("End guidance")}
       <div class="reason-actions">${reasons.map(([reason, label]) => action(label, "submit-stop-reason", ` data-reason="${reason}"`)).join("")}</div>`;
   }
 
   function renderStopped() {
-    return `<h1>안내가 종료되었어요</h1>
-      <p>필요하면 다시 조건을 확인해 새 추천을 받을 수 있어요.</p>
-      ${action("새 추천 받기", "new-recommendation")}`;
+    return `${screenHeading("Guidance ended")}
+      ${action("Get a new recommendation", "new-recommendation")}`;
   }
 
   function renderRouteRecovery(view) {
-    return `<h1>안내를 다시 확인해야 해요</h1>
+    return `${screenHeading("Review guidance")}
       ${renderDisclosedIdentity(view)}
-      <p>현재 방향을 신뢰하기 어려워서 정확한 방향을 확인하고 있어요.</p>
       ${renderNavigationGuidance({ ...view, routeStatus: "recovery", needleMode: "searching" })}
-      ${action("안내 다시 시도", "retry-guidance")}
-      ${action("저장된 경로 사용", "use-cached-route")}
-      ${action("안내 멈추기", "stop")}
-      ${action("외부 지도에서 보기", "request-external-map")}`;
+      ${action("Retry guidance", "retry-guidance")}
+      ${action("Use saved route", "use-cached-route")}
+      ${action("Stop", "stop")}
+      ${action("Open in external map", "request-external-map")}`;
   }
 
   function renderRecomputing(view) {
-    return `<h1>경로를 다시 계산하고 있어요</h1>
+    return `${screenHeading("Recalculating route")}
       ${renderDisclosedIdentity(view)}
       ${renderNavigationGuidance({ ...view, routeStatus: "recovery", needleMode: "searching" })}`;
   }
 
   function renderExternalMapWarning() {
-    return `<h1>외부 지도로 이동할까요?</h1>
-      <p>외부 지도에서는 목적지가 공개될 수 있습니다.</p>
-      ${action("돌아가기", "cancel-external-map")}
-      ${action("공개하고 이동", "confirm-external-map")}`;
+    return `${screenHeading("Open external map?")}
+      <p>The destination may be revealed in an external map.</p>
+      ${action("Back", "cancel-external-map")}
+      ${action("Reveal and open", "confirm-external-map")}`;
   }
 
   function renderExternalMapHandoff() {
-    return `<h1>외부 지도에 전달했어요</h1>
-      <p>이 프로토타입은 실제 지도나 경로를 열지 않아요.</p>`;
+    return `${screenHeading("Sent to external map")}`;
   }
 
   function renderFeedbackPending() {
-    return `<h1>방문 경험을 기다리고 있어요</h1>
-      <p>한 시간 뒤에 장소에 대한 짧은 반응을 남길 수 있어요.</p>
-      ${action("반응 확인", "check-feedback")}`;
+    return `${screenHeading("Waiting for your visit")}
+      ${action("Check in", "check-feedback")}`;
   }
 
   function renderPlaceReaction() {
-    return `<h1>이 장소는 어땠나요?</h1>
+    return `${screenHeading("How was this place?")}
       <div class="reaction-actions">
-        ${action("별로예요", "react", " data-reaction=\"dislike\"")}
-        ${action("좋아요", "react", " data-reaction=\"like\"")}
-        ${action("아주 좋아요", "react", " data-reaction=\"love\"")}
-        ${action("방문하지 못했어요", "react", " data-reaction=\"did_not_visit\"")}
+        ${action("Not for me", "react", " data-reaction=\"dislike\"")}
+        ${action("Good", "react", " data-reaction=\"like\"")}
+        ${action("Loved it", "react", " data-reaction=\"love\"")}
+        ${action("Could not visit", "react", " data-reaction=\"did_not_visit\"")}
       </div>`;
   }
 
   function renderComplete() {
-    return `<h1>고마워요</h1><p>다음 출발을 위한 반응이 기록되었어요.</p>`;
+    return `${screenHeading("Thank you")}`;
   }
 
   function renderInvalidState() {
-    return `<h1>화면을 불러올 수 없어요</h1><p>프로토타입 제어에서 처음부터 다시 시작할 수 있어요.</p>`;
+    return `${screenHeading("Unable to load screen")}<p>Reset from the prototype controls.</p>`;
   }
 
   function renderProductScreen(view) {
     const renderers = {
+      splash: renderSplash,
       onboarding: renderOnboarding,
       profile_setup: (value) => renderProfile(value, true),
       profile: (value) => renderProfile(value, false),
@@ -573,29 +585,116 @@
       "<h1",
       '<h1 data-screen-heading tabindex="-1"',
     );
-    return `<section class="product-screen" data-phase="${escapeHtml(safeView.phase)}">${body}</section>`;
+    const screenClass = safeView.phase === "splash" ? " product-screen splash-screen" : " product-screen";
+    return `<section class="${screenClass.trim()}" data-phase="${escapeHtml(safeView.phase)}" data-visual-style="a">${body}</section>`;
   }
 
   function renderPrototypeControls() {
     const simulations = [
-      ["walk", "140 m 걷기"], ["near", "가까이 이동"], ["arrive", "도착"],
+      ["walk", "140m 이동"], ["near", "더 가까이 이동"], ["arrive", "도착"],
       ["no-fit", "조건 불일치"], ["low-confidence", "방향 신뢰도 낮음"],
-      ["restore-confidence", "안내 복구"], ["permission-denied", "위치 권한 거부"],
-      ["missing-arrival-field", "층 정보 누락 도착"], ["feedback-ready", "반응 가능 시간"],
-      ["reset", "처음부터"],
+      ["restore-confidence", "안내 복원"], ["permission-denied", "위치 권한 거부"],
+      ["missing-arrival-field", "층 정보 없이 도착"], ["feedback-ready", "후기 확인 가능"],
+      ["reset", "초기화"],
     ];
-    return `<aside class="prototype-controls" aria-label="프로토타입 제어">
-      <h2>프로토타입 제어 — 실제 앱 UI 아님</h2>
+    return `<aside class="prototype-controls" aria-label="프로토타입 컨트롤">
+      <h2>프로토타입 컨트롤 — 앱 UI에 포함되지 않음</h2>
       <div>${simulations.map(([name, label]) => `<button type="button" data-simulate="${name}">${label}</button>`).join("")}</div>
     </aside>`;
   }
 
+  const COMPASS_TRANSITION_DURATION = 680;
+  const COMPASS_TRANSITION_EASING = "cubic-bezier(0.22, 0.61, 0.36, 1)";
+
+  function reducedMotionPreferred() {
+    return Boolean(globalScope.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  }
+
+  function renderWithCompassFallback(root, updateRoot) {
+    const previousCompass = root.querySelector?.(".compass-shell");
+    const previousRect = previousCompass?.getBoundingClientRect?.();
+    updateRoot();
+
+    const document = globalScope.document;
+    const body = document?.body;
+    const nextCompass = root.querySelector?.(".compass-shell");
+    const nextRect = nextCompass?.getBoundingClientRect?.();
+    if (
+      !previousCompass || !previousRect || typeof previousCompass.cloneNode !== "function"
+      || !body || typeof body.appendChild !== "function" || !nextCompass || !nextRect
+    ) return;
+
+    const proxy = previousCompass.cloneNode(true);
+    if (!proxy?.style) return;
+    const reducedMotion = reducedMotionPreferred();
+    const duration = reducedMotion ? 1 : COMPASS_TRANSITION_DURATION;
+    const scaleX = previousRect.width ? nextRect.width / previousRect.width : 1;
+    const scaleY = previousRect.height ? nextRect.height / previousRect.height : 1;
+    const deltaX = nextRect.left - previousRect.left;
+    const deltaY = nextRect.top - previousRect.top;
+    const previousVisibility = nextCompass.style.visibility;
+    let cleaned = false;
+    let timeoutId = null;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      if (timeoutId != null) globalScope.clearTimeout?.(timeoutId);
+      nextCompass.style.visibility = previousVisibility;
+      body.removeChild?.(proxy);
+    };
+
+    proxy.setAttribute?.("aria-hidden", "true");
+    proxy.tabIndex = -1;
+    Object.assign(proxy.style, {
+      position: "fixed",
+      left: `${previousRect.left}px`,
+      top: `${previousRect.top}px`,
+      width: `${previousRect.width}px`,
+      height: `${previousRect.height}px`,
+      margin: "0",
+      zIndex: "9999",
+      pointerEvents: "none",
+      transformOrigin: "top left",
+      transform: "translate3d(0px, 0px, 0) scale(1, 1)",
+      transition: `transform ${duration}ms ${COMPASS_TRANSITION_EASING}`,
+    });
+    body.appendChild(proxy);
+    nextCompass.style.visibility = "hidden";
+    proxy.addEventListener?.("transitionend", cleanup, { once: true });
+    timeoutId = globalScope.setTimeout?.(cleanup, duration + 100) ?? null;
+    const requestFrame = globalScope.requestAnimationFrame
+      || ((callback) => globalScope.setTimeout(callback, 0));
+    requestFrame(() => {
+      proxy.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})`;
+    });
+  }
+
   function renderApp(root, controlsRoot, view) {
     if (root) {
-      root.innerHTML = renderProductScreen(view);
-      root.querySelector?.("[data-screen-heading]")?.focus?.({ preventScroll: true });
+      const previousPhase = root.querySelector?.(".product-screen")?.dataset?.phase;
+      const phaseChanged = previousPhase !== view?.phase;
+      const updateRoot = () => {
+        root.innerHTML = renderProductScreen(view);
+        if (phaseChanged) root.scrollIntoView?.({ block: "start" });
+        root.querySelector?.("[data-screen-heading]")?.focus?.({ preventScroll: true });
+      };
+      const startViewTransition = globalScope.document?.startViewTransition;
+      if (phaseChanged && typeof startViewTransition === "function") {
+        try {
+          const transition = startViewTransition.call(globalScope.document, updateRoot);
+          transition?.finished?.catch?.(() => {});
+        } catch {
+          updateRoot();
+        }
+      } else if (phaseChanged && globalScope.document?.body) {
+        renderWithCompassFallback(root, updateRoot);
+      } else {
+        updateRoot();
+      }
     }
-    if (controlsRoot) controlsRoot.innerHTML = renderPrototypeControls(view);
+    if (controlsRoot) {
+      controlsRoot.innerHTML = view?.phase === "splash" ? "" : renderPrototypeControls(view);
+    }
   }
 
   const api = {
@@ -604,5 +703,5 @@
     renderPrototypeControls, renderApp,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  globalScope.SomewhereVNextScreens = api;
+  globalScope.RollTheCompassVNextScreens = api;
 })(typeof globalThis !== "undefined" ? globalThis : window);

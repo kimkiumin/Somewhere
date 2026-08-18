@@ -3,8 +3,9 @@
   --ink: #111;
   --paper: #fff;
   --line: #b7b7b7;
-  --compass-size: min(58vw, 240px);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --compass-size: min(78vw, 320px);
+  --ui-font: "Pretendard", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--ui-font);
 }
 
 * {
@@ -19,6 +20,7 @@ body {
   overflow-x: hidden;
   color: var(--ink);
   background: var(--paper);
+  font-family: var(--ui-font);
   line-height: 1.5;
 }
 
@@ -26,6 +28,10 @@ body {
 #prototype-controls {
   width: min(100%, 440px);
   margin-inline: auto;
+}
+
+#prototype-controls:empty {
+  display: none;
 }
 
 .product-screen {
@@ -36,6 +42,36 @@ body {
   flex-direction: column;
   justify-content: center;
   gap: 16px;
+}
+
+.splash-screen {
+  min-height: calc(100svh - 64px);
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  border: 0;
+  text-align: center;
+}
+
+.splash-wordmark {
+  max-width: 9ch;
+  font-size: clamp(2.2rem, 11vw, 3.5rem);
+  font-weight: 400;
+  letter-spacing: calc(-0.07em + 2pt);
+  line-height: 0.92;
+}
+
+.splash-loader {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--line);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: splash-loading 0.8s linear infinite;
+}
+
+@keyframes splash-loading {
+  to { transform: rotate(360deg); }
 }
 
 h1,
@@ -52,14 +88,41 @@ h1 {
   letter-spacing: -0.03em;
 }
 
+h1,
+h2,
+legend,
+.destination-name,
+.splash-wordmark {
+  font-family: var(--ui-font);
+  font-weight: 400;
+}
+
 h2 {
   font-size: 1rem;
+}
+
+[data-screen-heading]:focus {
+  outline: none;
+}
+
+.screen-heading-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 button,
 input,
 summary {
   font: inherit;
+  font-family: var(--ui-font);
 }
 
 button {
@@ -94,17 +157,79 @@ form {
   margin-top: 8px;
 }
 
-.screen-header {
+.product-screen[data-phase="constraints"] {
+  display: block;
+  min-height: 0;
+  padding: 0;
+}
+
+.constraints-home {
+  display: block;
+  margin: 0;
+}
+
+.constraints-launch {
+  min-height: max(600px, 100svh);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 20px;
+  padding: clamp(24px, 7vw, 40px);
+}
+
+.launch-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
 
-.screen-header h1 {
+.launch-header h1 {
   max-width: 15ch;
   min-width: 0;
+  font-size: clamp(1.35rem, 6.5vw, 1.75rem);
+  line-height: 1;
+  letter-spacing: calc(-0.03em + 2pt);
   overflow-wrap: anywhere;
+  white-space: nowrap;
+}
+
+.product-screen[data-phase="onboarding"] > h1 {
+  letter-spacing: calc(-0.03em + 2pt);
+}
+
+.launch-action {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.launch-action > p {
+  max-width: 22ch;
+}
+
+.condition-scroll-cue {
+  justify-self: center;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink);
+  font-weight: 700;
+  text-underline-offset: 4px;
+}
+
+.condition-settings {
+  display: grid;
+  gap: 16px;
+  padding: clamp(32px, 8vw, 48px) clamp(24px, 7vw, 40px);
+  border-top: 1px solid var(--ink);
+}
+
+.condition-settings h2 {
+  font-size: clamp(1.5rem, 6vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
 }
 
 .profile-menu-wrap {
@@ -130,6 +255,29 @@ form {
   border-radius: 50%;
   background: radial-gradient(circle at 50% 34%, currentColor 0 18%, transparent 20%),
     radial-gradient(ellipse at 50% 80%, currentColor 0 30%, transparent 32%);
+}
+
+.settings-button-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.settings-button {
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 9px;
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.settings-icon {
+  display: block;
+  width: 23px;
+  height: 23px;
+  fill: currentColor;
 }
 
 .profile-menu {
@@ -416,67 +564,90 @@ summary {
 
 .compass-shell {
   position: relative;
+  display: block;
   width: var(--compass-size);
   height: var(--compass-size);
   margin: 2px auto;
-  border: 2px solid var(--ink);
-  border-radius: 50%;
+  padding: 0;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
 }
 
-.compass-shell::before {
-  content: "N";
+.compass-face {
   position: absolute;
-  top: 8px;
-  left: 50%;
-  translate: -50% 0;
-  font-size: 0.75rem;
-  font-weight: 700;
+  inset: -6%;
+  z-index: 0;
+  display: block;
+  width: 112%;
+  height: 112%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 
-.compass-needle.is-pointing {
+.compass-needle {
   position: absolute;
-  top: 14%;
-  left: 50%;
-  width: 3px;
-  height: 36%;
-  background: var(--ink);
-  transform: translateX(-50%) rotate(var(--bearing));
-  transform-origin: 50% 100%;
+  inset: 0;
+  z-index: 1;
+  transform-origin: 50% 50%;
 }
 
-.compass-needle.is-pointing::before {
-  content: "";
+.compass-needle-image {
   position: absolute;
-  top: -7px;
-  left: 50%;
-  width: 9px;
-  height: 9px;
-  border-top: 2px solid var(--ink);
-  border-left: 2px solid var(--ink);
-  transform: translateX(-50%) rotate(45deg);
+  top: 12%;
+  left: 26%;
+  display: block;
+  width: 48%;
+  height: 48%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  transform-origin: 50% 80%;
+}
+
+.compass-needle.is-pointing .compass-needle-image {
+  transform: rotate(var(--bearing));
+}
+
+.compass-needle.is-ready .compass-needle-image {
+  transform: rotate(-18deg);
+}
+
+.compass-action {
+  min-height: 0;
+  cursor: pointer;
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.compass-action:hover {
+  background: transparent;
+  transform: scale(1.015);
+}
+
+.compass-action:active {
+  transform: scale(0.985);
 }
 
 .compass-needle.is-searching {
-  position: absolute;
-  inset: 24%;
-  border: 2px dashed var(--ink);
-  border-radius: 50%;
+  animation: none;
+}
+
+.compass-needle.is-searching .compass-needle-image {
   animation: searching-direction 2.4s linear infinite;
-  transform-origin: center;
 }
 
 .compass-needle.is-paused {
-  position: absolute;
-  top: calc(50% - 1px);
-  left: 32%;
-  width: 36%;
-  height: 2px;
-  background: var(--line);
   animation: none;
   transform: none;
 }
 
+.compass-needle.is-paused .compass-needle-image {
+  opacity: 0;
+}
+
 @keyframes searching-direction {
+  from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
@@ -559,6 +730,7 @@ dd {
   margin-top: 20px;
   padding: 16px;
   border: 1px dashed var(--ink);
+  font-family: var(--ui-font);
 }
 
 .prototype-controls > div {
@@ -571,6 +743,7 @@ dd {
 .prototype-controls button {
   min-width: 0;
   font-size: 0.875rem;
+  font-family: var(--ui-font);
 }
 
 @media (max-width: 420px) {
@@ -582,6 +755,10 @@ dd {
     min-height: 100svh;
     border-inline: 0;
     padding-inline: 20px;
+  }
+
+  .splash-screen {
+    min-height: 100svh;
   }
 
   #prototype-controls {
@@ -616,8 +793,8 @@ dd {
   }
 
   .compass-shell {
-    width: min(68vw, 220px);
-    height: min(68vw, 220px);
+    width: min(76vw, 250px);
+    height: min(76vw, 250px);
   }
 }
 
@@ -630,9 +807,594 @@ dd {
 
   .navigation-guidance,
   .next-action,
+  .compass-action,
   .compass-needle.is-searching {
     transition: none !important;
   }
 
-  .compass-needle.is-searching { animation: none !important; }
+  .compass-needle.is-searching .compass-needle-image { animation: none !important; }
+  .splash-loader { animation: none !important; }
+}
+
+/* A direction: bright system surfaces around the user-owned compass and wordmark. */
+:root {
+  --system-ink: #1d1d1f;
+  --system-secondary: #6e6e73;
+  --system-canvas: #f5f5f7;
+  --system-grouped: #f7f7f9;
+  --system-paper: #ffffff;
+  --system-line: #d2d2d7;
+  --system-accent: #0071e3;
+  --system-accent-pressed: #0066cc;
+  --system-danger: #ff3b30;
+  --system-shadow: 0 18px 48px rgba(28, 34, 43, 0.10);
+}
+
+body {
+  background: var(--system-canvas);
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) {
+  color: var(--system-ink);
+  background: var(--system-paper);
+  border: 1px solid var(--system-line);
+  border-radius: 24px;
+  box-shadow: var(--system-shadow);
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) > h1 {
+  color: var(--system-ink);
+  font-weight: 700;
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button:not(.compass-shell) {
+  border-color: var(--system-accent);
+  border-radius: 14px;
+  color: var(--system-paper);
+  background: var(--system-accent);
+  box-shadow: 0 5px 12px rgba(0, 113, 227, 0.18);
+  font-weight: 650;
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button:not(.compass-shell):hover {
+  background: var(--system-accent-pressed);
+  box-shadow: 0 7px 16px rgba(0, 113, 227, 0.24);
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button:not(.compass-shell):active {
+  transform: scale(0.985);
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button:not(.compass-shell):focus-visible,
+.product-screen[data-visual-style="a"]:not(.splash-screen) input:focus-visible,
+.product-screen[data-visual-style="a"]:not(.splash-screen) select:focus-visible,
+.product-screen[data-visual-style="a"]:not(.splash-screen) summary:focus-visible {
+  outline-color: var(--system-accent);
+}
+
+.product-screen[data-visual-style="a"] .launch-header h1 {
+  /* The brand wordmark is owned by the user and stays on the original ink. */
+  color: var(--ink);
+}
+
+.product-screen[data-visual-style="a"] .condition-scroll-cue {
+  color: var(--system-accent);
+}
+
+.product-screen[data-visual-style="a"] .profile-menu-button {
+  border-color: var(--system-line);
+  color: var(--system-secondary);
+  background: var(--system-grouped);
+  box-shadow: none;
+}
+
+.product-screen[data-visual-style="a"] .profile-menu {
+  min-width: 164px;
+  padding: 8px;
+  border: 1px solid var(--system-line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 30px rgba(28, 34, 43, 0.16);
+  backdrop-filter: blur(16px);
+}
+
+.product-screen[data-visual-style="a"] .profile-menu button,
+.product-screen[data-visual-style="a"] .party-selector-controls > button,
+.product-screen[data-visual-style="a"] button[data-action="cancel-profile"],
+.product-screen[data-visual-style="a"] button[data-action="cancel-external-map"],
+.product-screen[data-visual-style="a"] button[data-action="continue-guidance"],
+.product-screen[data-visual-style="a"] button[data-action="continue-after-reveal"] {
+  border-color: transparent;
+  color: var(--system-ink);
+  background: transparent;
+  box-shadow: none;
+  font-weight: 500;
+  text-align: left;
+}
+
+.product-screen[data-visual-style="a"] .profile-menu button:hover,
+.product-screen[data-visual-style="a"] .party-selector-controls > button:hover,
+.product-screen[data-visual-style="a"] button[data-action="cancel-profile"]:hover,
+.product-screen[data-visual-style="a"] button[data-action="cancel-external-map"]:hover,
+.product-screen[data-visual-style="a"] button[data-action="continue-guidance"]:hover,
+.product-screen[data-visual-style="a"] button[data-action="continue-after-reveal"]:hover {
+  background: var(--system-grouped);
+  box-shadow: none;
+}
+
+.product-screen[data-visual-style="a"] .profile-menu button[aria-disabled="true"] {
+  color: var(--system-secondary);
+}
+
+.product-screen[data-visual-style="a"] .condition-settings {
+  border-top: 0;
+  background: var(--system-paper);
+}
+
+.product-screen[data-visual-style="a"] .condition-settings > h2 {
+  color: var(--system-ink);
+  font-size: clamp(1.5rem, 6vw, 2rem);
+}
+
+.product-screen[data-visual-style="a"] .condition-settings > p,
+.product-screen[data-visual-style="a"] .profile-picker .picker-note,
+.product-screen[data-visual-style="a"] .next-action-instruction,
+.product-screen[data-visual-style="a"] .remaining-distance span,
+.product-screen[data-visual-style="a"] .next-action-label {
+  color: var(--system-secondary);
+}
+
+.product-screen[data-visual-style="a"] .condition-settings > .party-selector,
+.product-screen[data-visual-style="a"] .condition-settings > .slider-field,
+.product-screen[data-visual-style="a"] .condition-settings > details,
+.product-screen[data-visual-style="a"] .condition-settings > .form-errors,
+.product-screen[data-visual-style="a"] .condition-settings > .no-fit-review,
+.product-screen[data-visual-style="a"] .condition-settings > .recovery-review {
+  padding: 16px;
+  border: 1px solid var(--system-line);
+  border-radius: 18px;
+  background: var(--system-grouped);
+}
+
+.product-screen[data-visual-style="a"] .party-selector {
+  gap: 14px;
+}
+
+.product-screen[data-visual-style="a"] .party-count {
+  color: var(--system-accent);
+}
+
+.product-screen[data-visual-style="a"] .party-pawn {
+  fill: var(--system-ink);
+}
+
+.product-screen[data-visual-style="a"] input:not([type="radio"]):not([type="checkbox"]):not([type="range"]),
+.product-screen[data-visual-style="a"] select {
+  min-height: 46px;
+  border: 1px solid var(--system-line);
+  border-radius: 12px;
+  color: var(--system-ink);
+  background: var(--system-paper);
+}
+
+.product-screen[data-visual-style="a"] input[type="range"] {
+  accent-color: var(--system-accent);
+}
+
+.product-screen[data-visual-style="a"] details {
+  gap: 12px;
+}
+
+.product-screen[data-visual-style="a"] details summary {
+  color: var(--system-ink);
+  font-weight: 600;
+}
+
+.product-screen[data-visual-style="a"] form[data-form="profile"] {
+  gap: 18px;
+}
+
+.product-screen[data-visual-style="a"] .profile-picker {
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--system-line);
+  border-radius: 18px;
+  background: var(--system-grouped);
+}
+
+.product-screen[data-visual-style="a"] .profile-picker legend {
+  color: var(--system-ink);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.product-screen[data-visual-style="a"] .picker-search {
+  color: var(--system-secondary);
+  font-size: 0.875rem;
+}
+
+.product-screen[data-visual-style="a"] .picker-options-scroll {
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--system-line);
+  border-radius: 14px;
+  background: var(--system-paper);
+  scrollbar-color: var(--system-line) transparent;
+}
+
+.product-screen[data-visual-style="a"] .picker-option {
+  align-items: center;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid #e8e8ed;
+  background: var(--system-paper);
+}
+
+.product-screen[data-visual-style="a"] .picker-option:last-child {
+  border-bottom: 0;
+}
+
+.product-screen[data-visual-style="a"] .picker-option:hover,
+.product-screen[data-visual-style="a"] .picker-option:has(.profile-choice-input:focus-visible) {
+  background: #f0f7ff;
+}
+
+.product-screen[data-visual-style="a"] .picker-option-none {
+  background: var(--system-paper);
+}
+
+.product-screen[data-visual-style="a"] .picker-option-text {
+  order: 1;
+}
+
+.product-screen[data-visual-style="a"] .picker-option-text strong {
+  font-weight: 600;
+}
+
+.product-screen[data-visual-style="a"] .picker-option-text small {
+  color: var(--system-secondary);
+}
+
+.product-screen[data-visual-style="a"] .profile-choice-input {
+  order: 2;
+  appearance: none;
+  width: 22px !important;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px !important;
+  margin: 0;
+  border: 1.5px solid var(--system-line);
+  border-radius: 50%;
+  background: var(--system-paper);
+  accent-color: unset;
+  cursor: pointer;
+}
+
+.product-screen[data-visual-style="a"] .profile-choice-input:checked {
+  border-color: var(--system-accent);
+  background: radial-gradient(circle, var(--system-paper) 0 3px, transparent 3.5px), var(--system-accent);
+}
+
+.product-screen[data-visual-style="a"] .profile-choice-input:focus-visible {
+  outline: 2px solid var(--system-accent);
+  outline-offset: 2px;
+}
+
+.product-screen[data-visual-style="a"] .navigation-guidance {
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--system-line);
+  border-radius: 18px;
+  background: var(--system-grouped);
+}
+
+.product-screen[data-visual-style="a"] .guidance-status {
+  color: var(--system-secondary);
+}
+
+.product-screen[data-visual-style="a"] .next-action {
+  padding: 14px;
+  border: 1px solid var(--system-line);
+  border-left: 3px solid var(--system-accent);
+  border-radius: 14px;
+  background: var(--system-paper);
+}
+
+.product-screen[data-visual-style="a"] .next-action.is-unavailable {
+  border-left-color: var(--system-line);
+}
+
+.product-screen[data-visual-style="a"] .remaining-distance {
+  padding: 14px;
+  border: 1px solid var(--system-line);
+  border-radius: 14px;
+  background: var(--system-paper);
+}
+
+.product-screen[data-visual-style="a"] .guidance-details,
+.product-screen[data-visual-style="a"] .destination-details dl {
+  padding-inline: 14px;
+  border: 1px solid var(--system-line);
+  border-radius: 14px;
+  background: var(--system-grouped);
+}
+
+.product-screen[data-visual-style="a"] .guidance-details > div,
+.product-screen[data-visual-style="a"] .destination-details dl > div {
+  border-bottom-color: #e8e8ed;
+}
+
+.product-screen[data-visual-style="a"] .destination-photo {
+  border: 0;
+  border-radius: 16px;
+  background: var(--system-grouped);
+}
+
+.product-screen[data-visual-style="a"] .photo-unavailable,
+.product-screen[data-visual-style="a"] .destination-note {
+  padding: 14px;
+  border: 1px solid var(--system-line);
+  border-radius: 14px;
+  background: var(--system-grouped);
+}
+
+.product-screen[data-visual-style="a"] button[data-action="stop"],
+.product-screen[data-visual-style="a"] button[data-action="confirm-end"],
+.product-screen[data-visual-style="a"] button[data-action="submit-stop-reason"] {
+  border-color: var(--system-danger);
+  background: var(--system-danger);
+}
+
+.product-screen[data-visual-style="a"] button[data-action="stop"]:hover,
+.product-screen[data-visual-style="a"] button[data-action="confirm-end"]:hover,
+.product-screen[data-visual-style="a"] button[data-action="submit-stop-reason"]:hover {
+  background: #d70015;
+}
+
+@media (max-width: 420px) {
+  .product-screen[data-visual-style="a"]:not(.splash-screen) {
+    border-inline: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* Keep secondary controls and semantic Stop actions distinct from the primary blue action. */
+.product-screen[data-visual-style="a"]:not(.splash-screen) button.profile-menu-button,
+.product-screen[data-visual-style="a"]:not(.splash-screen) button.settings-button,
+.product-screen[data-visual-style="a"]:not(.splash-screen) .profile-menu button:not(.compass-shell),
+.product-screen[data-visual-style="a"]:not(.splash-screen) .party-selector-controls > button:not(.compass-shell),
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="cancel-profile"],
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="cancel-external-map"],
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="continue-guidance"],
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="continue-after-reveal"] {
+  border-color: var(--system-line);
+  color: var(--system-ink);
+  background: var(--system-paper);
+  box-shadow: none;
+  font-weight: 500;
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button.profile-menu-button {
+  border-radius: 50%;
+  color: var(--system-secondary);
+  background: var(--system-grouped);
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button.settings-button {
+  border-radius: 50%;
+  color: var(--system-secondary);
+  background: var(--system-grouped);
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) .profile-menu button:not(.compass-shell):hover,
+.product-screen[data-visual-style="a"]:not(.splash-screen) .party-selector-controls > button:not(.compass-shell):hover,
+.product-screen[data-visual-style="a"]:not(.splash-screen) button.settings-button:hover,
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="cancel-profile"]:hover,
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="cancel-external-map"]:hover,
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="continue-guidance"]:hover,
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="continue-after-reveal"]:hover {
+  border-color: var(--system-line);
+  color: var(--system-ink);
+  background: var(--system-grouped);
+  box-shadow: none;
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="stop"],
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="confirm-end"],
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="submit-stop-reason"] {
+  border-color: var(--system-danger);
+  color: var(--system-paper);
+  background: var(--system-danger);
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="stop"]:hover,
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="confirm-end"]:hover,
+.product-screen[data-visual-style="a"]:not(.splash-screen) button[data-action="submit-stop-reason"]:hover {
+  border-color: #d70015;
+  color: var(--system-paper);
+  background: #d70015;
+}
+
+/* Let the shared compass travel between phase layouts instead of being replaced in place. */
+@supports (view-transition-name: compass-shell) {
+  .product-screen[data-visual-style="a"] .compass-shell {
+    view-transition-name: compass-shell;
+  }
+
+  ::view-transition-group(compass-shell) {
+    animation-duration: 680ms;
+    animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  ::view-transition-old(compass-shell),
+  ::view-transition-new(compass-shell) {
+    animation-duration: 680ms;
+    animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 180ms;
+    animation-timing-function: ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(compass-shell),
+    ::view-transition-old(compass-shell),
+    ::view-transition-new(compass-shell),
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation-duration: 0.001ms;
+    }
+  }
+}
+
+/* A refinement: cardless utility surfaces */
+.product-screen[data-visual-style="a"]:not(.splash-screen) {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.product-screen[data-visual-style="a"] .condition-settings {
+  row-gap: 0;
+}
+
+.product-screen[data-visual-style="a"] .condition-settings > h2 {
+  margin-bottom: 4px;
+}
+
+.product-screen[data-visual-style="a"] .condition-settings > p {
+  margin-bottom: 16px;
+}
+
+.product-screen[data-visual-style="a"] .condition-settings > .party-selector,
+.product-screen[data-visual-style="a"] .condition-settings > .slider-field,
+.product-screen[data-visual-style="a"] .condition-settings > details,
+.product-screen[data-visual-style="a"] .condition-settings > .form-errors,
+.product-screen[data-visual-style="a"] .condition-settings > .no-fit-review,
+.product-screen[data-visual-style="a"] .condition-settings > .recovery-review {
+  padding: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--system-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.product-screen[data-visual-style="a"] .condition-settings > .form-errors {
+  padding: 10px 0 10px 12px;
+  border-top: 0;
+  border-left: 3px solid var(--system-danger);
+  color: var(--system-danger);
+}
+
+.product-screen[data-visual-style="a"] .condition-settings > .condition-complete-button {
+  margin-top: 16px;
+}
+
+.product-screen[data-visual-style="a"] form[data-form="profile"] {
+  gap: 0;
+}
+
+.product-screen[data-visual-style="a"] .profile-picker {
+  padding: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--system-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.product-screen[data-visual-style="a"] .profile-picker:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.product-screen[data-visual-style="a"] .picker-options-scroll {
+  border: 0;
+  border-inline: 0;
+  border-block: 1px solid var(--system-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.product-screen[data-visual-style="a"] .navigation-guidance {
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.product-screen[data-visual-style="a"] .next-action {
+  padding: 12px 0 12px 14px;
+  border: 0;
+  border-left: 3px solid var(--system-accent);
+  border-radius: 0;
+  background: transparent;
+}
+
+.product-screen[data-visual-style="a"] .next-action.is-unavailable {
+  border-left-color: var(--system-line);
+}
+
+.product-screen[data-visual-style="a"] .remaining-distance {
+  padding: 14px 0;
+  border: 0;
+  border-inline: 0;
+  border-block: 1px solid var(--system-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.product-screen[data-visual-style="a"] .guidance-details,
+.product-screen[data-visual-style="a"] .destination-details dl {
+  padding-inline: 0;
+  border: 0;
+  border-inline: 0;
+  border-block: 1px solid var(--system-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.product-screen[data-visual-style="a"] .photo-unavailable,
+.product-screen[data-visual-style="a"] .destination-note {
+  padding: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--system-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.product-screen[data-visual-style="a"] .profile-picker[data-profile-picker="dietary"],
+.product-screen[data-visual-style="a"] .profile-picker[data-profile-picker="allergies"] {
+  padding: 16px;
+  border: 1px solid var(--system-line);
+  border-radius: 18px;
+  background: var(--system-grouped);
+}
+
+/* Typography contract: display words carry the compass character; utility copy stays quiet. */
+.product-screen h1,
+.product-screen h2,
+.product-screen legend,
+.product-screen .destination-name,
+.product-screen .splash-wordmark {
+  font-family: var(--ui-font);
+  font-weight: 400;
+}
+
+.product-screen button,
+.product-screen input,
+.product-screen select,
+.product-screen summary,
+.product-screen p,
+.product-screen dt,
+.product-screen dd,
+.product-screen label,
+.product-screen small,
+.product-screen output {
+  font-family: var(--ui-font);
 }

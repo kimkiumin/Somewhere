@@ -34,8 +34,8 @@ function createScheduler() {
   return {
     scheduled,
     cancelled,
-    schedule(callback) {
-      const effect = { id: scheduled.length + 1, callback };
+    schedule(callback, delay) {
+      const effect = { id: scheduled.length + 1, callback, delay };
       scheduled.push(effect);
       return effect.id;
     },
@@ -44,6 +44,27 @@ function createScheduler() {
     },
   };
 }
+
+test("first-use controller schedules a three-second splash before profile setup", () => {
+  const timer = createScheduler();
+  const rendered = [];
+  const controller = createInspectableController({
+    initialState: stateApi.createInitialState({ firstUse: true }),
+    render: (view) => rendered.push(view),
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+    now: () => 1000,
+  });
+
+  assert.equal(controller.getState().phase, "splash");
+  assert.equal(timer.scheduled.length, 1);
+  assert.equal(timer.scheduled[0].delay, 3000);
+
+  timer.scheduled[0].callback();
+  assert.equal(controller.getState().phase, "profile_setup");
+  assert.equal(rendered.at(-1).phase, "profile_setup");
+  controller.destroy();
+});
 
 test("start schedules one automatic finding completion and no second commit", () => {
   const timer = createScheduler();
@@ -118,8 +139,8 @@ test("mock destination is complete for arrival but is not exposed on the browser
   assert.equal(typeof MOCK_DESTINATION.recommendationReason, "string");
   assert.equal(typeof MOCK_DESTINATION.reviewSummary, "string");
   assert.equal(Number.isFinite(MOCK_ROUTE.distanceM), true);
-  assert.equal(globalThis.SomewhereVNextController.MOCK_DESTINATION, undefined);
-  assert.equal(globalThis.SomewhereVNextController.MOCK_ROUTE, undefined);
+  assert.equal(globalThis.RollTheCompassVNextController.MOCK_DESTINATION, undefined);
+  assert.equal(globalThis.RollTheCompassVNextController.MOCK_ROUTE, undefined);
 });
 
 test("mock route contains ordered turn steps for the navigation prototype", () => {
@@ -177,10 +198,10 @@ test("no-fit simulation reports the active advanced conditions without changing 
   assert.equal(controller.getState().phase, "constraints");
   assert.deepEqual(controller.getState().constraints, constraints);
   assert.deepEqual(controller.getState().affectedConditions, [
-    { field: "budget", label: "예산" },
-    { field: "dietary", label: "식이 조건" },
-    { field: "allergies", label: "알레르기" },
-    { field: "disclosure", label: "목적지 공개 수준" },
+    { field: "budget", label: "Budget" },
+    { field: "dietary", label: "Dietary preferences" },
+    { field: "allergies", label: "Allergies" },
+    { field: "disclosure", label: "Destination disclosure" },
   ]);
   assert.deepEqual(rendered.at(-1).affectedConditions, controller.getState().affectedConditions);
 });
@@ -368,7 +389,6 @@ test("profile none choices save as empty condition arrays", () => {
       }
     },
   });
-  root.click(productButton("open-profile-menu"));
   root.click(productButton("open-profile-settings"));
   root.click(productButton("save-profile", { form: { values: {} } }));
   assert.deepEqual(mounted.controller.getState().profile, { dietary: [], allergies: [] });
@@ -436,7 +456,7 @@ test("party arrow buttons update party size and stop at both boundaries", () => 
   mounted.destroy();
 });
 
-test("profile menu opens settings and profile save returns to constraints", () => {
+test("direct settings button opens profile and profile save returns to constraints", () => {
   const root = createEventRoot();
   const controlsRoot = createEventRoot();
   const mounted = mountInspectable(root, controlsRoot, {
@@ -448,8 +468,6 @@ test("profile menu opens settings and profile save returns to constraints", () =
     },
   });
 
-  root.click(productButton("open-profile-menu"));
-  assert.equal(mounted.controller.getState().profileMenuOpen, true);
   root.click(productButton("open-profile-settings"));
   assert.equal(mounted.controller.getState().phase, "profile");
   assert.equal(mounted.controller.getState().profileMenuOpen, false);
@@ -459,6 +477,30 @@ test("profile menu opens settings and profile save returns to constraints", () =
     dietary: ["vegetarian"],
     allergies: ["peanut"],
   });
+  mounted.destroy();
+});
+
+test("condition scroll actions use smooth scrolling without changing phase", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const scrollCalls = [];
+  const scrollTargets = {
+    "#condition-settings": { scrollIntoView: (options) => scrollCalls.push(["down", options]) },
+    "#constraints-launch": { scrollIntoView: (options) => scrollCalls.push(["up", options]) },
+  };
+  root.querySelector = (selector) => scrollTargets[selector] ?? null;
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+  });
+
+  root.click(productButton("scroll-to-conditions"));
+  root.click(productButton("scroll-to-launch"));
+
+  assert.deepEqual(scrollCalls, [
+    ["down", { behavior: "smooth", block: "start" }],
+    ["up", { behavior: "smooth", block: "start" }],
+  ]);
+  assert.equal(mounted.controller.getState().phase, "constraints");
   mounted.destroy();
 });
 
@@ -564,8 +606,8 @@ test("mount renders guarded review and restarts with one acknowledged Start", ()
   root.click(productButton("submit-stop-reason", { reason: "safety" }));
   root.click(productButton("new-recommendation"));
   assert.equal(mounted.controller.getState().guardedRecovery, true);
-  assert.match(root.innerHTML, /최근 안내 종료 이유/);
-  assert.match(root.innerHTML, /안전 문제/);
+  assert.match(root.innerHTML, /Recent stop reason/);
+  assert.match(root.innerHTML, /Safety issue/);
   form.reviewVisible = true;
   root.click(productButton("start", { form }));
   assert.equal(mounted.controller.getState().phase, "constraints");
@@ -593,13 +635,13 @@ function stoppedState(reason) {
 
 test("mount dispatches every Stop reason into its guarded new-start review", () => {
   const cases = [
-    ["safety", /안전 관련 조건/],
-    ["route_sensor", /재보정/],
-    ["condition_mismatch", /맞지 않았던 필수 조건/],
-    ["venue_problem", /현장에서 문제가 된 사항/],
-    ["change_of_mind", /모든 조건/],
-    ["schedule_change", /이전 여정은 종료되었어요/],
-    ["skipped", /종료 이유를 건너뛰었어요/],
+    ["safety", /Check the safety conditions/],
+    ["route_sensor", /recalibration/],
+    ["condition_mismatch", /required condition/],
+    ["venue_problem", /issue at the venue/],
+    ["change_of_mind", /Review all conditions/],
+    ["schedule_change", /current schedule/],
+    ["skipped", /stop reason was skipped/],
   ];
 
   for (const [reason, expectedPrompt] of cases) {
@@ -673,7 +715,7 @@ test("mount focuses accepted screen renders but not rejected duplicate actions",
 test("advanced input updates its collapsed summary without rerendering or moving focus", () => {
   const root = createEventRoot();
   const controlsRoot = createEventRoot();
-  const summary = { textContent: "추가 조건 1개 적용 중 — 목적지 공개 수준" };
+  const summary = { textContent: "1 additional conditions · Disclosure" };
   const details = {
     querySelector(selector) {
       return selector === "summary" ? summary : null;
@@ -705,7 +747,7 @@ test("advanced input updates its collapsed summary without rerendering or moving
 
   assert.equal(
     summary.textContent,
-    "추가 조건 1개 적용 중 — 목적지 공개 수준",
+    "1 additional conditions · Disclosure",
   );
   assert.equal(root.focusCount(), focusBeforeInput);
   mounted.destroy();
@@ -718,7 +760,7 @@ test("CommonJS test inspection is separate from browser and mounted production A
   const rendered = [];
   const scheduled = [];
   let interceptedDestination = null;
-  const browserController = globalThis.SomewhereVNextController.createController({
+  const browserController = globalThis.RollTheCompassVNextController.createController({
     initialState: stateApi.createInitialState({ firstUse: false }),
     render: (publicView) => rendered.push(publicView),
     schedule: (callback) => { scheduled.push(callback); return scheduled.length; },
@@ -738,7 +780,7 @@ test("CommonJS test inspection is separate from browser and mounted production A
 
   const root = createEventRoot();
   const controlsRoot = createEventRoot();
-  const mounted = globalThis.SomewhereVNextController.mount(root, controlsRoot, {
+  const mounted = globalThis.RollTheCompassVNextController.mount(root, controlsRoot, {
     initialState: stateApi.createInitialState({ firstUse: false }),
   });
   assert.equal(mounted.controller.getState, undefined);
@@ -760,6 +802,8 @@ test("app boot return value cannot inspect private controller state", () => {
     delete globalThis.document;
     delete require.cache[require.resolve("./app.js")];
     const { boot } = require("./app.js");
+    assert.equal(globalThis.RollTheCompassVNextApp.boot, boot);
+    assert.equal(globalThis.SomewhereVNextApp, undefined);
     globalThis.document = {
       querySelector(selector) {
         if (selector === "#app") return root;

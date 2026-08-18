@@ -4,6 +4,11 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const stateApi = require("./state.js");
 
+test("state exposes the CommonJS API under the Roll the compass browser namespace", () => {
+  assert.equal(globalThis.RollTheCompassVNextState, stateApi);
+  assert.equal(globalThis.SomewhereVNextState, undefined);
+});
+
 function validConstraints() {
   return {
     category: "restaurant",
@@ -64,6 +69,15 @@ test("defaults to two people for group-aware restaurant discovery", () => {
   assert.equal(initial.constraints.partySize, 2);
 });
 
+test("first use starts in a splash and enters profile setup after splash completion", () => {
+  const initial = stateApi.createInitialState({ firstUse: true });
+  assert.equal(initial.phase, "splash");
+
+  const profile = stateApi.reduce(initial, { type: "SPLASH_COMPLETE" });
+  assert.equal(profile.phase, "profile_setup");
+  assert.equal(stateApi.reduce(profile, { type: "SPLASH_COMPLETE" }), profile);
+});
+
 test("accepts party sizes one through five and rejects out-of-range values", () => {
   const initial = stateApi.createInitialState({ firstUse: false });
   for (const partySize of [1, 2, 3, 4, 5]) {
@@ -75,8 +89,8 @@ test("accepts party sizes one through five and rejects out-of-range values", () 
   const invalidLow = stateApi.validateConstraints({ ...initial.constraints, partySize: 0 });
   const invalidHigh = stateApi.validateConstraints({ ...initial.constraints, partySize: 6 });
   const invalidType = stateApi.validateConstraints({ ...initial.constraints, partySize: "2" });
-  assert.equal(invalidLow.errors.partySize, "함께 가는 인원은 1명 이상 5명 이하로 선택해 주세요.");
-  assert.equal(invalidHigh.errors.partySize, "함께 가는 인원은 1명 이상 5명 이하로 선택해 주세요.");
+  assert.equal(invalidLow.errors.partySize, "Choose a party size from 1 to 5 people.");
+  assert.equal(invalidHigh.errors.partySize, "Choose a party size from 1 to 5 people.");
   assert.equal(invalidType.valid, false);
 });
 
@@ -110,9 +124,9 @@ test("one start action moves valid constraints directly into finding", () => {
   assert.equal(finding.destination, null);
 });
 
-test("first-use onboarding opens profile setup before constraints", () => {
+test("first-use profile setup saves directly into constraints", () => {
   const initial = stateApi.createInitialState({ firstUse: true });
-  const profile = stateApi.reduce(initial, { type: "CONTINUE_ONBOARDING" });
+  const profile = stateApi.reduce(initial, { type: "SPLASH_COMPLETE" });
   assert.equal(profile.phase, "profile_setup");
   const saved = stateApi.reduce(profile, {
     type: "SAVE_PROFILE",
@@ -143,7 +157,7 @@ test("budget validation rejects the unsupported 2,000 won floor", () => {
   const tooLow = stateApi.validateConstraints({ ...initial.constraints, budget: 2_000 });
   const supported = stateApi.validateConstraints({ ...initial.constraints, budget: 4_000 });
   assert.equal(tooLow.valid, false);
-  assert.equal(tooLow.errors.budget, "예산은 4,000원 이상이어야 합니다.");
+  assert.equal(tooLow.errors.budget, "Budget must be at least 4,000 KRW.");
   assert.equal(supported.valid, true);
 });
 
@@ -156,12 +170,12 @@ test("invalid constraints remain editable and identify exact fields", () => {
 
   assert.equal(unchanged.phase, "constraints");
   assert.deepEqual(unchanged.errors, {
-    maxWalkMinutes: "도보 시간은 1분 이상이어야 합니다.",
+    maxWalkMinutes: "Walk time must be at least 1 minute.",
   });
   assert.equal(unchanged.constraints.maxWalkMinutes, 0);
 });
 
-test("sequence errors use intentional Korean without known mojibake", () => {
+test("sequence errors use intentional English without known mojibake", () => {
   const invalid = stateApi.validateConstraints({
     ...validConstraints(), category: "unknown", maxWalkMinutes: 0,
   });
@@ -202,8 +216,8 @@ test("sequence errors use intentional Korean without known mojibake", () => {
   ];
 
   assert.equal(messages.length, 6);
-  for (const message of messages) assert.match(message, /[가-힣]/);
-  assert.doesNotMatch(messages.join(" "), /\?앸|\?꾨|\?쒓|\?μ|議곌굔|異⑹|⑸땲|Review the|Location permission/);
+  for (const message of messages) assert.match(message, /[A-Za-z]/);
+  assert.doesNotMatch(messages.join(" "), /\?앸|\?꾨|\?쒓|\?μ|議곌굔|異⑹|⑸땲/);
 });
 
 test("finding success begins guidance without a ready or second commit state", () => {
@@ -500,7 +514,7 @@ test("no-fit returns exact affected conditions without relaxing constraints", ()
     { field: "allergies", label: "견과류 알레르기" },
   ]);
   assert.deepEqual(stateApi.toPublicView(noFit).affectedConditions, noFit.affectedConditions);
-  assert.match(noFit.errors.finding, /충족하는 장소를 찾지 못했습니다/);
+  assert.match(noFit.errors.finding, /No place matched all required conditions/);
   assert.equal(missingMetadata, finding);
 });
 
@@ -566,7 +580,7 @@ test("guarded recovery preserves Stop reason and requires explicit review before
   assert.equal(guarded.recoveryReason, "safety");
   assert.equal(guarded.recoveryReviewed, false);
   assert.equal(blocked.phase, "constraints");
-  assert.match(blocked.errors.recoveryReview, /종료 이유와 새 출발 조건/);
+  assert.match(blocked.errors.recoveryReview, /recent stop reason and new starting conditions/);
   assert.equal(reviewed.phase, "finding");
   assert.equal(reviewed.recoveryReviewed, true);
 });
