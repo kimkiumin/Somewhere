@@ -18,6 +18,8 @@ output/
 .omo/
 playwright-report/
 test-results/
+demo-artifacts/
+/design-qa.md
 
 # Dependencies / build outputs
 node_modules/
@@ -31,6 +33,8 @@ build/
 
 # Native iOS generated output and private signing material
 ios/Somewhere.xcodeproj/
+# Local manual field-test routes can contain precise coordinates.
+ios/*.gpx
 DerivedData/
 .local-artifacts/
 *.xcresult

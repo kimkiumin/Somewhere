@@ -1,17 +1,27 @@
-# Somewhere V2
+# Roll the compass! V2
 
-Somewhere는 사용자가 정한 최소 조건 안에서 검증된 목적지 하나를
+`Roll the compass!` is the public product name. `Somewhere` remains the internal
+repository, target, bundle, and API namespace for compatibility.
+
+Roll the compass!는 사용자가 정한 최소 조건 안에서 검증된 목적지 하나를
 숨긴 채 확정하고, 후보 비교 대신 출발하게 만드는 모바일 서비스입니다.
 지도나 후보 목록이 아니라 조용한 나침반과 대략적인 거리만 전면에 둡니다.
 
+현재 네이티브 iPhone 제품 요구사항은
+[`docs/product/roll-the-compass-ios-requirements.md`](docs/product/roll-the-compass-ios-requirements.md),
+Mac/Xcode 개발과 AI 협업 절차는
+[`docs/operations/native-ios-collaboration-handoff.md`](docs/operations/native-ios-collaboration-handoff.md)를
+먼저 확인하세요.
+
 ```text
-최소 조건 → 숨겨진 목적지 하나 → 명시적 확정 → 경로 기반 안내
+최소 조건 → 숨겨진 목적지 하나를 한 번에 확정 → 경로 기반 안내
 → 도착 → 공개 → 60분 뒤 선택적 반응
 ```
 
 ## 현재 구현
 
 - 모바일 전용 V2 웹앱과 실제 Cloudflare Workers 백엔드
+- SwiftUI/Core Location 기반 네이티브 iPhone 앱과 Simulator GPS QA
 - 익명 세션, CSRF/Origin/Host 검증, 요청 순서와 멱등성 경계
 - D1, SQLite Durable Objects, Queues/DLQ/Cron, Static Assets
 - 서버가 소유하는 숨겨진 목적지와 목적지 정체를 노출하지 않는 응답
@@ -36,7 +46,8 @@ Study A 기반 RC 정책, 동일 빌드의 iPhone 15 Pro Max 실기기 4회,
 
 - 목적지는 한 번에 하나만 선택하며 이름·주소·사진·리뷰·평점은 기본적으로
   숨깁니다.
-- `목적지 확인`은 안전을 위한 독립 동작이며 안내를 끝내지 않습니다.
+- 현재 네이티브 흐름은 진행 중 `멈춤`으로 즉시 방향 안내를 정지한 뒤
+  안전 확인 화면에서 목적지 공개와 외부 지도를 선택할 수 있습니다.
 - 진행 중 활성 Reroll, 후보 목록, 순위, 검색, 지도 중심 UI는 없습니다.
 - 목적지 직선 방위 fallback은 없습니다. 경로·위치·방향 신뢰도가 깨지면
   화살표를 즉시 숨깁니다.
@@ -54,6 +65,7 @@ Study A 기반 RC 정책, 동일 빌드의 iPhone 15 Pro Max 실기기 4회,
 ```text
 app/                 모바일 V2 TypeScript/Vite PWA와 브라우저 QA
 contracts/           wire·정책·스키마 계약
+ios/                 SwiftUI/Core Location 네이티브 iPhone 앱과 XcodeGen 명세
 server/              Cloudflare Worker와 D1/DO/Queue 구현
 scripts/operations/  로컬 운영·복구·비용 검증
 scripts/release/     정확 트리 준비와 F1–F4 릴리스 증거 도구

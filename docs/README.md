@@ -53,6 +53,15 @@ authority order above. In particular, `codex_handoff_agents.md`,
 `repo_setup_guide.md`, `codex_first_prompt.md`, and `combined_source_pack.md`
 remain working or historical material, not V2 onboarding authority.
 
+For the current native implementation, use these two focused documents:
+
+- [Roll the compass! iOS product requirements](product/roll-the-compass-ios-requirements.md)
+  records the owner's current visual, interaction, disclosure, and acceptance
+  decisions without rewriting the preserved blueprint source documents.
+- [Native iOS collaboration handoff](operations/native-ios-collaboration-handoff.md)
+  gives a Mac/Xcode quickstart, source map, deterministic demo modes, real local
+  Worker test path, physical-iPhone boundary, and an AI contributor checklist.
+
 ## Historical v0.2 application
 
 To understand the preserved v0.2 `/app` behavior, use the following historical
