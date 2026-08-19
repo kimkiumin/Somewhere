@@ -535,14 +535,25 @@
       ${action("Check in", "check-feedback")}`;
   }
 
+  function renderReactionIcon(direction) {
+    return `<svg class="reaction-icon reaction-icon-${escapeHtml(direction)}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M7 10v10H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1h3Zm2 10h7.2a2 2 0 0 0 1.9-1.4l2.4-7A2 2 0 0 0 18.6 9H15l.5-3.4A2.2 2.2 0 0 0 13.3 3L9 8.2V20Z"></path>
+    </svg>`;
+  }
+
   function renderPlaceReaction() {
     return `${screenHeading("How was this place?")}
       <div class="reaction-actions">
-        ${action("Not for me", "react", " data-reaction=\"dislike\"")}
-        ${action("Good", "react", " data-reaction=\"like\"")}
-        ${action("Loved it", "react", " data-reaction=\"love\"")}
-        ${action("Could not visit", "react", " data-reaction=\"did_not_visit\"")}
-      </div>`;
+        <button type="button" class="reaction-button reaction-button-negative" data-action="react" data-reaction="dislike" aria-label="Not for me">
+          ${renderReactionIcon("down")}
+          <span>Not for me</span>
+        </button>
+        <button type="button" class="reaction-button reaction-button-positive" data-action="react" data-reaction="like" aria-label="Good">
+          ${renderReactionIcon("up")}
+          <span>Good</span>
+        </button>
+      </div>
+      <button type="button" class="reaction-secondary" data-action="react" data-reaction="did_not_visit" aria-label="Could not visit">Could not visit</button>`;
   }
 
   function renderComplete() {

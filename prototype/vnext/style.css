@@ -686,6 +686,37 @@ dd {
   gap: 10px;
 }
 
+.reaction-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reaction-button {
+  min-height: 156px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.reaction-icon {
+  width: 56px;
+  height: 56px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.reaction-icon-down {
+  transform: rotate(180deg);
+}
+
+.reaction-secondary {
+  width: 100%;
+}
+
 .destination-name {
   margin: 0;
   font-size: clamp(2rem, 9vw, 3.4rem);
@@ -1374,6 +1405,53 @@ body {
   border: 1px solid var(--system-line);
   border-radius: 18px;
   background: var(--system-grouped);
+}
+
+.product-screen[data-visual-style="a"] .reaction-actions {
+  gap: 14px;
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button.reaction-button {
+  min-height: 164px;
+  padding: 20px 14px;
+  border-color: var(--system-line);
+  border-radius: 20px;
+  color: var(--system-ink);
+  background: var(--system-paper);
+  box-shadow: none;
+  font-weight: 650;
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button.reaction-button:hover {
+  border-color: var(--system-accent);
+  color: var(--system-accent);
+  background: var(--system-grouped);
+  box-shadow: none;
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button.reaction-button-positive .reaction-icon {
+  color: var(--system-accent);
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button.reaction-button-negative .reaction-icon {
+  color: var(--system-secondary);
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button.reaction-secondary {
+  border-color: transparent;
+  color: var(--system-secondary);
+  background: transparent;
+  box-shadow: none;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.product-screen[data-visual-style="a"]:not(.splash-screen) button.reaction-secondary:hover {
+  border-color: transparent;
+  color: var(--system-ink);
+  background: transparent;
+  box-shadow: none;
 }
 
 /* Typography contract: display words carry the compass character; utility copy stays quiet. */

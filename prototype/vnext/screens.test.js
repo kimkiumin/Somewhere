@@ -92,6 +92,29 @@ test("all product typography uses Pretendard for readable consistency", () => {
   assert.match(css, /\.prototype-controls[\s\S]*font-family:\s*var\(--ui-font\)/);
 });
 
+test("place reaction uses thumb buttons with a separate visit exception", () => {
+  const html = screens.renderProductScreen(view({ phase: "place_reaction" }));
+  const css = fs.readFileSync(path.join(__dirname, "style.css"), "utf8");
+
+  assert.match(html, /class="reaction-actions"/);
+  assert.match(html, /class="reaction-button reaction-button-negative"/);
+  assert.match(html, /class="reaction-button reaction-button-positive"/);
+  assert.match(html, /data-reaction="dislike"/);
+  assert.match(html, /data-reaction="like"/);
+  assert.match(html, /class="reaction-icon reaction-icon-down"/);
+  assert.match(html, /class="reaction-icon reaction-icon-up"/);
+  assert.match(html, /aria-label="Not for me"/);
+  assert.match(html, /aria-label="Good"/);
+  assert.match(html, /class="reaction-secondary"[^>]*data-reaction="did_not_visit"/);
+  assert.doesNotMatch(html, /data-reaction="love"/);
+  assert.equal((html.match(/data-action="react"/g) || []).length, 3);
+  assert.match(css, /\.reaction-actions[\s\S]*grid-template-columns:\s*repeat\(2/);
+  assert.match(css, /\.reaction-button[\s\S]*\.reaction-icon/);
+  assert.match(css, /\.product-screen\[data-visual-style="a"\]:not\(\.splash-screen\) button\.reaction-button/);
+  assert.match(css, /\.product-screen\[data-visual-style="a"\]:not\(\.splash-screen\) button\.reaction-secondary/);
+  assert.match(css, /\.reaction-secondary/);
+});
+
 test("temporary Roll the compass wordmarks add two points of tracking", () => {
   const css = fs.readFileSync(path.join(__dirname, "style.css"), "utf8");
   const splashStart = css.indexOf(".splash-wordmark {");
