@@ -1,37 +1,436 @@
 import SwiftUI
+import UIKit
 
 struct ConstraintView: View {
+    private enum Section: Hashable {
+        case launch
+        case conditions
+    }
+
     @ObservedObject var store: JourneyStore
-    @State private var category = "cafe"
-    @State private var walkMinutes = 15
-    @State private var budget = "medium"
+    @ObservedObject private var locationController: LocationController
+    @State private var draft: SomewherePreferences
+    @State private var budgetIndex: Int
+    @State private var showsAdvanced = false
+    @State private var showsProfile = false
+
+    init(store: JourneyStore) {
+        self.store = store
+        _locationController = ObservedObject(wrappedValue: store.locationController)
+        let value = store.preferences.normalized
+        _draft = State(initialValue: value)
+        _budgetIndex = State(initialValue: Self.index(for: value.budgetAmount))
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            Spacer()
-            Text("어디로 갈지는\n도착할 때 알게 돼요.")
-                .font(.largeTitle.weight(.semibold))
-            Picker("종류", selection: $category) {
-                Text("카페").tag("cafe")
-                Text("식당").tag("restaurant")
+        GeometryReader { geometry in
+            ScrollViewReader { proxy in
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        launchPage(height: geometry.size.height, width: geometry.size.width) {
+                            withAnimation(.snappy(duration: 0.42)) {
+                                proxy.scrollTo(Section.conditions, anchor: .top)
+                            }
+                        }
+                        .id(Section.launch)
+
+                        VStack(alignment: .leading, spacing: 15) {
+                            conditionsHeader
+                            conditions
+                            locationStatus
+                        }
+                        .padding(.top, 24)
+                        .padding(.bottom, 28)
+                        .id(Section.conditions)
+                    }
+                    .scrollTargetLayout()
+                }
+                .onAppear {
+                    Task { @MainActor in
+                        await Task.yield()
+                        proxy.scrollTo(Section.launch, anchor: .top)
+                    }
+                }
             }
-            .pickerStyle(.segmented)
-            Stepper("걷기 \(walkMinutes)분", value: $walkMinutes, in: 5...60, step: 5)
-            Picker("예산", selection: $budget) {
-                Text("가볍게").tag("low")
-                Text("보통").tag("medium")
-                Text("여유롭게").tag("high")
-            }
-            Button("숨은 목적지 시작") {
-                Task { await store.start(category: category, maxWalkMinutes: walkMinutes, budgetBand: budget) }
-            }
-            .buttonStyle(.borderedProminent)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .disabled(store.isWorking)
-            .accessibilityLabel("숨은 목적지 여정 시작")
-            Spacer()
         }
+        .onAppear {
+            draft = store.preferences.normalized
+            budgetIndex = Self.index(for: draft.budgetAmount)
+            if locationController.authorizationGranted { store.requestLocationAccess() }
+        }
+        .onChange(of: store.preferences) { _, value in
+            draft = value.normalized
+            budgetIndex = Self.index(for: value.budgetAmount)
+        }
+        .sheet(isPresented: $showsProfile) {
+            ProfileSettingsView(profile: store.profile) { dietary, allergies in
+                store.saveProfile(dietary: dietary, allergies: allergies)
+                draft.dietary = dietary
+                draft.allergies = allergies
+            }
+        }
+    }
+
+    private func launchPage(height: CGFloat, width: CGFloat, scrollToConditions: @escaping () -> Void) -> some View {
+        VStack(spacing: 0) {
+            launchHeader(scrollToConditions: scrollToConditions)
+            Spacer(minLength: 24)
+            launchCompass(size: min(width + 42, 360))
+            Spacer(minLength: 18)
+            Button(action: scrollToConditions) {
+                Text("Conditions")
+                    .font(.title3.weight(.bold))
+                    .underline()
+                    .foregroundStyle(SomewherePalette.link)
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("탐색 조건 보기")
+            .accessibilityIdentifier("somewhere.conditions-link")
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: max(height, 560), alignment: .top)
+    }
+
+    private func launchHeader(scrollToConditions: @escaping () -> Void) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            Text(RollCompassBrand.name)
+                .font(RollCompassBrand.wordmarkFont(size: 34))
+                .foregroundStyle(SomewherePalette.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .accessibilityLabel("Roll the compass")
+                .accessibilityIdentifier("somewhere.logo")
+            Spacer()
+            Menu {
+                Button {
+                    showsProfile = true
+                } label: {
+                    Label("프로필 조건", systemImage: "person.crop.circle")
+                }
+                Button {
+                    showsAdvanced = true
+                    scrollToConditions()
+                } label: {
+                    Label("탐색 설정", systemImage: "slider.horizontal.3")
+                }
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(Color(red: 0.42, green: 0.43, blue: 0.46))
+                    .frame(width: 54, height: 54)
+                    .background(Color(red: 0.965, green: 0.965, blue: 0.972), in: Circle())
+                    .overlay { Circle().stroke(Color.black.opacity(0.12), lineWidth: 1) }
+            }
+            .accessibilityLabel("프로필 및 앱 메뉴")
+            .accessibilityIdentifier("somewhere.profile-menu")
+        }
+        .padding(.top, 2)
+    }
+
+    private var conditionsHeader: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Conditions")
+                .font(RollCompassBrand.wordmarkFont(size: 36))
+                .foregroundStyle(SomewherePalette.ink)
+            Text("한 곳을 고르는 기준을 정해요.")
+                .font(.subheadline)
+                .foregroundStyle(SomewherePalette.mutedInk)
+        }
+    }
+
+    private func launchCompass(size: CGFloat) -> some View {
+        SomewhereCompass(mode: store.isWorking ? .searching : .ready, size: size) {
+            SomewhereHaptics.impact()
+            var value = draft
+            value.category = "restaurant"
+            value.dietary = store.profile.dietary
+            value.allergies = store.profile.allergies
+            store.updatePreferences(value)
+            Task { await store.start(preferences: value) }
+        }
+            .disabled(store.isWorking)
+            .opacity(store.isWorking ? 0.62 : 1)
+            .accessibilityLabel("나침반을 눌러 현재 조건으로 숨은 목적지 안내 시작")
+    }
+
+    private var conditions: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("오늘의 탐색")
+                    .font(.headline.weight(.bold))
+                Spacer()
+                Button(showsAdvanced ? "접기" : "더 보기") {
+                    withAnimation(.easeInOut(duration: 0.2)) { showsAdvanced.toggle() }
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(SomewherePalette.accent)
+                .accessibilityIdentifier("somewhere.toggle-advanced")
+            }
+            categoryCard
+            partyCard
+            walkingCard
+            budgetCard
+            profileSummary
+            if showsAdvanced {
+                advancedCard
+            }
+        }
+    }
+
+    private var categoryCard: some View {
+        SomewhereCard(padding: 13) {
+            HStack(spacing: 12) {
+                Image(systemName: "fork.knife")
+                    .foregroundStyle(SomewherePalette.accent)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("오늘은 식당을 찾아요")
+                        .font(.subheadline.weight(.semibold))
+                    Text("카페 탐색은 다음 버전에서 열릴 예정이에요.")
+                        .font(.caption)
+                        .foregroundStyle(SomewherePalette.mutedInk)
+                }
+                Spacer()
+            }
+        }
+        .onAppear { draft.category = "restaurant" }
+    }
+
+    private var partyCard: some View {
+        SomewhereCard(padding: 13) {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Label("함께 가는 인원", systemImage: "person.2.fill")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text(draft.partySize == 5 ? "5명 이상" : "\(draft.partySize)명")
+                        .font(.subheadline.monospacedDigit().weight(.bold))
+                        .foregroundStyle(SomewherePalette.accent)
+                }
+                HStack(spacing: 12) {
+                    Button {
+                        draft.partySize = max(1, draft.partySize - 1)
+                        SomewhereHaptics.selection()
+                    } label: {
+                        Image(systemName: "minus")
+                            .frame(width: 38, height: 38)
+                    }
+                    .buttonStyle(SomewhereSecondaryButtonStyle())
+                    .accessibilityLabel("인원 줄이기")
+                    .accessibilityIdentifier("somewhere.party-decrement")
+                    HStack(spacing: 5) {
+                        ForEach(0..<draft.partySize, id: \.self) { _ in
+                            PartyPawn()
+                                .frame(width: 22, height: 29)
+                                .foregroundStyle(SomewherePalette.accent)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityHidden(true)
+                    Button {
+                        draft.partySize = min(5, draft.partySize + 1)
+                        SomewhereHaptics.selection()
+                    } label: {
+                        Image(systemName: "plus")
+                            .frame(width: 38, height: 38)
+                    }
+                    .buttonStyle(SomewhereSecondaryButtonStyle())
+                    .accessibilityLabel("인원 늘리기")
+                    .accessibilityIdentifier("somewhere.party-increment")
+                }
+            }
+        }
+    }
+
+    private var walkingCard: some View {
+        SomewhereCard(padding: 13) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("최대 도보 시간", systemImage: "figure.walk")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("\(draft.maxWalkMinutes)분")
+                        .font(.title3.monospacedDigit().weight(.bold))
+                        .foregroundStyle(SomewherePalette.accent)
+                }
+                Slider(
+                    value: Binding(
+                        get: { Double(draft.maxWalkMinutes) },
+                        set: { draft.maxWalkMinutes = min(60, max(5, Int(($0 / 5).rounded()) * 5)) }
+                    ),
+                    in: 5...60,
+                    step: 5
+                )
+                .tint(SomewherePalette.accent)
+                .accessibilityLabel("최대 도보 시간")
+                .accessibilityValue("\(draft.maxWalkMinutes)분")
+                .accessibilityIdentifier("somewhere.walking-time")
+                HStack {
+                    Text("5분"); Spacer(); Text("60분")
+                }
+                .font(.caption2)
+                .foregroundStyle(SomewherePalette.mutedInk)
+            }
+        }
+    }
+
+    private var budgetCard: some View {
+        SomewhereCard(padding: 13) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("1인 예산", systemImage: "wallet.pass.fill")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text(draft.budgetTitle)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(SomewherePalette.accent)
+                }
+                Picker("예산", selection: $budgetIndex) {
+                    ForEach(Array(SomewherePreferences.budgetStops.enumerated()), id: \.offset) { index, value in
+                        Text(value.map(SomewherePreferences.formattedBudget) ?? "상관없음")
+                            .tag(index)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .frame(height: 94)
+                .clipped()
+                .accessibilityLabel("1인 예산")
+                .accessibilityIdentifier("somewhere.budget-wheel")
+                .onChange(of: budgetIndex) { _, value in
+                    draft.budgetAmount = SomewherePreferences.budgetStops[min(value, SomewherePreferences.budgetStops.count - 1)]
+                    SomewhereHaptics.selection()
+                }
+            }
+        }
+    }
+
+    private var profileSummary: some View {
+        SomewhereCard(padding: 13) {
+            Button { showsProfile = true } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "leaf.fill")
+                        .foregroundStyle(SomewherePalette.success)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("식이·알레르기 조건")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(SomewherePalette.ink)
+                        Text(profileSummaryText)
+                            .font(.caption)
+                            .foregroundStyle(SomewherePalette.mutedInk)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(SomewherePalette.mutedInk)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("식이 및 알레르기 조건. \(profileSummaryText)")
+            .accessibilityIdentifier("somewhere.profile-settings")
+        }
+    }
+
+    private var advancedCard: some View {
+        SomewhereCard(padding: 13) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("공개 수준", systemImage: "eye.slash.fill")
+                    .font(.subheadline.weight(.semibold))
+                Picker("공개 수준", selection: $draft.disclosure) {
+                    ForEach(SomewhereDisclosure.allCases, id: \.self) { value in
+                        Text(value.title).tag(value)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text(draft.disclosure.detail)
+                    .font(.caption)
+                    .foregroundStyle(SomewherePalette.mutedInk)
+            }
+        }
+        .accessibilityIdentifier("somewhere.disclosure-settings")
+    }
+
+    private var profileSummaryText: String {
+        let dietary = store.profile.dietary.compactMap { id in SomewherePreferences.dietaryOptions.first { $0.id == id }?.title }
+        let allergies = store.profile.allergies.compactMap { id in SomewherePreferences.allergyOptions.first { $0.id == id }?.title }
+        if dietary.isEmpty && allergies.isEmpty { return "없음 · 프로필에서 설정할 수 있어요" }
+        let values = dietary + allergies.map { "알레르기: \($0)" }
+        return values.joined(separator: " · ")
+    }
+
+    private var locationStatus: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: locationIcon)
+                .font(.title3)
+                .foregroundStyle(locationController.location == nil ? SomewherePalette.mutedInk : SomewherePalette.success)
+                .frame(width: 24)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(locationTitle).font(.subheadline.weight(.semibold))
+                Text(locationDetail)
+                    .font(.caption)
+                    .foregroundStyle(SomewherePalette.mutedInk)
+            }
+            Spacer(minLength: 8)
+            if locationController.location == nil && !locationController.authorizationDenied {
+                ProgressView().controlSize(.small)
+            }
+            if locationController.authorizationDenied || locationController.location == nil {
+                Button(locationActionTitle) {
+                    if locationController.authorizationDenied { openSettings() } else { store.requestLocationAccess() }
+                }
+                .buttonStyle(SomewhereSecondaryButtonStyle())
+                .accessibilityLabel(locationActionTitle)
+                .accessibilityIdentifier("somewhere.location-permission")
+            }
+        }
+        .padding(16)
+        .background(SomewherePalette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(SomewherePalette.border, lineWidth: 1) }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("여정 조건 선택")
+        .accessibilityLabel("\(locationTitle). \(locationDetail)")
+    }
+
+    private var locationIcon: String {
+        if locationController.authorizationDenied { return "location.slash" }
+        if locationController.location != nil { return "location.fill" }
+        return "location"
+    }
+
+    private var locationTitle: String {
+        if locationController.authorizationDenied { return "위치 권한이 꺼져 있어요" }
+        if locationController.location != nil { return "출발 가능" }
+        if locationController.authorizationStatus == .notDetermined { return "출발 전에 위치 확인이 필요해요" }
+        return "출발 위치를 찾는 중이에요"
+    }
+
+    private var locationDetail: String {
+        if locationController.authorizationDenied { return "설정에서 위치를 허용하면 시작할 수 있어요." }
+        if locationController.location != nil { return "현재 위치를 확인했어요." }
+        if locationController.authorizationStatus == .notDetermined { return "시작 전에 한 번만 권한을 확인해 주세요." }
+        return "잠시만 기다리면 현재 위치를 확인할게요."
+    }
+
+    private var locationActionTitle: String {
+        locationController.authorizationDenied ? "설정 열기" : "위치 확인"
+    }
+
+    private func openSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+
+    private static func index(for value: Int?) -> Int {
+        SomewherePreferences.budgetStops.firstIndex(where: { $0 == value }) ?? SomewherePreferences.budgetStops.count - 1
+    }
+}
+
+private struct PartyPawn: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Circle().frame(width: 8, height: 8)
+            RoundedRectangle(cornerRadius: 5).frame(width: 16, height: 15)
+        }
     }
 }

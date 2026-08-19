@@ -2,6 +2,12 @@ import XCTest
 @testable import Somewhere
 
 final class GuidanceEngineTests: XCTestCase {
+    func testCompassPulseStartsOnlyWhenEnteringPointingMode() {
+        XCTAssertTrue(SomewhereCompassMotionPolicy.shouldStartPulse(from: .ready, to: .pointing(15)))
+        XCTAssertFalse(SomewhereCompassMotionPolicy.shouldStartPulse(from: .pointing(15), to: .pointing(20)))
+        XCTAssertFalse(SomewhereCompassMotionPolicy.shouldStartPulse(from: .pointing(20), to: .paused))
+    }
+
     func testGuidanceUsesRouteLookAheadAndRejectsPoorAccuracy() throws {
         let now = Date(timeIntervalSince1970: 3_000)
         let route = TrustedRoute(
@@ -46,6 +52,16 @@ final class GuidanceEngineTests: XCTestCase {
         var gate = ArrivalGate()
         for offset in [0.0, 4.0, 8.0] {
             XCTAssertFalse(gate.advance(sample: qualifyingSample(at: start.addingTimeInterval(offset))))
+        }
+        XCTAssertTrue(gate.advance(sample: qualifyingSample(at: start.addingTimeInterval(12))))
+        XCTAssertTrue(gate.arrived)
+    }
+
+    func testArrivalWorksWithOneSecondLocationUpdatesAfterTwelveSeconds() {
+        let start = Date(timeIntervalSince1970: 1_500)
+        var gate = ArrivalGate()
+        for second in 0...11 {
+            XCTAssertFalse(gate.advance(sample: qualifyingSample(at: start.addingTimeInterval(Double(second)))))
         }
         XCTAssertTrue(gate.advance(sample: qualifyingSample(at: start.addingTimeInterval(12))))
         XCTAssertTrue(gate.arrived)

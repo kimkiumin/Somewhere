@@ -278,6 +278,7 @@ export function transitionJourney(state: JourneyState, command: JourneyCommand):
             status: "scheduled",
           },
           phase: "arrived",
+          revealed: true,
           routeRepair: undefined,
         });
       }

@@ -23,9 +23,8 @@ struct ArrivalGate: Equatable, Sendable {
         let earliest = sample.capturedAt.addingTimeInterval(-Double(NavigationPolicy.arrivalSampleWindowMs) / 1000)
         qualifyingTimes = qualifyingTimes.filter { $0 >= earliest && $0 <= sample.capturedAt }
         qualifyingTimes.append(sample.capturedAt)
-        let evidence = Array(qualifyingTimes.suffix(NavigationPolicy.arrivalConsecutiveSamples))
-        if let first = evidence.first,
-           evidence.count == NavigationPolicy.arrivalConsecutiveSamples,
+        if let first = qualifyingTimes.first,
+           qualifyingTimes.count >= NavigationPolicy.arrivalConsecutiveSamples,
            sample.capturedAt.timeIntervalSince(first) * 1000 >= Double(NavigationPolicy.arrivalMinimumDwellMs) {
             arrived = true
         }

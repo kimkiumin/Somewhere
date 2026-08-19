@@ -108,6 +108,7 @@ function stateFor(phase: JourneyState["phase"]): JourneyState {
         activeRoute: undefined,
         feedback: { dueAt: 3_610_000, eventId: "event_arrived_lifecycle", status: "scheduled" },
         phase,
+        revealed: true,
       };
     default:
       return assertNever(phase);
@@ -168,7 +169,7 @@ function command(action: PublicAction, sequence: number, ordinal: number): Journ
 }
 
 const ALLOWED = {
-  arrived: ["reveal"],
+  arrived: [],
   committed: ["reveal", "stop-request"],
   completed: ["reveal", "recovery-intent", "recovery-confirm"],
   following: ["reveal", "stop-request", "route-recover", "arrival"],
@@ -249,8 +250,35 @@ describe("Todo11 exhaustive lifecycle transitions", () => {
     // Then: arrival clears route state, schedules feedback once, and never unlatches.
     expect(arrived.state.phase).toBe("arrived");
     expect(arrived.state.activeRoute).toBeUndefined();
+    expect(arrived.state.revealed).toBe(true);
     expect(late.kind).toBe("illegal_transition");
     expect(late.state.phase).toBe("arrived");
+  });
+
+  it("predicts a credible arrival as revealed before serializing the mutation response", () => {
+    // Given: a following journey and the same complete evidence accepted by the aggregate.
+    const following = stateFor("following");
+    const body = {
+      accuracyBand: "good" as const,
+      consecutiveSamples: 4,
+      contractVersion: 1 as const,
+      dwellMs: 12_000,
+      endpointDistanceBand: "within-arrival-threshold" as const,
+      routeConsistency: "consistent" as const,
+    };
+
+    // When: the HTTP boundary predicts the snapshot used to serialize the response.
+    const predicted = predictSnapshot(
+      "arrival",
+      body,
+      following,
+      { ...body, type: "arrival" },
+      30_000,
+    );
+
+    // Then: the response projection agrees with the persisted aggregate transition.
+    expect(predicted.phase).toBe("arrived");
+    expect(predicted.revealed).toBe(true);
   });
 
   it("projects every phase with exact actions and Reveal as an orthogonal flag", () => {

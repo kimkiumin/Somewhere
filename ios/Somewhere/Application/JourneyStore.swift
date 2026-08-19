@@ -1,16 +1,21 @@
 import Combine
 import Foundation
+import UIKit
 
 enum JourneyCommand: Equatable, Sendable {
     case create(category: String, maxWalkMinutes: Int, budgetBand: String, origin: LocationSample)
+    case createWithPreferences(SomewherePreferences, origin: LocationSample)
     case commit, reveal, cancelSelection, requestStop, cancelStop, confirmStop, skipStopReason, refresh
+    case recordStopReason(String)
     case recoverRoute, recordArrival, requestRecovery
+    case recoverRouteWithChoice(String)
     case confirmRecovery(category: String, maxWalkMinutes: Int, budgetBand: String, origin: LocationSample)
+    case confirmRecoveryWithPreferences(SomewherePreferences, origin: LocationSample)
     case submitFeedback(String)
 }
 
 enum JourneyStoreError: Error, Equatable, Sendable {
-    case unavailable, invalidTransition, sequenceConflict, expired, protocolViolation
+    case unavailable, invalidTransition, sequenceConflict, expired, protocolViolation, noFit
 }
 
 protocol JourneyServiceProtocol: Sendable {
@@ -26,7 +31,18 @@ final class JourneyStore: ObservableObject {
     @Published var showsStopConfirmation = false
     @Published var showsFeedback = false
     @Published var showsRecoveryReview = false
+    @Published var showsRevealReason = false
+    @Published var showsExternalMapWarning = false
+    @Published var showsProfileSetup = false
+    @Published var showsNoFit = false
+    @Published var recoveryReviewAcknowledged = false
     @Published var presentedError: JourneyStoreError?
+    @Published private(set) var preferences: SomewherePreferences
+    @Published private(set) var profile: SomewhereProfile
+    @Published private(set) var isOnboardingRequired: Bool
+    @Published private(set) var noFitConditions: [SomewhereConditionIssue] = []
+    @Published private(set) var lastRevealReason: String?
+    @Published private(set) var lastStopReason: String?
 
     let locationController: LocationController
     let notificationController: NotificationController
@@ -35,8 +51,8 @@ final class JourneyStore: ObservableObject {
     private var arrivalGate = ArrivalGate()
     private var trustedRoute: TrustedRoute?
     private var arrivalSubmitted = false
-    private var selectedConstraints: (category: String, maxWalkMinutes: Int, budgetBand: String)?
-    private var pendingStartConstraints: (category: String, maxWalkMinutes: Int, budgetBand: String)?
+    private var selectedConstraints: SomewherePreferences?
+    private var pendingStartConstraints: SomewherePreferences?
     private var waitingForRecoveryLocation = false
     private var pendingSafetyCommands: [(JourneyCommand, Bool)] = []
     private var pollTask: Task<Void, Never>?
@@ -50,6 +66,9 @@ final class JourneyStore: ObservableObject {
         self.service = service
         self.locationController = locationController
         self.notificationController = notificationController
+        self.preferences = SomewherePreferencesPersistence.loadPreferences()
+        self.profile = SomewherePreferencesPersistence.loadProfile()
+        self.isOnboardingRequired = !SomewherePreferencesPersistence.hasCompletedOnboarding()
         notificationController.$inAppFallbackRequired
             .receive(on: RunLoop.main)
             .sink { [weak self] value in if value { self?.showsFeedback = true } }
@@ -67,11 +86,7 @@ final class JourneyStore: ObservableObject {
                 guard let self else { return }
                 if let pending = self.pendingStartConstraints, self.projection == nil, !self.isWorking {
                     self.pendingStartConstraints = nil
-                    Task { await self.start(
-                        category: pending.category,
-                        maxWalkMinutes: pending.maxWalkMinutes,
-                        budgetBand: pending.budgetBand
-                    ) }
+                    Task { await self.start(preferences: pending) }
                 } else if self.waitingForRecoveryLocation, !self.isWorking {
                     self.waitingForRecoveryLocation = false
                     Task { await self.confirmRecovery() }
@@ -85,14 +100,69 @@ final class JourneyStore: ObservableObject {
     }
 
     func start(category: String, maxWalkMinutes: Int, budgetBand: String) async {
-        selectedConstraints = (category, maxWalkMinutes, budgetBand)
+        var value = preferences
+        value.category = category
+        value.maxWalkMinutes = max(5, min(60, maxWalkMinutes))
+        value.budgetAmount = switch budgetBand {
+        case "low": 8_000
+        case "medium": 14_000
+        case "high": 30_000
+        default: nil
+        }
+        await start(preferences: value)
+    }
+
+    func start(preferences value: SomewherePreferences) async {
+        let normalized = value.normalized
+        self.preferences = normalized
+        noFitConditions = []
+        showsNoFit = false
+        SomewherePreferencesPersistence.savePreferences(normalized)
+        selectedConstraints = normalized
         guard let origin = locationController.location else {
-            pendingStartConstraints = (category, maxWalkMinutes, budgetBand)
+            pendingStartConstraints = normalized
             locationController.requestPermissionInContext()
             return
         }
         pendingStartConstraints = nil
-        await execute(.create(category: category, maxWalkMinutes: maxWalkMinutes, budgetBand: budgetBand, origin: origin))
+        let created = await execute(.createWithPreferences(normalized, origin: origin))
+        guard created,
+              projection?.phase == .ready,
+              projection?.actions.contains(.commit) == true else { return }
+        await execute(.commit)
+    }
+
+    func updatePreferences(_ value: SomewherePreferences) {
+        let normalized = value.normalized
+        preferences = normalized
+        SomewherePreferencesPersistence.savePreferences(normalized)
+    }
+
+    func saveProfile(dietary: [String], allergies: [String]) {
+        let value = SomewhereProfile(
+            dietary: Array(Set(dietary)).sorted(),
+            allergies: Array(Set(allergies)).sorted()
+        )
+        profile = value
+        SomewherePreferencesPersistence.saveProfile(value)
+        showsProfileSetup = false
+        var updated = preferences
+        updated.dietary = value.dietary
+        updated.allergies = value.allergies
+        updatePreferences(updated)
+    }
+
+    func completeOnboarding() {
+        isOnboardingRequired = false
+        SomewherePreferencesPersistence.markOnboardingCompleted()
+        if !SomewherePreferencesPersistence.hasCompletedProfile() {
+            showsProfileSetup = true
+        }
+    }
+
+    func requestLocationAccess() {
+        presentedError = nil
+        locationController.requestPermissionInContext()
     }
 
     func commit() async { await execute(.commit) }
@@ -120,9 +190,49 @@ final class JourneyStore: ObservableObject {
     }
 
     func reveal() async { await execute(.reveal) }
-    func skipStopReason() async { await execute(.skipStopReason) }
+    func requestReveal() {
+        if projection?.revealed == true {
+            return
+        }
+        showsRevealReason = true
+    }
+
+    func submitRevealReason(_ reason: String) async {
+        showsRevealReason = false
+        lastRevealReason = reason
+        await execute(.reveal)
+    }
+
+    func skipStopReason() async {
+        lastStopReason = "skip"
+        await execute(.skipStopReason)
+    }
+    func submitStopReason(_ reason: String) async {
+        lastStopReason = reason
+        await execute(.recordStopReason(reason))
+    }
     func recoverRoute() async { await execute(.recoverRoute) }
+    func recoverRoute(choice: String) async { await execute(.recoverRouteWithChoice(choice)) }
     func recordArrival() async { await execute(.recordArrival) }
+
+    func requestExternalMap() {
+        showsExternalMapWarning = true
+    }
+
+    func confirmExternalMapHandoff() async {
+        showsExternalMapWarning = false
+        if projection?.revealed != true {
+            await execute(.reveal)
+        }
+        if projection?.phase == .paused || projection?.phase == .routeRecovery {
+            await execute(.recoverRouteWithChoice("external-map"))
+        }
+        guard let address = projection?.reveal?.address,
+              var components = URLComponents(string: "http://maps.apple.com/") else { return }
+        components.queryItems = [URLQueryItem(name: "address", value: address)]
+        guard let url = components.url else { return }
+        await MainActor.run { UIApplication.shared.open(url) }
+    }
 
     func requestRecovery() async {
         guard projection?.phase == .completed else {
@@ -131,15 +241,20 @@ final class JourneyStore: ObservableObject {
         }
         if await execute(.requestRecovery) {
             locationController.requestPermissionInContext()
+            recoveryReviewAcknowledged = false
             showsRecoveryReview = true
         }
     }
 
-    func cancelRecoveryReview() { showsRecoveryReview = false }
+    func cancelRecoveryReview() {
+        showsRecoveryReview = false
+        recoveryReviewAcknowledged = false
+    }
 
     func confirmRecovery() async {
         guard projection?.phase == .completed,
               showsRecoveryReview,
+              recoveryReviewAcknowledged,
               let constraints = selectedConstraints else {
             presentedError = .invalidTransition
             return
@@ -150,13 +265,11 @@ final class JourneyStore: ObservableObject {
             return
         }
         waitingForRecoveryLocation = false
-        let replaced = await execute(.confirmRecovery(
-            category: constraints.category,
-            maxWalkMinutes: constraints.maxWalkMinutes,
-            budgetBand: constraints.budgetBand,
-            origin: origin
-        ))
-        if replaced { showsRecoveryReview = false }
+        let replaced = await execute(.confirmRecoveryWithPreferences(constraints, origin: origin))
+        if replaced {
+            showsRecoveryReview = false
+            recoveryReviewAcknowledged = false
+        }
     }
 
     func submitFeedback(_ reaction: String) async { await execute(.submitFeedback(reaction)) }
@@ -174,7 +287,48 @@ final class JourneyStore: ObservableObject {
         arrivalSubmitted = false
         guidance = .suppressed(.invalidRoute)
         presentedError = nil
+        showsRevealReason = false
+        showsExternalMapWarning = false
+        showsNoFit = false
+        recoveryReviewAcknowledged = false
+        noFitConditions = []
+        lastRevealReason = nil
+        lastStopReason = nil
     }
+
+    func reviewNoFit() {
+        resetLocal()
+    }
+
+    #if DEBUG
+    func presentNoFitForTesting() {
+        noFitConditions = [
+            .init(id: "budget", title: "예산"),
+            .init(id: "dietary", title: "식이 조건"),
+        ]
+        showsNoFit = true
+    }
+
+    func presentRecoveryReviewForTesting() {
+        recoveryReviewAcknowledged = false
+        showsRecoveryReview = true
+    }
+
+    func presentFeedbackForTesting() {
+        showsFeedback = true
+    }
+
+    func presentGuidanceForTesting(bearing: Double = 315, remainingM: Double = 420) {
+        isGuidancePaused = false
+        guidance = .credible(GuidanceReading(
+            arrowDegrees: bearing,
+            remainingM: remainingM,
+            endpointDistanceM: remainingM,
+            finalCorridorDeviationM: 0,
+            routeProgressIsCredible: true
+        ))
+    }
+    #endif
 
     func applyServerProjection(_ value: JourneyProjection) {
         pollTask?.cancel()
@@ -201,11 +355,17 @@ final class JourneyStore: ObservableObject {
 
     func updateGuidance(location: LocationSample, heading: HeadingSample, route: TrustedRoute, now: Date) {
         guard !isGuidancePaused else {
-            guidance = .suppressed(.routeRecovering)
+            let pausedGuidance = GuidanceResult.suppressed(.routeRecovering)
+            if guidance != pausedGuidance {
+                guidance = pausedGuidance
+            }
             return
         }
-        guidance = guidanceEngine.update(location: location, heading: heading, route: route, now: now)
-        if case .credible(let reading) = guidance, !arrivalSubmitted {
+        let nextGuidance = guidanceEngine.update(location: location, heading: heading, route: route, now: now)
+        if guidance != nextGuidance {
+            guidance = nextGuidance
+        }
+        if case .credible(let reading) = nextGuidance, !arrivalSubmitted {
             let arrived = arrivalGate.advance(sample: ArrivalSample(
                 endpointDistanceM: reading.endpointDistanceM,
                 accuracyM: location.horizontalAccuracyM,
@@ -218,6 +378,23 @@ final class JourneyStore: ObservableObject {
                 arrivalSubmitted = true
                 Task { await execute(.recordArrival) }
             }
+        }
+    }
+
+    var guidanceTitle: String {
+        switch guidance {
+        case .credible:
+            return "화살표를 따라가요"
+        case .suppressed(.offRoute), .suppressed(.progressJump):
+            return "경로에서 벗어났어요"
+        case .suppressed(.poorLocationAccuracy), .suppressed(.staleLocation):
+            return "위치를 다시 확인하는 중"
+        case .suppressed(.poorHeadingAccuracy), .suppressed(.invalidHeading), .suppressed(.staleHeading):
+            return "나침반을 다시 확인하는 중"
+        case .suppressed(.routeRecovering):
+            return "경로를 다시 맞추는 중"
+        case .suppressed:
+            return "방향을 확인하는 중"
         }
     }
 
@@ -247,6 +424,10 @@ final class JourneyStore: ObservableObject {
             presentedError = nil
         } catch let error as JourneyStoreError {
             presentedError = error
+            if error == .noFit {
+                noFitConditions = conditionIssues(for: selectedConstraints ?? preferences)
+                showsNoFit = true
+            }
             if error == .sequenceConflict { await refreshAfterSequenceConflict() }
             if !retainLocalPauseOnFailure { isGuidancePaused = projection?.phase == .paused }
         } catch {
@@ -259,6 +440,31 @@ final class JourneyStore: ObservableObject {
             await execute(pending.0, retainLocalPauseOnFailure: pending.1)
         }
         return presentedError == nil
+    }
+
+    private func conditionIssues(for value: SomewherePreferences) -> [SomewhereConditionIssue] {
+        var issues: [SomewhereConditionIssue] = []
+        if value.partySize != SomewherePreferences.defaults.partySize {
+            issues.append(.init(id: "partySize", title: "함께 가는 인원"))
+        }
+        if value.maxWalkMinutes != SomewherePreferences.defaults.maxWalkMinutes {
+            issues.append(.init(id: "maxWalkMinutes", title: "최대 도보 시간"))
+        }
+        if value.budgetAmount != nil {
+            issues.append(.init(id: "budget", title: "예산"))
+        }
+        if !value.dietary.isEmpty {
+            issues.append(.init(id: "dietary", title: "식이 조건"))
+        }
+        if !value.allergies.isEmpty {
+            issues.append(.init(id: "allergies", title: "알레르기"))
+        }
+        if value.disclosure == .privateMode {
+            issues.append(.init(id: "disclosure", title: "목적지 공개 수준"))
+        }
+        return issues.isEmpty
+            ? [.init(id: "maxWalkMinutes", title: "최대 도보 시간")]
+            : issues
     }
 
     private func refreshAfterSequenceConflict() async {

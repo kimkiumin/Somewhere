@@ -11,6 +11,11 @@ struct SomewhereApp: App {
     @StateObject private var store: JourneyStore
 
     init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-reset-preferences") {
+            SomewherePreferencesPersistence.resetJourneyPreferencesForTesting()
+        }
+        #endif
         let service: any JourneyServiceProtocol
         if let value = Bundle.main.object(forInfoDictionaryKey: "SomewhereAPIOrigin") as? String,
            let origin = URL(string: value),
@@ -19,12 +24,40 @@ struct SomewhereApp: App {
         } else {
             service = UnconfiguredJourneyService()
         }
-        let value = JourneyStore(service: service)
         #if DEBUG
+        let suppressNotifications = ProcessInfo.processInfo.arguments.contains("--ui-test-no-notifications")
+        #else
+        let suppressNotifications = false
+        #endif
+        let notificationController = NotificationController(suppressScheduling: suppressNotifications)
+        let value = JourneyStore(service: service, notificationController: notificationController)
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-private") {
+            var preferences = value.preferences
+            preferences.disclosure = .privateMode
+            value.updatePreferences(preferences)
+        }
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-category-cafe") {
+            var preferences = value.preferences
+            preferences.category = "cafe"
+            value.updatePreferences(preferences)
+        }
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-no-fit") {
+            value.presentNoFitForTesting()
+        }
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-recovery-review") {
+            value.presentRecoveryReviewForTesting()
+        }
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-feedback") {
+            value.presentFeedbackForTesting()
+        }
         if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--ui-test-state"),
            ProcessInfo.processInfo.arguments.indices.contains(index + 1),
            let projection = UITestProjectionFactory.make(ProcessInfo.processInfo.arguments[index + 1]) {
             value.applyServerProjection(projection)
+        }
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-credible-guidance") {
+            value.presentGuidanceForTesting()
         }
         #endif
         _store = StateObject(wrappedValue: value)
@@ -42,12 +75,31 @@ private enum UITestProjectionFactory {
     static func make(_ state: String) -> JourneyProjection? {
         let common = #""contractVersion":1,"journeyId":"j_v1.AAAAAAAAAAAAAAAAAAAAAA","sequence":1"#
         let disclosure = #""disclosure":{"routeDistanceM":700,"routeDurationMinutes":10,"representativeCategories":["cafe"],"priceBand":"medium","policyVersion":"policy-v1"}"#
+        let reveal = #""reveal":{"name":"Test destination","address":"Test address"}"#
         let json: String
         switch state {
         case "following":
             json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":false,\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000},\"actions\":[\"reveal\",\"stop\",\"route-recover\",\"arrival\"]}"
+        case "following-revealed":
+            json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":true,\(reveal),\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000},\"actions\":[\"stop\",\"route-recover\",\"arrival\"]}"
+        case "route-recovery":
+            json = "{\(common),\(disclosure),\"phase\":\"route-recovery\",\"revealed\":false,\"guidance\":{\"kind\":\"unavailable\",\"reason\":\"provider\"},\"actions\":[\"reveal\",\"stop\",\"route-recover\"]}"
         case "arrived-unrevealed":
             json = "{\(common),\(disclosure),\"phase\":\"arrived\",\"revealed\":false,\"feedbackDueAt\":4102444800000,\"actions\":[\"reveal\"]}"
+        case "arrived-revealed":
+            json = "{\(common),\(disclosure),\"phase\":\"arrived\",\"revealed\":true,\(reveal),\"feedbackDueAt\":4102444800000,\"actions\":[]}"
+        case "arrived-rich":
+            json = "{\(common),\(disclosure),\"phase\":\"arrived\",\"revealed\":true,\"reveal\":{\"name\":\"Test destination\",\"address\":\"Test address\",\"building\":\"해빛가 빌딩\",\"floorUnit\":\"2층 201호\",\"recommendationReason\":\"도보 시간과 조건 충돌이 적은 곳이에요.\",\"reviewSummary\":\"담백한 메뉴와 빠른 동선이 좋다는 후기가 있어요.\"},\"feedbackDueAt\":4102444800000,\"actions\":[]}"
+        case "paused":
+            json = "{\(common),\(disclosure),\"phase\":\"paused\",\"phaseBeforePause\":\"following\",\"stopConfirmationId\":\"sc_v1.AAAAAAAAAAAAAAAAAAAAAA\",\"stopConfirmation\":{\"copyVersion\":\"v1\"},\"routeRepair\":{\"status\":\"idle\"},\"revealed\":false,\"actions\":[\"continue\",\"route-recover\",\"confirm-stop\",\"reveal\"]}"
+        case "stopped":
+            json = "{\(common),\(disclosure),\"phase\":\"stopped\",\"stopReasonState\":\"required-or-skip\",\"revealed\":false,\"actions\":[\"record-reason\",\"skip-reason\",\"reveal\"]}"
+        case "stopped-revealed":
+            json = "{\(common),\(disclosure),\"phase\":\"stopped\",\"stopReasonState\":\"required-or-skip\",\"revealed\":true,\(reveal),\"actions\":[\"record-reason\",\"skip-reason\"]}"
+        case "completed":
+            json = "{\(common),\(disclosure),\"phase\":\"completed\",\"stopReasonState\":\"recorded\",\"recoveryExpiresAt\":4102444800000,\"revealed\":false,\"actions\":[\"reveal\",\"recovery\"]}"
+        case "completed-revealed":
+            json = "{\(common),\(disclosure),\"phase\":\"completed\",\"stopReasonState\":\"recorded\",\"recoveryExpiresAt\":4102444800000,\"revealed\":true,\(reveal),\"actions\":[\"recovery\"]}"
         case "expired":
             json = "{\(common),\"phase\":\"expired\",\"actions\":[]}"
         default: return nil

@@ -128,7 +128,9 @@ export async function emitLocation(page: Page, coordinates: LocationCoordinates)
 }
 
 export async function installDeterministicClock(page: Page): Promise<void> {
-  await page.clock.install({ time: new Date("2026-07-29T12:00:00.000Z") });
+  // Freeze the browser at the current wall-clock epoch so its seven-day
+  // feedback-retention bound stays aligned with the live local Worker clock.
+  await page.clock.install({ time: Date.now() });
 }
 
 export async function driveCredibleArrival(page: Page): Promise<void> {

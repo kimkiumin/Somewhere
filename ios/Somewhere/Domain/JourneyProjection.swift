@@ -31,6 +31,11 @@ struct SafeDisclosure: Codable, Equatable, Sendable {
 struct RevealedIdentity: Codable, Equatable, Sendable {
     let name: String
     let address: String
+    let photoURL: String?
+    let building: String?
+    let floorUnit: String?
+    let recommendationReason: String?
+    let reviewSummary: String?
 }
 
 struct RouteGuidance: Codable, Equatable, Sendable {
@@ -40,6 +45,18 @@ struct RouteGuidance: Codable, Equatable, Sendable {
     let routeVersion: String?
     let expiresAt: Int64?
     let reason: String?
+    // Optional provider enrichment. The current server contract does not
+    // require these fields, but the native surface can render the same
+    // next-maneuver cue as the vNext prototype when a reviewed provider
+    // starts returning it.
+    let nextStep: RouteNavigationStep?
+}
+
+struct RouteNavigationStep: Codable, Equatable, Sendable {
+    let maneuver: String?
+    let instruction: String?
+    let distanceM: Double?
+    let road: String?
 }
 
 struct StopConfirmation: Codable, Equatable, Sendable {

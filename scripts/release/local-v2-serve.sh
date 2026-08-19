@@ -15,7 +15,11 @@ cleanup() {
   local exit_code=$?
   trap - EXIT INT TERM
   if [[ -n "$WORKER_PID" ]] && kill -0 "$WORKER_PID" 2>/dev/null; then
-    kill -- "-$WORKER_PID" 2>/dev/null || true
+    if command -v setsid >/dev/null 2>&1; then
+      kill -- "-$WORKER_PID" 2>/dev/null || true
+    else
+      kill "$WORKER_PID" 2>/dev/null || true
+    fi
     for _ in $(seq 1 100); do
       kill -0 "$WORKER_PID" 2>/dev/null || break
       sleep 0.05
@@ -62,14 +66,25 @@ openssl req -x509 -newkey rsa:2048 -nodes \
 
 (
   cd "$ROOT_DIR"
-  exec setsid bunx wrangler dev \
-    --config "$SERVER_DIR/wrangler.jsonc" \
-    --ip "$HOST" \
-    --port "$PORT" \
-    --local-protocol https \
-    --https-key-path "$RUN_DIR/local.key" \
-    --https-cert-path "$RUN_DIR/local.crt" \
-    --persist-to "$RUN_DIR/state"
+  if command -v setsid >/dev/null 2>&1; then
+    exec setsid bunx wrangler dev \
+      --config "$SERVER_DIR/wrangler.jsonc" \
+      --ip "$HOST" \
+      --port "$PORT" \
+      --local-protocol https \
+      --https-key-path "$RUN_DIR/local.key" \
+      --https-cert-path "$RUN_DIR/local.crt" \
+      --persist-to "$RUN_DIR/state"
+  else
+    exec bunx wrangler dev \
+      --config "$SERVER_DIR/wrangler.jsonc" \
+      --ip "$HOST" \
+      --port "$PORT" \
+      --local-protocol https \
+      --https-key-path "$RUN_DIR/local.key" \
+      --https-cert-path "$RUN_DIR/local.crt" \
+      --persist-to "$RUN_DIR/state"
+  fi
 ) >"$RUN_DIR/worker.log" 2>&1 &
 WORKER_PID=$!
 readonly WORKER_PID

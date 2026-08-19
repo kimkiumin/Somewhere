@@ -28,11 +28,19 @@ export function requestPolicyForEnvironment(
   canonicalOrigin: string | undefined,
 ): RequestPolicy {
   if (environment === "local") {
-    return localLoopbackRequestPolicy(url) ?? { kind: "invalid" };
+    // Local development remains loopback-only by default. An explicitly
+    // configured canonical HTTPS origin is allowed for temporary physical-
+    // device QA tunnels; it still uses the same Host + Origin binding below.
+    return canonicalOrigin === undefined
+      ? (localLoopbackRequestPolicy(url) ?? { kind: "invalid" })
+      : configuredHttpsOriginPolicy(canonicalOrigin);
   }
-  if (canonicalOrigin === undefined) {
-    return { kind: "invalid" };
-  }
+  return canonicalOrigin === undefined
+    ? { kind: "invalid" }
+    : configuredHttpsOriginPolicy(canonicalOrigin);
+}
+
+function configuredHttpsOriginPolicy(canonicalOrigin: string): RequestPolicy {
   try {
     const parsed = new URL(canonicalOrigin);
     return parsed.protocol === "https:" &&
@@ -140,7 +148,10 @@ export function validateSessionRequest(request: Request, policy: RequestPolicy):
     request.headers.get("sec-fetch-site") === "same-origin" &&
     request.headers.get("sec-fetch-mode") === "cors" &&
     request.headers.get("sec-fetch-dest") === "empty" &&
-    isExactOriginReferer(request.headers.get("referer"), policy.canonicalOrigin)
+    // Static assets deliberately use Referrer-Policy: no-referrer, so Fetch Metadata
+    // is the remaining browser proof for this safe, Origin-less session GET.
+    (request.headers.get("referer") === null ||
+      isExactOriginReferer(request.headers.get("referer"), policy.canonicalOrigin))
   );
 }
 

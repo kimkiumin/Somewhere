@@ -199,7 +199,8 @@ poor_arrival='{"contractVersion":1,"endpointDistanceBand":"within-arrival-thresh
 arrival='{"contractVersion":1,"endpointDistanceBand":"within-arrival-threshold","accuracyBand":"good","consecutiveSamples":4,"dwellMs":12000,"routeConsistency":"consistent"}'
 [[ "$(mutate arrival arrival 3 R "$arrival")" == 200 ]] || fail "arrival"
 [[ "$(json_field "$TMP_DIR/arrival.body" result.phase)" == arrived ]] || fail "arrival phase"
-[[ "$(json_field "$TMP_DIR/arrival.body" result.actions)" == '["reveal"]' ]] || fail "arrived actions"
+[[ "$(json_field "$TMP_DIR/arrival.body" result.actions)" == '[]' ]] || fail "arrived actions"
+[[ "$(json_field "$TMP_DIR/arrival.body" result.revealed)" == true ]] || fail "arrival reveal"
 
 delete_status="$(request delete \
   -b "$TMP_DIR/cookies" \

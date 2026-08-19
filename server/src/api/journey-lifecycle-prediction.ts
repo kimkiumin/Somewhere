@@ -119,6 +119,7 @@ function predictArrival(
         activeRoute: undefined,
         feedback: { dueAt: now + 3_600_000 },
         phase: "arrived",
+        revealed: true,
       }
     : {
         ...next,

@@ -10,7 +10,16 @@ private struct SessionResponse: Decodable, Sendable {
 
 private struct ContractOnlyBody: Encodable, Sendable { let contractVersion = 1 }
 private struct StopBody: Encodable, Sendable { let contractVersion = 1; let stopConfirmationId: String }
-private struct RouteRecoveryBody: Encodable, Sendable { let choice = "recalibrate"; let contractVersion = 1 }
+private struct RouteRecoveryBody: Encodable, Sendable {
+    let choice: String
+    let contractVersion = 1
+
+    init(choice: String = "recalibrate") {
+        self.choice = ["recalibrate", "reroute", "cached-route", "external-map"].contains(choice)
+            ? choice
+            : "recalibrate"
+    }
+}
 private struct ArrivalBody: Encodable, Sendable {
     let contractVersion = 1
     let endpointDistanceBand = "within-arrival-threshold"
@@ -48,8 +57,22 @@ private struct CreateBody: Encodable, Sendable {
         let category: String
         let maxWalkMinutes: Int
         let budgetBand: String
-        let dietary: [String] = []
-        let accessibility: [String] = []
+        let dietary: [String]
+        let accessibility: [String]
+
+        init(
+            category: String,
+            maxWalkMinutes: Int,
+            budgetBand: String,
+            dietary: [String] = [],
+            accessibility: [String] = []
+        ) {
+            self.category = category
+            self.maxWalkMinutes = maxWalkMinutes
+            self.budgetBand = budgetBand
+            self.dietary = dietary
+            self.accessibility = accessibility
+        }
     }
     struct Origin: Encodable, Sendable {
         let latitude: Double
@@ -62,6 +85,27 @@ private struct CreateBody: Encodable, Sendable {
     let origin: Origin
     let disclosureLevel = "standard"
     let recoveryCapability: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case contractVersion
+        case constraints
+        case origin
+        case disclosureLevel
+        case recoveryCapability
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(contractVersion, forKey: .contractVersion)
+        try container.encode(constraints, forKey: .constraints)
+        try container.encode(origin, forKey: .origin)
+        try container.encode(disclosureLevel, forKey: .disclosureLevel)
+        if let recoveryCapability {
+            try container.encode(recoveryCapability, forKey: .recoveryCapability)
+        } else {
+            try container.encodeNil(forKey: .recoveryCapability)
+        }
+    }
 }
 
 actor APIJourneyService: JourneyServiceProtocol {
@@ -84,6 +128,23 @@ actor APIJourneyService: JourneyServiceProtocol {
             case let .create(category, maxWalkMinutes, budgetBand, origin):
                 let body = CreateBody(
                     constraints: .init(category: category, maxWalkMinutes: maxWalkMinutes, budgetBand: budgetBand),
+                    origin: .init(
+                        latitude: origin.coordinate.latitude,
+                        longitude: origin.coordinate.longitude,
+                        accuracyM: origin.horizontalAccuracyM,
+                        capturedAt: Int64(origin.capturedAt.timeIntervalSince1970 * 1000)
+                    ),
+                    recoveryCapability: nil
+                )
+                return try await requestProjection("POST", "/journeys", current: nil, body: body)
+            case let .createWithPreferences(preferences, origin):
+                let body = CreateBody(
+                    constraints: .init(
+                        category: preferences.category,
+                        maxWalkMinutes: preferences.maxWalkMinutes,
+                        budgetBand: preferences.budgetBand,
+                        dietary: preferences.dietary
+                    ),
                     origin: .init(
                         latitude: origin.coordinate.latitude,
                         longitude: origin.coordinate.longitude,
@@ -116,8 +177,21 @@ actor APIJourneyService: JourneyServiceProtocol {
             case .skipStopReason:
                 struct Reason: Encodable, Sendable { let contractVersion = 1; let reason = "skip"; let reasonPolicyVersion = "stop-reasons-v1" }
                 return try await mutation("/journeys/:journeyId/stop/reason", current: current, body: Reason())
+            case let .recordStopReason(reason):
+                struct Reason: Encodable, Sendable {
+                    let contractVersion = 1
+                    let reason: String
+                    let reasonPolicyVersion = "stop-reasons-v1"
+                }
+                return try await mutation("/journeys/:journeyId/stop/reason", current: current, body: Reason(reason: reason))
             case .recoverRoute:
                 return try await mutation("/journeys/:journeyId/route/recover", current: current, body: RouteRecoveryBody())
+            case let .recoverRouteWithChoice(choice):
+                return try await mutation(
+                    "/journeys/:journeyId/route/recover",
+                    current: current,
+                    body: RouteRecoveryBody(choice: choice)
+                )
             case .refresh:
                 return try await api.request(
                     endpoint: try endpoint("GET", "/journeys/:journeyId"),
@@ -136,7 +210,11 @@ actor APIJourneyService: JourneyServiceProtocol {
                     idempotencyKey: try idempotencyKey()
                 )
                 feedbackCapability = value.feedbackCapability
-                try FeedbackCapabilityStore.save(value.feedbackCapability)
+                // Arrival is the primary journey transition. Keychain
+                // persistence only supports feedback after a later relaunch;
+                // a simulator or a transient keychain failure must not turn a
+                // successful arrival into an unavailable journey.
+                try? FeedbackCapabilityStore.save(value.feedbackCapability)
                 return value.result
             case .requestRecovery:
                 let endpoint = try endpoint("POST", "/journeys/:journeyId/recovery")
@@ -197,6 +275,47 @@ actor APIJourneyService: JourneyServiceProtocol {
                     recoveryCapability: grant.recoveryCapability
                 )
                 return try await requestProjection("POST", "/journeys", current: nil, body: body)
+            case let .confirmRecoveryWithPreferences(preferences, origin):
+                guard let current,
+                      let intent = pendingRecoveryIntent,
+                      intent.expiresAt > Int64(Date().timeIntervalSince1970 * 1000) else {
+                    throw JourneyStoreError.invalidTransition
+                }
+                let constraints = CreateBody.Constraints(
+                    category: preferences.category,
+                    maxWalkMinutes: preferences.maxWalkMinutes,
+                    budgetBand: preferences.budgetBand,
+                    dietary: preferences.dietary
+                )
+                let grant: RecoveryGrantResponse = try await api.request(
+                    endpoint: try endpoint("POST", "/journeys/:journeyId/recovery/confirm"),
+                    pathParameters: ["journeyId": current.journeyId],
+                    body: RecoveryConfirmBody(
+                        constraints: constraints,
+                        recoveryIntentId: intent.recoveryIntentId,
+                        reviewedFields: intent.requiredReviewFields
+                    ),
+                    expectedSequence: current.sequence + 1,
+                    idempotencyKey: try idempotencyKey()
+                )
+                guard grant.contractVersion == 1,
+                      grant.previousDestinationExcluded,
+                      grant.expiresAt > Int64(Date().timeIntervalSince1970 * 1000),
+                      grant.recoveryCapability.range(of: #"^rc_v1\.[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil else {
+                    throw JourneyStoreError.protocolViolation
+                }
+                pendingRecoveryIntent = nil
+                let body = CreateBody(
+                    constraints: constraints,
+                    origin: .init(
+                        latitude: origin.coordinate.latitude,
+                        longitude: origin.coordinate.longitude,
+                        accuracyM: origin.horizontalAccuracyM,
+                        capturedAt: Int64(origin.capturedAt.timeIntervalSince1970 * 1000)
+                    ),
+                    recoveryCapability: grant.recoveryCapability
+                )
+                return try await requestProjection("POST", "/journeys", current: nil, body: body)
             case let .submitFeedback(reaction):
                 guard let capability = feedbackCapability ?? FeedbackCapabilityStore.load(),
                       let prompt = try await api.eligibleFeedback(capability: capability),
@@ -219,6 +338,7 @@ actor APIJourneyService: JourneyServiceProtocol {
             if case .contract(_, let code, _, _, _) = error {
                 if code == "sequence_conflict" { throw JourneyStoreError.sequenceConflict }
                 if code == "journey_expired" { throw JourneyStoreError.expired }
+                if code == "no_fit" { throw JourneyStoreError.noFit }
             }
             throw JourneyStoreError.unavailable
         }

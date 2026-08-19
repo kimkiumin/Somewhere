@@ -70,6 +70,25 @@ const FIXTURE = parseProviderFixtureBundle({
   venues: venuesJson,
 });
 
+function indexFirstByCandidate<T extends Readonly<{ candidateId: string }>>(
+  values: readonly T[],
+): ReadonlyMap<string, T> {
+  const index = new Map<string, T>();
+  for (const value of values) {
+    if (!index.has(value.candidateId)) {
+      index.set(value.candidateId, value);
+    }
+  }
+  return index;
+}
+
+const CANDIDATES = canonicalizeVenues(FIXTURE.venues);
+const ROUTES_BY_CANDIDATE = indexFirstByCandidate(FIXTURE.routes.routes);
+const VENUES_BY_CANDIDATE = indexFirstByCandidate([
+  ...FIXTURE.venues.restaurants,
+  ...FIXTURE.venues.cafes,
+]);
+
 function priceBand(value: number): "low" | "medium" | "high" | "unknown" {
   if (value === 1) {
     return "low";
@@ -97,14 +116,19 @@ export async function buildJourneyPreparation(
     randomUint32?: RandomUint32;
   }>,
 ): Promise<JourneyPreparation> {
-  const candidates = canonicalizeVenues(FIXTURE.venues);
-  const evidence = qualifyCandidates({ ...FIXTURE, candidates, now: input.now });
+  const evidence = qualifyCandidates({ ...FIXTURE, candidates: CANDIDATES, now: input.now });
+  const qualifiedSnapshotsByCandidate = new Map<string, Set<string>>();
+  for (const candidate of evidence.qualified) {
+    const snapshots = qualifiedSnapshotsByCandidate.get(candidate.candidateId) ?? new Set<string>();
+    snapshots.add(candidate.snapshotVersion);
+    qualifiedSnapshotsByCandidate.set(candidate.candidateId, snapshots);
+  }
   const durationLimitSeconds = input.body.constraints.maxWalkMinutes * 60;
   const qualified = evidence.qualified.filter((candidate) => {
     if (candidate.category !== input.body.constraints.category) {
       return false;
     }
-    const route = FIXTURE.routes.routes.find((item) => item.candidateId === candidate.candidateId);
+    const route = ROUTES_BY_CANDIDATE.get(candidate.candidateId);
     return route !== undefined && route.expectedDurationSeconds <= durationLimitSeconds;
   });
   if (qualified.length === 0) {
@@ -115,12 +139,10 @@ export async function buildJourneyPreparation(
     pool,
     requestId: input.requestId,
     revalidate: async (member) => {
-      const current = qualifyCandidates({ ...FIXTURE, candidates, now: input.now }).qualified.some(
-        (candidate) =>
-          candidate.candidateId === member.candidateId &&
-          candidate.snapshotVersion === member.snapshotVersion,
-      );
-      return current ? { verdict: "pass" } : { code: "POLICY_UPDATED", verdict: "reject" };
+      const currentSnapshots = qualifiedSnapshotsByCandidate.get(member.candidateId);
+      return currentSnapshots?.has(member.snapshotVersion) === true
+        ? { verdict: "pass" }
+        : { code: "POLICY_UPDATED", verdict: "reject" };
     },
     ...(input.randomUint32 === undefined ? {} : { randomUint32: input.randomUint32 }),
   });
@@ -137,9 +159,7 @@ export async function buildJourneyPreparation(
   if (reviewedRoute.kind === "unavailable") {
     return { code: "route_unavailable", kind: "error" };
   }
-  const venue = [...FIXTURE.venues.restaurants, ...FIXTURE.venues.cafes].find(
-    (item) => item.candidateId === selected.member.candidateId,
-  );
+  const venue = VENUES_BY_CANDIDATE.get(selected.member.candidateId);
   const originZoneRef = FIXTURE.routes.originZones.find((zone) =>
     reviewedRoute.route.routeId.includes(zone.zoneId.replace("seoul-forest-", "")),
   )?.zoneId;

@@ -1,10 +1,5 @@
 import type { CanonicalCandidate } from "./canonicalization";
-import type {
-  EvidenceDocument,
-  ProviderFixtureBundle,
-  RightsDocument,
-  RouteDocument,
-} from "./parser";
+import type { EvidenceDocument, ProviderFixtureBundle, RightsDocument } from "./parser";
 
 export type QualifiedCandidate = Readonly<{
   canonicalId: string;
@@ -54,20 +49,10 @@ function rightsFailure(rights: RightsDocument, providerId: string, now: Date) {
   return undefined;
 }
 
-function routeIsCurrent(routes: RouteDocument, candidateId: string, now: Date): boolean {
-  return routes.routes.some(
-    (route) =>
-      route.candidateId === candidateId &&
-      route.fieldValidation === "reviewed" &&
-      !route.materialChangeReported &&
-      isCurrent(route.expiresAt, now),
-  );
-}
-
 function evidenceFailure(
   candidate: CanonicalCandidate,
-  evidence: EvidenceDocument,
-  routes: RouteDocument,
+  evidenceByCandidate: ReadonlyMap<string, EvidenceDocument["entries"][number]>,
+  currentRouteCandidates: ReadonlySet<string>,
   now: Date,
 ): EvidenceRejectionCode | undefined {
   if (candidate.venue.safetyStatus !== "reviewed") {
@@ -76,7 +61,7 @@ function evidenceFailure(
   if (!isCurrent(candidate.venue.expiresAt, now)) {
     return "VENUE_EXPIRED";
   }
-  const entry = evidence.entries.find((item) => item.candidateId === candidate.venue.candidateId);
+  const entry = evidenceByCandidate.get(candidate.venue.candidateId);
   if (entry === undefined) {
     return "EVIDENCE_MISSING";
   }
@@ -93,7 +78,7 @@ function evidenceFailure(
   if (!entry.merit.evidenceIds.includes(entry.sourceId)) {
     return "MERIT_UNSUPPORTED";
   }
-  if (!routeIsCurrent(routes, candidate.venue.candidateId, now)) {
+  if (!currentRouteCandidates.has(candidate.venue.candidateId)) {
     return "ROUTE_UNAVAILABLE";
   }
   return undefined;
@@ -109,18 +94,33 @@ export function qualifyCandidates(
   rejections: readonly EvidenceRejection[];
 }> {
   const globalFailure = rightsFailure(input.rights, input.venues.provider.id, input.now);
+  const evidenceByCandidate = new Map<string, EvidenceDocument["entries"][number]>();
+  for (const entry of input.evidence.entries) {
+    if (!evidenceByCandidate.has(entry.candidateId)) {
+      evidenceByCandidate.set(entry.candidateId, entry);
+    }
+  }
+  const currentRouteCandidates = new Set(
+    input.routes.routes
+      .filter(
+        (route) =>
+          route.fieldValidation === "reviewed" &&
+          !route.materialChangeReported &&
+          isCurrent(route.expiresAt, input.now),
+      )
+      .map((route) => route.candidateId),
+  );
   const qualified: QualifiedCandidate[] = [];
   const rejections: EvidenceRejection[] = [];
   for (const candidate of input.candidates) {
     const code =
-      globalFailure ?? evidenceFailure(candidate, input.evidence, input.routes, input.now);
+      globalFailure ??
+      evidenceFailure(candidate, evidenceByCandidate, currentRouteCandidates, input.now);
     if (code !== undefined) {
       rejections.push(Object.freeze({ candidateId: candidate.venue.candidateId, code }));
       continue;
     }
-    const entry = input.evidence.entries.find(
-      (item) => item.candidateId === candidate.venue.candidateId,
-    );
+    const entry = evidenceByCandidate.get(candidate.venue.candidateId);
     if (entry === undefined) {
       rejections.push(
         Object.freeze({ candidateId: candidate.venue.candidateId, code: "EVIDENCE_MISSING" }),

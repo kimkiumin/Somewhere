@@ -6,30 +6,38 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.95, green: 0.92, blue: 0.86).ignoresSafeArea()
+            SomewhereBackground()
             Group {
-                if let projection = store.projection {
+                if store.showsNoFit {
+                    NoFitView(store: store)
+                } else if let projection = store.projection {
                     journey(projection)
+                } else if store.isOnboardingRequired {
+                    OnboardingView { store.completeOnboarding() }
                 } else {
                     ConstraintView(store: store)
                 }
             }
-            .padding(24)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Somewhere 여정")
         .overlay(alignment: .top) {
             if let error = store.presentedError {
-                HStack {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
                     Text(errorMessage(error)).font(.footnote)
                     Button("닫기") { store.dismissError() }
                         .frame(minHeight: 44)
                         .accessibilityLabel("오류 안내 닫기")
                 }
                 .padding(.horizontal, 16)
-                .background(.regularMaterial, in: Capsule())
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.8), lineWidth: 1)
+                }
                 .padding(.top, 8)
-                .accessibilityElement(children: .contain)
                 .accessibilityLabel("여정 오류: \(errorMessage(error))")
             }
         }
@@ -39,6 +47,17 @@ struct RootView: View {
         .sheet(isPresented: $store.showsFeedback) {
             FeedbackView(store: store)
         }
+        .sheet(isPresented: $store.showsRevealReason) {
+            RevealReasonView(store: store)
+        }
+        .sheet(isPresented: $store.showsExternalMapWarning) {
+            ExternalMapWarningView(store: store)
+        }
+        .sheet(isPresented: $store.showsProfileSetup) {
+            ProfileSettingsView(profile: store.profile) { dietary, allergies in
+                store.saveProfile(dietary: dietary, allergies: allergies)
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 store.notificationController.refreshFallback()
@@ -47,6 +66,10 @@ struct RootView: View {
                 store.locationController.applicationDidEnterBackground()
             }
         }
+        // The V2 surface is intentionally a warm, light canvas. On a device
+        // configured for Dark Mode, SwiftUI's default text color becomes white
+        // while this custom background remains light, making the UI unreadable.
+        .preferredColorScheme(.light)
     }
 
     private func errorMessage(_ error: JourneyStoreError) -> String {
@@ -56,6 +79,7 @@ struct RootView: View {
         case .sequenceConflict: "최신 여정 상태로 다시 맞췄어요."
         case .expired: "여정이 만료되었어요."
         case .protocolViolation: "안전한 응답을 확인하지 못했어요."
+        case .noFit: "현재 조건에 맞는 장소를 찾지 못했어요."
         }
     }
 
@@ -67,8 +91,7 @@ struct RootView: View {
         case .stopped, .completed:
             RecoveryView(store: store, projection: projection)
         case .arrived:
-            if projection.revealed == true { RevealView(projection: projection) }
-            else { CompassView(store: store, projection: projection) }
+            ArrivalView(store: store, projection: projection)
         case .expired:
             VStack(spacing: 20) {
                 Text("여정이 만료되었어요.").font(.title2)

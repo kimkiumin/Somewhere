@@ -150,7 +150,7 @@ describe("V2 journey application facade", () => {
   });
 
   test("TASK16_V2_ROUTE_ADAPTER emits guidance and submits only strong route-consistent arrival", async () => {
-    const context = fixture();
+    const context = fixture(true);
     await context.application.startAdventure();
     context.rig.advanceMs(1_000);
     context.rig.emitLocation({
@@ -207,6 +207,15 @@ describe("V2 journey application facade", () => {
           routeConsistency: "consistent",
         },
       },
+    });
+    await vi.waitFor(() =>
+      expect(context.store.snapshot().projection).toMatchObject({
+        phase: "arrived",
+        revealed: true,
+      }),
+    );
+    expect(context.application.snapshot().revealedDestination).toMatchObject({
+      name: "조용한 정원",
     });
   });
 

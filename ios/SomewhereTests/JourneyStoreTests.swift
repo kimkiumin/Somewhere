@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 @testable import Somewhere
 
@@ -24,6 +25,21 @@ private actor SequenceConflictService: JourneyServiceProtocol {
     func capturedCommands() -> [JourneyCommand] { commands }
 }
 
+private actor QueuedJourneyService: JourneyServiceProtocol {
+    var responses: [JourneyProjection]
+    var commands: [JourneyCommand] = []
+
+    init(responses: [JourneyProjection]) { self.responses = responses }
+
+    func perform(_ command: JourneyCommand, current: JourneyProjection?) async throws -> JourneyProjection? {
+        commands.append(command)
+        guard !responses.isEmpty else { throw JourneyStoreError.protocolViolation }
+        return responses.removeFirst()
+    }
+
+    func capturedCommands() -> [JourneyCommand] { commands }
+}
+
 @MainActor
 final class JourneyStoreTests: XCTestCase {
     func testReadyProjectionRemainsHidden() throws { XCTAssertNil(try projection(phase: "ready", revealed: false).reveal) }
@@ -33,7 +49,11 @@ final class JourneyStoreTests: XCTestCase {
     }
     func testFollowingStartsGuidanceState() throws { XCTAssertEqual(try projection(phase: "following", revealed: false).actions.first, .reveal) }
     func testNearPreservesHiddenIdentity() throws { XCTAssertNil(try projection(phase: "near", revealed: false).reveal) }
-    func testArrivedRequiresExplicitReveal() throws { XCTAssertEqual(try projection(phase: "arrived", revealed: false).actions, [.reveal]) }
+    func testArrivedProjectionIsAlreadyRevealed() throws {
+        let value = try projection(phase: "arrived", revealed: true)
+        XCTAssertTrue(value.actions.isEmpty)
+        XCTAssertNotNil(value.reveal)
+    }
     func testRevealContainsIdentityOnlyAfterServerReveal() throws { XCTAssertNotNil(try projection(phase: "arrived", revealed: true).reveal) }
     func testStopPausesImmediately() async throws {
         let store = try await store(phase: "paused")
@@ -79,6 +99,80 @@ final class JourneyStoreTests: XCTestCase {
         await store.requestRecovery()
         XCTAssertEqual(store.presentedError, .invalidTransition)
         XCTAssertFalse(store.showsRecoveryReview)
+    }
+
+    func testOneTapStartAutomaticallyCommitsReadyJourney() async throws {
+        let ready = try projection(phase: "ready", revealed: false)
+        let following = try projection(phase: "following", revealed: false)
+        let service = QueuedJourneyService(responses: [ready, following])
+        let locationController = LocationController()
+        locationController.injectForTesting(location: LocationSample(
+            coordinate: Coordinate(latitude: 37.54385, longitude: 127.03695),
+            horizontalAccuracyM: 5,
+            capturedAt: Date()
+        ))
+        let store = JourneyStore(service: service, locationController: locationController)
+
+        await store.start(preferences: .defaults)
+
+        let commands = await service.capturedCommands()
+        XCTAssertEqual(commands.count, 2)
+        guard case .createWithPreferences = commands[0] else {
+            return XCTFail("first command must create the journey")
+        }
+        XCTAssertEqual(commands[1], .commit)
+        XCTAssertEqual(store.projection?.phase, .following)
+    }
+
+    func testPrototypePreferencesSnapBudgetAndPreserveProfileTaxonomy() {
+        var value = SomewherePreferences.defaults
+        XCTAssertEqual(value.maxWalkMinutes, 25)
+        value.budgetAmount = 11_000
+        value.dietary = ["lacto-ovo"]
+        let normalized = value.normalized
+        XCTAssertEqual(normalized.budgetAmount, 10_000)
+        XCTAssertEqual(normalized.dietary, ["lacto_ovo"])
+        XCTAssertTrue(SomewherePreferences.dietaryOptions.contains { $0.id == "pollo_pesco" })
+        XCTAssertEqual(SomewherePreferences.allergyOptions.count, 20)
+    }
+
+    func testEquivalentGuidanceDoesNotRepublish() throws {
+        let now = Date(timeIntervalSince1970: 3_000)
+        let route = TrustedRoute(
+            geometry: [
+                Coordinate(latitude: 37.5440, longitude: 127.0370),
+                Coordinate(latitude: 37.5450, longitude: 127.0370),
+                Coordinate(latitude: 37.5450, longitude: 127.0380),
+            ],
+            routeDigest: "sha256:" + String(repeating: "a", count: 64),
+            routeVersion: "test-v1",
+            expiresAt: now.addingTimeInterval(600),
+            receivedAt: now
+        )
+        let location = LocationSample(
+            coordinate: Coordinate(latitude: 37.5442, longitude: 127.0370),
+            horizontalAccuracyM: 5,
+            capturedAt: now
+        )
+        let heading = HeadingSample(
+            trueHeadingDegrees: 0,
+            magneticHeadingDegrees: 0,
+            magneticDeclinationDegreesEast: nil,
+            accuracyDegrees: 5,
+            capturedAt: now
+        )
+        let store = JourneyStore(
+            service: FakeJourneyService(response: try projection(phase: "following", revealed: false)),
+            notificationController: NotificationController(suppressScheduling: true)
+        )
+        var publications: [GuidanceResult] = []
+        let cancellable = store.$guidance.dropFirst().sink { publications.append($0) }
+
+        store.updateGuidance(location: location, heading: heading, route: route, now: now)
+        store.updateGuidance(location: location, heading: heading, route: route, now: now)
+
+        XCTAssertEqual(publications.count, 1)
+        withExtendedLifetime(cancellable) {}
     }
 
     private func store(phase: String) async throws -> JourneyStore {
