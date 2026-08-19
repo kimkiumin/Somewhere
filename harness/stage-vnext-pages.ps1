@@ -22,6 +22,10 @@ $runtimeFiles = @(
   "controller.js",
   "app.js"
 )
+$assetFiles = @(
+  "compass-body.png",
+  "compass-needle.png"
+)
 
 $source = [System.IO.Path]::GetFullPath($SourceDirectory)
 $destination = [System.IO.Path]::GetFullPath($DestinationDirectory)
@@ -57,6 +61,21 @@ foreach ($file in $runtimeFiles) {
   Copy-Item -LiteralPath $sourceFile -Destination (Join-Path $publicDirectory $file)
 }
 
+$sourceAssets = Join-Path $source "assets"
+$publicAssets = Join-Path $publicDirectory "assets"
+$hasAssets = Test-Path -LiteralPath $sourceAssets -PathType Container
+if ($hasAssets) {
+  New-Item -ItemType Directory -Path $publicAssets | Out-Null
+  foreach ($file in $assetFiles) {
+    $sourceFile = Join-Path $sourceAssets $file
+    if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) {
+      throw "Required prototype asset is missing: assets/$file"
+    }
+
+    Copy-Item -LiteralPath $sourceFile -Destination (Join-Path $publicAssets $file)
+  }
+}
+
 $publishedFiles = @(
   Get-ChildItem -LiteralPath $publicDirectory -File |
     Select-Object -ExpandProperty Name |
@@ -66,6 +85,30 @@ $expectedFiles = @($runtimeFiles | Sort-Object)
 
 if (Compare-Object $expectedFiles $publishedFiles) {
   throw "Pages artifact does not match the runtime-file allowlist"
+}
+
+$publishedPublicEntries = @(
+  Get-ChildItem -LiteralPath $publicDirectory |
+    Select-Object -ExpandProperty Name |
+    Sort-Object
+)
+$expectedPublicEntries = @($runtimeFiles)
+if ($hasAssets) { $expectedPublicEntries += "assets" }
+$expectedPublicEntries = @($expectedPublicEntries | Sort-Object)
+if (Compare-Object $expectedPublicEntries $publishedPublicEntries) {
+  throw "Pages artifact does not match the public-entry allowlist"
+}
+
+if ($hasAssets) {
+  $publishedAssets = @(
+    Get-ChildItem -LiteralPath $publicAssets -File |
+      Select-Object -ExpandProperty Name |
+      Sort-Object
+  )
+  $expectedAssets = @($assetFiles | Sort-Object)
+  if (Compare-Object $expectedAssets $publishedAssets) {
+    throw "Pages artifact does not match the asset allowlist"
+  }
 }
 
 $publishedRootEntries = @(
