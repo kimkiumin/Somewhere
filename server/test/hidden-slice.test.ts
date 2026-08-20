@@ -147,4 +147,38 @@ describe("hidden journey composition", () => {
     expect(routeResult).toEqual({ code: "route_unavailable", kind: "error" });
     expect(fitResult).toEqual({ code: "no_fit", kind: "error" });
   });
+
+  it("does not select a restaurant above the requested budget band", async () => {
+    const lowBudget = {
+      ...CREATE_INPUT,
+      constraints: { ...CREATE_INPUT.constraints, budgetBand: "low" as const },
+    };
+
+    const result = await buildJourneyPreparation({
+      body: lowBudget,
+      journeyId: "j_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      now: new Date("2026-07-29T00:00:00Z"),
+      requestId: "req_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      randomUint32: () => 0,
+    });
+
+    expect(result).toEqual({ code: "no_fit", kind: "error" });
+  });
+
+  it("fails closed when allergy evidence has not been reviewed", async () => {
+    const allergyConstrained = {
+      ...CREATE_INPUT,
+      constraints: { ...CREATE_INPUT.constraints, allergies: ["peanut"] },
+    };
+
+    const result = await buildJourneyPreparation({
+      body: allergyConstrained,
+      journeyId: "j_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      now: new Date("2026-07-29T00:00:00Z"),
+      requestId: "req_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      randomUint32: () => 0,
+    });
+
+    expect(result).toEqual({ code: "no_fit", kind: "error" });
+  });
 });

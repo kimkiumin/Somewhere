@@ -136,6 +136,13 @@ final class JourneyStoreTests: XCTestCase {
         XCTAssertEqual(SomewherePreferences.allergyOptions.count, 20)
     }
 
+    func testPreferencesAlwaysUseRestaurantAsTheOnlyDiscoveryCategory() {
+        var value = SomewherePreferences.defaults
+        value.category = "cafe"
+
+        XCTAssertEqual(value.normalized.category, "restaurant")
+    }
+
     func testEquivalentGuidanceDoesNotRepublish() throws {
         let now = Date(timeIntervalSince1970: 3_000)
         let route = TrustedRoute(

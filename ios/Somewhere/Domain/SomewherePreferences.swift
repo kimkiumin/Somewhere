@@ -58,7 +58,10 @@ struct SomewherePreferences: Codable, Equatable, Sendable {
 
     var normalized: SomewherePreferences {
         var value = self
-        value.category = ["restaurant", "cafe"].contains(value.category) ? value.category : "restaurant"
+        // The current field product only recommends restaurants. Keep the
+        // legacy cafe value readable, but never persist or submit it from the
+        // native surface.
+        value.category = "restaurant"
         value.partySize = min(5, max(1, value.partySize))
         value.maxWalkMinutes = min(60, max(5, value.maxWalkMinutes.roundedDown(toMultipleOf: 5)))
         if let budgetAmount = value.budgetAmount, budgetAmount > 0 {

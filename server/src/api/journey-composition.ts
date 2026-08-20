@@ -6,6 +6,7 @@ import rightsJson from "../../fixtures/seoul-forest/rights.json";
 import routesJson from "../../fixtures/seoul-forest/routes.json";
 import venuesJson from "../../fixtures/seoul-forest/venues.json";
 import { canonicalizeVenues } from "../provider/canonicalization";
+import { matchesHardConstraints } from "../provider/constraints";
 import { qualifyCandidates } from "../provider/evidence";
 import { parseProviderFixtureBundle } from "../provider/parser";
 import { sealPool } from "../provider/pool";
@@ -124,8 +125,13 @@ export async function buildJourneyPreparation(
     qualifiedSnapshotsByCandidate.set(candidate.candidateId, snapshots);
   }
   const durationLimitSeconds = input.body.constraints.maxWalkMinutes * 60;
+  const hardEligibleCandidateIds = new Set(
+    CANDIDATES.filter((candidate) => matchesHardConstraints(candidate, input.body.constraints)).map(
+      (candidate) => candidate.venue.candidateId,
+    ),
+  );
   const qualified = evidence.qualified.filter((candidate) => {
-    if (candidate.category !== input.body.constraints.category) {
+    if (!hardEligibleCandidateIds.has(candidate.candidateId)) {
       return false;
     }
     const route = ROUTES_BY_CANDIDATE.get(candidate.candidateId);

@@ -254,8 +254,9 @@ export const JourneyConstraintsV1Schema = z.object({
   category: z.enum(["restaurant", "cafe"]),
   maxWalkMinutes: z.number().int().min(1).max(120),
   budgetBand: z.enum(["low", "medium", "high"]),
-  dietary: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)).max(20),
-  accessibility: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)).max(20),
+  dietary: z.array(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/)).max(20),
+  allergies: z.array(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/)).max(20).default([]),
+  accessibility: z.array(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/)).max(20),
 }).strict().readonly();
 
 export const JourneyCreateBodyV1Schema = z.object({

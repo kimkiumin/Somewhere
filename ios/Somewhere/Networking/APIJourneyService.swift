@@ -58,6 +58,7 @@ private struct CreateBody: Encodable, Sendable {
         let maxWalkMinutes: Int
         let budgetBand: String
         let dietary: [String]
+        let allergies: [String]
         let accessibility: [String]
 
         init(
@@ -65,12 +66,14 @@ private struct CreateBody: Encodable, Sendable {
             maxWalkMinutes: Int,
             budgetBand: String,
             dietary: [String] = [],
+            allergies: [String] = [],
             accessibility: [String] = []
         ) {
             self.category = category
             self.maxWalkMinutes = maxWalkMinutes
             self.budgetBand = budgetBand
             self.dietary = dietary
+            self.allergies = allergies
             self.accessibility = accessibility
         }
     }
@@ -143,7 +146,8 @@ actor APIJourneyService: JourneyServiceProtocol {
                         category: preferences.category,
                         maxWalkMinutes: preferences.maxWalkMinutes,
                         budgetBand: preferences.budgetBand,
-                        dietary: preferences.dietary
+                        dietary: preferences.dietary,
+                        allergies: preferences.allergies
                     ),
                     origin: .init(
                         latitude: origin.coordinate.latitude,
@@ -285,7 +289,8 @@ actor APIJourneyService: JourneyServiceProtocol {
                     category: preferences.category,
                     maxWalkMinutes: preferences.maxWalkMinutes,
                     budgetBand: preferences.budgetBand,
-                    dietary: preferences.dietary
+                    dietary: preferences.dietary,
+                    allergies: preferences.allergies
                 )
                 let grant: RecoveryGrantResponse = try await api.request(
                     endpoint: try endpoint("POST", "/journeys/:journeyId/recovery/confirm"),

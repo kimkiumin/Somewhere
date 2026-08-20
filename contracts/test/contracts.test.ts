@@ -3,6 +3,7 @@ import {
   ArrivalBodyV1Schema,
   EndpointContractV1Schema,
   ErrorResponseV1Schema,
+  JourneyCreateBodyV1Schema,
   JourneyProjectionV1Schema,
   contractDocumentV1,
   IdempotencyKeySchema,
@@ -145,6 +146,33 @@ describe("HTTP and primitive contracts", () => {
         details: { venueId: "leak" },
       },
     }).success).toBe(false);
+  });
+
+  test("accepts allergy constraints as a separate hard-filter input", () => {
+    const result = JourneyCreateBodyV1Schema.safeParse({
+      contractVersion: 1,
+      constraints: {
+        category: "restaurant",
+        maxWalkMinutes: 25,
+        budgetBand: "medium",
+        dietary: ["lacto_ovo"],
+        allergies: ["peanut"],
+        accessibility: [],
+      },
+      origin: {
+        latitude: 37.54385,
+        longitude: 127.03695,
+        accuracyM: 5,
+        capturedAt: 1_785_283_200_000,
+      },
+      disclosureLevel: "standard",
+      recoveryCapability: null,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.constraints.allergies).toEqual(["peanut"]);
+    }
   });
 });
 

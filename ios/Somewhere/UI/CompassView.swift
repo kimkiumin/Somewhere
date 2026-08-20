@@ -16,8 +16,8 @@ struct CompassView: View {
                     if projection.phase == .routeRecovery {
                         RouteRecoveryView(store: store)
                     }
-                    compassDial
                     directionSummary
+                    compassDial
                     distanceCard
                     safetyNote
                 }
@@ -50,7 +50,7 @@ struct CompassView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(RollCompassBrand.name)
                     .font(RollCompassBrand.wordmarkFont(size: 23))
-                Text("JOURNEY LIVE")
+                Text("안내 중")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(SomewherePalette.mutedInk)
             }
@@ -77,7 +77,7 @@ struct CompassView: View {
     }
 
     private var compassDial: some View {
-        SomewhereCompass(mode: compassMode, size: 258)
+        SomewhereCompass(mode: compassMode, size: 286)
             .accessibilityIdentifier("somewhere.guidance-compass")
     }
 
@@ -169,52 +169,52 @@ struct CompassView: View {
             EmptyView()
         } else {
             VStack(spacing: 10) {
-            if projection.actions.contains(.commit) {
-                Button("안내 시작") {
-                    SomewhereHaptics.impact()
-                    Task { await store.commit() }
-                }
-                .buttonStyle(SomewherePrimaryButtonStyle())
-                .accessibilityLabel("숨은 목적지 안내 시작")
-                .accessibilityIdentifier("somewhere.commit")
-            }
-            HStack(spacing: 10) {
-                if projection.actions.contains(.cancel) {
-                    Button("선택 취소") {
+                if projection.actions.contains(.commit) {
+                    Button("안내 시작") {
                         SomewhereHaptics.impact()
-                        Task { await store.cancelSelection() }
+                        Task { await store.commit() }
                     }
-                    .buttonStyle(SomewhereSecondaryButtonStyle())
-                    .accessibilityLabel("숨은 목적지 선택 취소")
-                    .accessibilityIdentifier("somewhere.cancel-selection")
+                    .buttonStyle(SomewherePrimaryButtonStyle())
+                    .accessibilityLabel("숨은 목적지 안내 시작")
+                    .accessibilityIdentifier("somewhere.commit")
                 }
                 if projection.actions.contains(.stop) {
                     Button("멈춤") {
                         SomewhereHaptics.impact()
                         store.requestStop()
                     }
-                    .buttonStyle(SomewhereSecondaryButtonStyle())
+                    .buttonStyle(SomewhereDangerButtonStyle())
                     .accessibilityLabel("여정 즉시 멈춤")
                     .accessibilityIdentifier("somewhere.stop")
                 }
-                if projection.revealed == true, projection.phase != .arrived {
-                    Button("외부 지도") {
-                        store.requestExternalMap()
+                HStack(spacing: 10) {
+                    if projection.actions.contains(.cancel) {
+                        Button("선택 취소") {
+                            SomewhereHaptics.impact()
+                            Task { await store.cancelSelection() }
+                        }
+                        .buttonStyle(SomewhereSecondaryButtonStyle())
+                        .accessibilityLabel("숨은 목적지 선택 취소")
+                        .accessibilityIdentifier("somewhere.cancel-selection")
                     }
-                    .buttonStyle(SomewhereSecondaryButtonStyle())
-                    .accessibilityLabel("외부 지도 열기")
-                    .accessibilityIdentifier("somewhere.external-map")
-                }
-                if showsRecoveryAction {
-                    Button("방향 다시 잡기") {
-                        SomewhereHaptics.impact()
-                        Task { await store.recoverRoute() }
+                    if projection.revealed == true, projection.phase != .arrived {
+                        Button("외부 지도") {
+                            store.requestExternalMap()
+                        }
+                        .buttonStyle(SomewhereSecondaryButtonStyle())
+                        .accessibilityLabel("외부 지도 열기")
+                        .accessibilityIdentifier("somewhere.external-map")
                     }
-                    .buttonStyle(SomewhereSecondaryButtonStyle())
-                    .accessibilityLabel("방향 다시 잡기")
-                    .accessibilityIdentifier("somewhere.route-recover")
+                    if showsRecoveryAction {
+                        Button("방향 다시 잡기") {
+                            SomewhereHaptics.impact()
+                            Task { await store.recoverRoute() }
+                        }
+                        .buttonStyle(SomewhereSecondaryButtonStyle())
+                        .accessibilityLabel("방향 다시 잡기")
+                        .accessibilityIdentifier("somewhere.route-recover")
+                    }
                 }
-            }
             }
             .padding(.top, 10)
         }
@@ -239,7 +239,7 @@ struct CompassView: View {
     private var phaseSubtitle: String {
         switch projection.phase {
         case .ready: "안내를 시작하면 보물의 이름은 계속 숨겨진 채로 남아요."
-        case .following, .near: "화면을 오래 보지 말고, 화살표와 거리만 가볍게 확인하세요."
+        case .following, .near: "화살표는 진행 방향을, 거리는 남은 길을 보여줘요."
         case .arrived: "도착을 확인해 이곳의 이름을 공개했어요."
         case .routeRecovery: "잠시 멈춰 표시가 안정되면 다시 안내받을 수 있어요."
         default: "보물은 숨기고, 지금 필요한 신호만 보여드려요."
@@ -330,7 +330,7 @@ struct CompassView: View {
                 if let step = projection.guidance?.nextStep {
                     let distance = step.distanceM.map { "약 \(Int($0))m 뒤" }
                     let road = step.road.map { " · \($0)" } ?? ""
-                    if let distance { return "\(distance)\(road). 화살표와 남은 거리만 가볍게 확인하세요." }
+                    if let distance { return "\(distance)\(road)." }
                 }
                 return "화살표와 남은 거리만 가볍게 확인하세요."
             }

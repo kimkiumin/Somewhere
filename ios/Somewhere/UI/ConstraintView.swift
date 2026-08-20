@@ -10,16 +10,17 @@ struct ConstraintView: View {
     @ObservedObject var store: JourneyStore
     @ObservedObject private var locationController: LocationController
     @State private var draft: SomewherePreferences
-    @State private var budgetIndex: Int
+    @State private var budgetSliderValue: Double
     @State private var showsAdvanced = false
     @State private var showsProfile = false
+    @State private var isShowingConditions = false
 
     init(store: JourneyStore) {
         self.store = store
         _locationController = ObservedObject(wrappedValue: store.locationController)
         let value = store.preferences.normalized
         _draft = State(initialValue: value)
-        _budgetIndex = State(initialValue: Self.index(for: value.budgetAmount))
+        _budgetSliderValue = State(initialValue: Double(Self.index(for: value.budgetAmount)))
     }
 
     var body: some View {
@@ -28,6 +29,7 @@ struct ConstraintView: View {
                 ScrollView(showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         launchPage(height: geometry.size.height, width: geometry.size.width) {
+                            isShowingConditions = true
                             withAnimation(.snappy(duration: 0.42)) {
                                 proxy.scrollTo(Section.conditions, anchor: .top)
                             }
@@ -35,7 +37,12 @@ struct ConstraintView: View {
                         .id(Section.launch)
 
                         VStack(alignment: .leading, spacing: 15) {
-                            conditionsHeader
+                            conditionsHeader {
+                                isShowingConditions = false
+                                withAnimation(.snappy(duration: 0.42)) {
+                                    proxy.scrollTo(Section.launch, anchor: .top)
+                                }
+                            }
                             conditions
                             locationStatus
                         }
@@ -55,12 +62,12 @@ struct ConstraintView: View {
         }
         .onAppear {
             draft = store.preferences.normalized
-            budgetIndex = Self.index(for: draft.budgetAmount)
+            budgetSliderValue = Double(Self.index(for: draft.budgetAmount))
             if locationController.authorizationGranted { store.requestLocationAccess() }
         }
         .onChange(of: store.preferences) { _, value in
             draft = value.normalized
-            budgetIndex = Self.index(for: value.budgetAmount)
+            budgetSliderValue = Double(Self.index(for: value.budgetAmount))
         }
         .sheet(isPresented: $showsProfile) {
             ProfileSettingsView(profile: store.profile) { dietary, allergies in
@@ -77,16 +84,23 @@ struct ConstraintView: View {
             Spacer(minLength: 24)
             launchCompass(size: min(width + 42, 360))
             Spacer(minLength: 18)
-            Button(action: scrollToConditions) {
-                Text("Conditions")
-                    .font(.title3.weight(.bold))
-                    .underline()
-                    .foregroundStyle(SomewherePalette.link)
-                    .frame(minHeight: 44)
+            VStack(spacing: 0) {
+                Text("나침반을 눌러 출발")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SomewherePalette.mutedInk)
+                Button(action: scrollToConditions) {
+                    Text("Conditions")
+                        .font(.title3.weight(.bold))
+                        .underline()
+                        .foregroundStyle(SomewherePalette.link)
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("탐색 조건 보기")
+                .accessibilityIdentifier("somewhere.conditions-link")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("탐색 조건 보기")
-            .accessibilityIdentifier("somewhere.conditions-link")
+            .opacity(isShowingConditions ? 0 : 1)
+            .accessibilityHidden(isShowingConditions)
         }
         .frame(maxWidth: .infinity)
         .frame(minHeight: max(height, 560), alignment: .top)
@@ -106,13 +120,13 @@ struct ConstraintView: View {
                 Button {
                     showsProfile = true
                 } label: {
-                    Label("프로필 조건", systemImage: "person.crop.circle")
+                    Label("식이·알레르기 설정", systemImage: "person.crop.circle")
                 }
                 Button {
                     showsAdvanced = true
                     scrollToConditions()
                 } label: {
-                    Label("탐색 설정", systemImage: "slider.horizontal.3")
+                    Label("탐색 조건 수정", systemImage: "slider.horizontal.3")
                 }
             } label: {
                 Image(systemName: "gearshape.fill")
@@ -128,26 +142,31 @@ struct ConstraintView: View {
         .padding(.top, 2)
     }
 
-    private var conditionsHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Conditions")
-                .font(RollCompassBrand.wordmarkFont(size: 36))
-                .foregroundStyle(SomewherePalette.ink)
-            Text("한 곳을 고르는 기준을 정해요.")
-                .font(.subheadline)
-                .foregroundStyle(SomewherePalette.mutedInk)
+    private func conditionsHeader(onBack: @escaping () -> Void) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.subheadline.weight(.bold))
+                    .frame(width: 42, height: 42)
+            }
+            .buttonStyle(SomewhereSecondaryButtonStyle())
+            .accessibilityLabel("출발 화면으로 돌아가기")
+            .accessibilityIdentifier("somewhere.conditions-back")
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("탐색 조건")
+                    .font(RollCompassBrand.wordmarkFont(size: 32))
+                    .foregroundStyle(SomewherePalette.ink)
+                Text("한 곳을 고르는 기준을 정해요.")
+                    .font(.subheadline)
+                    .foregroundStyle(SomewherePalette.mutedInk)
+            }
         }
     }
 
     private func launchCompass(size: CGFloat) -> some View {
         SomewhereCompass(mode: store.isWorking ? .searching : .ready, size: size) {
-            SomewhereHaptics.impact()
-            var value = draft
-            value.category = "restaurant"
-            value.dietary = store.profile.dietary
-            value.allergies = store.profile.allergies
-            store.updatePreferences(value)
-            Task { await store.start(preferences: value) }
+            startJourney()
         }
             .disabled(store.isWorking)
             .opacity(store.isWorking ? 0.62 : 1)
@@ -171,10 +190,10 @@ struct ConstraintView: View {
             partyCard
             walkingCard
             budgetCard
-            profileSummary
             if showsAdvanced {
                 advancedCard
             }
+            startButton
         }
     }
 
@@ -185,9 +204,9 @@ struct ConstraintView: View {
                     .foregroundStyle(SomewherePalette.accent)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("오늘은 식당을 찾아요")
+                    Text("식당 한 곳을 찾아요")
                         .font(.subheadline.weight(.semibold))
-                    Text("카페 탐색은 다음 버전에서 열릴 예정이에요.")
+                    Text("이름은 도착할 때까지 숨겨둘게요.")
                         .font(.caption)
                         .foregroundStyle(SomewherePalette.mutedInk)
                 }
@@ -286,50 +305,42 @@ struct ConstraintView: View {
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(SomewherePalette.accent)
                 }
-                Picker("예산", selection: $budgetIndex) {
-                    ForEach(Array(SomewherePreferences.budgetStops.enumerated()), id: \.offset) { index, value in
-                        Text(value.map(SomewherePreferences.formattedBudget) ?? "상관없음")
-                            .tag(index)
-                    }
-                }
-                .pickerStyle(.wheel)
-                .frame(height: 94)
-                .clipped()
+                Slider(
+                    value: $budgetSliderValue,
+                    in: 0...Double(max(0, SomewherePreferences.budgetStops.count - 1)),
+                    step: 1
+                )
+                .tint(SomewherePalette.accent)
                 .accessibilityLabel("1인 예산")
-                .accessibilityIdentifier("somewhere.budget-wheel")
-                .onChange(of: budgetIndex) { _, value in
-                    draft.budgetAmount = SomewherePreferences.budgetStops[min(value, SomewherePreferences.budgetStops.count - 1)]
+                .accessibilityValue(draft.budgetTitle)
+                .accessibilityIdentifier("somewhere.budget-slider")
+                .onChange(of: budgetSliderValue) { _, value in
+                    let index = min(
+                        max(0, Int(value.rounded())),
+                        max(0, SomewherePreferences.budgetStops.count - 1)
+                    )
+                    draft.budgetAmount = SomewherePreferences.budgetStops[index]
                     SomewhereHaptics.selection()
                 }
+                HStack {
+                    Text("4,000원")
+                    Spacer()
+                    Text("상관없음")
+                }
+                .font(.caption2)
+                .foregroundStyle(SomewherePalette.mutedInk)
             }
         }
     }
 
-    private var profileSummary: some View {
-        SomewhereCard(padding: 13) {
-            Button { showsProfile = true } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "leaf.fill")
-                        .foregroundStyle(SomewherePalette.success)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("식이·알레르기 조건")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(SomewherePalette.ink)
-                        Text(profileSummaryText)
-                            .font(.caption)
-                            .foregroundStyle(SomewherePalette.mutedInk)
-                            .lineLimit(2)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(SomewherePalette.mutedInk)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("식이 및 알레르기 조건. \(profileSummaryText)")
-            .accessibilityIdentifier("somewhere.profile-settings")
+    private var startButton: some View {
+        Button("이 조건으로 출발") {
+            startJourney()
         }
+        .buttonStyle(SomewherePrimaryButtonStyle())
+        .accessibilityLabel("현재 조건으로 숨은 목적지 안내 시작")
+        .accessibilityIdentifier("somewhere.start-journey-conditions")
+        .disabled(store.isWorking)
     }
 
     private var advancedCard: some View {
@@ -351,12 +362,15 @@ struct ConstraintView: View {
         .accessibilityIdentifier("somewhere.disclosure-settings")
     }
 
-    private var profileSummaryText: String {
-        let dietary = store.profile.dietary.compactMap { id in SomewherePreferences.dietaryOptions.first { $0.id == id }?.title }
-        let allergies = store.profile.allergies.compactMap { id in SomewherePreferences.allergyOptions.first { $0.id == id }?.title }
-        if dietary.isEmpty && allergies.isEmpty { return "없음 · 프로필에서 설정할 수 있어요" }
-        let values = dietary + allergies.map { "알레르기: \($0)" }
-        return values.joined(separator: " · ")
+    private func startJourney() {
+        guard !store.isWorking else { return }
+        SomewhereHaptics.impact()
+        var value = draft
+        value.category = "restaurant"
+        value.dietary = store.profile.dietary
+        value.allergies = store.profile.allergies
+        store.updatePreferences(value)
+        Task { await store.start(preferences: value) }
     }
 
     private var locationStatus: some View {

@@ -50,6 +50,7 @@ describe("browser V2 API boundary", () => {
         contractVersion: 1,
         constraints: {
           accessibility: [],
+          allergies: [],
           budgetBand: "medium",
           category: "cafe",
           dietary: [],

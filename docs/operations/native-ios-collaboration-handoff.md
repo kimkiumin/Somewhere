@@ -27,8 +27,9 @@ isolated wireframe branch as current native authority.
 
 - Native baseline: `codex/v2-macos-handoff` at `8fd64d4` before this review work.
 - Current native review branch: `codex/roll-compass-native-app`.
-- Collaborator visual prototype: `codex/roll-the-compass-visual`, currently
-  represented by `prototype/vnext` at `0d96147`.
+- Collaborator visual prototype: `codex/roll-the-compass-visual`, whose latest
+  feedback direction is represented by `8435594` (two primary reactions plus a
+  visit exception).
 
 The visual prototype and V2 native implementation are isolated histories with
 different directory and product boundaries. Do not merge the prototype branch
@@ -44,6 +45,7 @@ contract, and test boundaries.
 | Journey orchestration and UI state | `ios/Somewhere/Application/JourneyStore.swift` |
 | Route/arrival guidance math | `ios/Somewhere/Domain/GuidanceEngine.swift`, `ArrivalGate.swift` |
 | API contract adapter | `ios/Somewhere/Networking/APIJourneyService.swift` |
+| Restaurant eligibility and food-safety gates | `server/src/provider/constraints.ts`, `server/src/api/journey-composition.ts` |
 | Real and Debug sensor adapters | `ios/Somewhere/Platform/LocationController.swift`, `SimulatorHeadingReplay.swift` |
 | Screen routing | `ios/Somewhere/UI/RootView.swift` |
 | Launch/conditions/profile | `ConstraintView.swift`, `OnboardingView.swift`, `ProfileSettingsView.swift` |
@@ -127,6 +129,82 @@ With XcodeBuildMCP, first inspect session defaults, then use:
   "extraArgs": ["CODE_SIGNING_ALLOWED=NO", "SOMEWHERE_API_ORIGIN=https://example.invalid"]
 }
 ```
+
+## Current collaborator decisions (2026-08-20)
+
+These decisions are intentionally explicit so another human or coding agent can
+continue the work without reconstructing the discussion:
+
+- Native discovery is restaurant-only. The old `cafe` value remains in the
+  shared contract and historical fixtures so old evidence stays parseable, but
+  `SomewherePreferences.normalized` always persists/submits `restaurant`.
+- Dietary conditions and allergies are profile state. They are edited from the
+  launch gear menu, stored locally, and copied into each create/recovery request
+  at the moment a journey starts. They are not duplicated in the journey form.
+- Budget is a SwiftUI `Slider`, not a wheel. Stops are 4,000원 through 50,000원
+  plus `상관없음`; the native value is displayed exactly, then mapped to the
+  current server `low`/`medium`/`high` compatibility band.
+- The design remains deliberately editable: colors, card shape, danger action,
+  reaction tiles, and primary/secondary buttons live in
+  `ios/Somewhere/UI/SomewhereStyle.swift`; screen composition stays in small
+  SwiftUI views rather than a screenshot or a generated canvas.
+
+## Restaurant recommendation algorithm
+
+The selection is not a ranking feed. The product promise is one hidden,
+evidence-qualified discovery, so the algorithm uses an evidence-first pool and
+an unbiased draw:
+
+1. Canonicalize the reviewed provider bundle and remove duplicate provider place
+   IDs.
+2. Apply hard eligibility gates before random selection: restaurant category,
+   requested budget ceiling, reviewed venue safety, active rights/quota,
+   reviewed merit/evidence, a reviewed route inside the walk-time limit, and
+   reviewed dietary/allergen metadata when the user has supplied those profile
+   constraints.
+3. Fail closed for food-safety claims. Unknown dietary or allergen metadata is
+   not treated as “safe”; a constrained request returns `no_fit` until the
+   venue has reviewed metadata. This is a deliberate safety boundary, not a
+   temporary UI fallback.
+4. Seal the remaining pool and choose with uint32 rejection sampling. The draw
+   is uniform over eligible candidates, excludes the previous destination when
+   a guarded replacement is allowed, and records revalidation receipts.
+5. Revalidate the selected snapshot immediately before returning it. If policy
+   changed, remove that member and draw again from the remaining pool.
+
+This follows the standard candidate-generation/evidence-validation separation
+used by recommender systems while preserving the hidden-destination product's
+fair exposure and surprise. It intentionally avoids a hidden popularity score:
+feedback can improve future evidence and curation, but it must not quietly turn
+the experience into restaurant rankings.
+
+The current Seoul Forest fixture has no reviewed dietary/allergen fields, so a
+non-empty dietary or allergy profile correctly produces `no_fit` in this
+fixture. Before field use, add source-backed, rights-approved metadata to the
+venue bundle and its review evidence; never weaken the gate to make a demo fit.
+
+Research anchors for future provider work:
+
+- [Apple Slider](https://developer.apple.com/documentation/swiftui/slider) and
+  [SwiftUI accessibility fundamentals](https://developer.apple.com/documentation/swiftui/accessibility-fundamentals)
+  support the native control and stable assistive labels.
+- [Google Places place types](https://developers.google.com/maps/documentation/places/web-service/place-types)
+  and [field selection](https://developers.google.com/maps/documentation/places/web-service/choose-fields)
+  are reference material only; adding a live/paid provider still requires an
+  owner-approved rights, quota, field-mask, and privacy decision.
+- [MFDS allergen guidance](https://www.law.go.kr/LSW/cgmExpcInfoP.do?cgmExpcDatSeq=2406627&mode=2)
+  is the reason ingredient presence and cross-contamination evidence must be
+  represented separately and reviewed before a safety claim.
+
+## Verification matrix for this change set
+
+| Area | Evidence |
+| --- | --- |
+| Contract | Allergy IDs parse independently; legacy payloads still parse via the default empty array. |
+| Server | Medium restaurant selection remains valid; low-budget overreach and unknown allergy metadata return `no_fit`. |
+| Native unit | Legacy `cafe` preference normalizes to `restaurant`; profile taxonomy remains stable. |
+| Native UI | Slider identifier `somewhere.budget-slider`; profile form is absent from journey conditions; menu reaches the profile sheet; feedback exposes dislike/like plus did-not-visit. |
+| Simulator | `SomewhereTests` pass; `JourneyFlowUITests` exercise launch, conditions, guidance, stop, reveal, arrival, recovery, and feedback. Network-backed virtual field tests remain opt-in when the local Worker/proxy is available. |
 
 ## Simulator build and automated tests
 

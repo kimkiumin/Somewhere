@@ -13,11 +13,11 @@ struct OnboardingView: View {
             SomewhereCompass(mode: .ready, size: 236)
                 .accessibilityLabel("출발 전 나침반")
             VStack(spacing: 12) {
-                Text("길은 보여주고,\n도착지는 숨겨둘게요.")
+                Text("목적지는 마지막에 만나요.")
                     .font(.system(size: 30, weight: .bold, design: .serif))
                     .foregroundStyle(SomewherePalette.ink)
                     .multilineTextAlignment(.center)
-                Text("방향과 거리만 따라가세요.\n도착하면 그곳을 공개해요.")
+                Text("이름과 지도 대신,\n방향과 거리만 따라가요.")
                     .font(.body)
                     .foregroundStyle(SomewherePalette.mutedInk)
                     .multilineTextAlignment(.center)
@@ -25,8 +25,8 @@ struct OnboardingView: View {
             }
             SomewhereCard(padding: 16) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("이름과 주소는 기본으로 숨겨요", systemImage: "eye.slash.fill")
-                    Label("안전할 때 언제든 멈추거나 확인할 수 있어요", systemImage: "hand.raised.fill")
+                    Label("이름과 주소는 도착할 때까지 숨겨요", systemImage: "eye.slash.fill")
+                    Label("필요하면 언제든 멈추고 확인할 수 있어요", systemImage: "hand.raised.fill")
                     Label("도착 후 한 번만 장소를 물어봐요", systemImage: "bubble.left.fill")
                 }
                 .font(.subheadline.weight(.semibold))

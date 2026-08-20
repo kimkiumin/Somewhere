@@ -1,6 +1,6 @@
 # Roll the compass! native iOS requirements
 
-Status: owner-directed implementation requirements, 2026-08-19
+Status: owner-directed implementation requirements, 2026-08-20
 
 This document translates the project owner's current product direction and
 visual references into an implementation contract for the native iPhone app.
@@ -60,8 +60,18 @@ lines, maps, and destination identity remain absent from active guidance.
 ### Conditions and profile
 
 - Provide a clear back action.
-- Support party size, maximum walking time, budget, disclosure level, dietary
-  preferences, and allergies.
+- The current native discovery category is restaurants only. Keep the legacy
+  cafe contract readable for historical evidence, but do not expose cafe
+  selection in the native product.
+- Support party size, maximum walking time, budget, and disclosure level in the
+  journey conditions screen.
+- Budget is a continuous, accessible slider with a final `상관없음` stop. The
+  native exact stop is translated to the server's current coarse budget band at
+  the transport boundary.
+- Dietary preferences and allergies are persistent profile settings, reachable
+  from the launch settings menu rather than repeated in every journey form.
+  Starting a journey copies the saved profile into the request without making
+  the user configure it again.
 - The app may remember local preferences, but must not add account/login scope.
 - One start action performs selection and commit; there is no candidate list.
 - No-fit handling identifies which conditions should be reviewed without

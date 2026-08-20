@@ -139,19 +139,32 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["somewhere.external-map-cancel"].exists)
     }
 
-    func testPlaceReactionSheetOffersAllPrototypeReactions() {
+    func testPlaceReactionSheetUsesTwoPrimaryReactionsAndAVisitException() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-test-feedback", "--ui-test-no-notifications"]
         app.launch()
-        XCTAssertTrue(app.buttons["somewhere.feedback.love"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.buttons["somewhere.feedback.dislike"].exists)
+        XCTAssertTrue(app.buttons["somewhere.feedback.dislike"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["somewhere.feedback.like"].exists)
         XCTAssertTrue(app.buttons["somewhere.feedback.did_not_visit"].exists)
+        XCTAssertFalse(app.buttons["somewhere.feedback.love"].exists)
+    }
+
+    func testConditionsUseABudgetSliderAndKeepDietarySettingsOutOfTheJourneyForm() {
+        let app = launchStartSurface()
+        let conditions = app.buttons["somewhere.conditions-link"]
+        XCTAssertTrue(conditions.waitForExistence(timeout: 2))
+        conditions.tap()
+
+        XCTAssertTrue(app.sliders["somewhere.budget-slider"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons["somewhere.profile-settings"].exists)
     }
 
     func testProfilePickerIsReachableFromLaunchSurface() {
         let app = launchStartSurface()
-        let profile = app.buttons["somewhere.profile-settings"]
+        let menu = app.buttons["somewhere.profile-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 2))
+        menu.tap()
+        let profile = app.buttons["식이·알레르기 설정"]
         XCTAssertTrue(profile.waitForExistence(timeout: 2))
         profile.tap()
         XCTAssertTrue(app.textFields["somewhere.profile-search-dietary"].waitForExistence(timeout: 2))
