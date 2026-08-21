@@ -9,7 +9,7 @@ import { canonicalizeVenues } from "../provider/canonicalization";
 import { matchesHardConstraints } from "../provider/constraints";
 import { qualifyCandidates } from "../provider/evidence";
 import { parseProviderFixtureBundle } from "../provider/parser";
-import { sealPool } from "../provider/pool";
+import { digestMember, sealPool } from "../provider/pool";
 import { getReviewedRoute } from "../provider/route";
 import { type RandomUint32, selectDestination } from "../provider/selection";
 
@@ -103,6 +103,23 @@ function priceBand(value: number): "low" | "medium" | "high" | "unknown" {
   return "unknown";
 }
 
+function currentMemberDigest(candidate: (typeof CANDIDATES)[number]): string | undefined {
+  const snapshotVersion = FIXTURE.evidence.entries.find(
+    (entry) => entry.candidateId === candidate.venue.candidateId,
+  )?.snapshotVersion;
+  if (snapshotVersion === undefined) {
+    return undefined;
+  }
+  return digestMember({
+    broadMenuCategory: candidate.venue.broadMenuCategory,
+    candidateId: candidate.venue.candidateId,
+    canonicalId: candidate.canonicalId,
+    category: candidate.venue.category,
+    priceBand: candidate.venue.priceBand,
+    snapshotVersion,
+  }).slice(7);
+}
+
 async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -113,6 +130,7 @@ export async function buildJourneyPreparation(
     body: CreateBody;
     journeyId: string;
     now: Date;
+    previousMemberDigest?: string;
     requestId: string;
     randomUint32?: RandomUint32;
   }>,
@@ -137,10 +155,22 @@ export async function buildJourneyPreparation(
     const route = ROUTES_BY_CANDIDATE.get(candidate.candidateId);
     return route !== undefined && route.expectedDurationSeconds <= durationLimitSeconds;
   });
-  if (qualified.length === 0) {
+  if (input.previousMemberDigest !== undefined) {
+    const matchingCandidates = CANDIDATES.filter(
+      (candidate) => currentMemberDigest(candidate) === input.previousMemberDigest,
+    );
+    if (matchingCandidates.length !== 1) {
+      return { code: "no_fit", kind: "error" };
+    }
+  }
+  const eligibleAfterRecovery =
+    input.previousMemberDigest === undefined
+      ? qualified
+      : qualified.filter((member) => digestMember(member).slice(7) !== input.previousMemberDigest);
+  if (eligibleAfterRecovery.length === 0) {
     return { code: "no_fit", kind: "error" };
   }
-  const pool = sealPool({ bundle: FIXTURE, qualified });
+  const pool = sealPool({ bundle: FIXTURE, qualified: eligibleAfterRecovery });
   const selected = await selectDestination({
     pool,
     requestId: input.requestId,
@@ -178,9 +208,7 @@ export async function buildJourneyPreparation(
   ]);
   const receiptJson = JSON.stringify(selected.receipt);
   const receiptDigest = await sha256(receiptJson);
-  const selectedMemberDigest = await sha256(
-    `${selected.member.canonicalId}\0${selected.member.candidateId}\0${selected.member.snapshotVersion}`,
-  );
+  const selectedMemberDigest = digestMember(selected.member).slice(7);
   return {
     disclosure: {
       policyVersion: pool.evidencePolicyVersion,
@@ -223,7 +251,7 @@ export function projectReadyJourney(prepared: PreparedJourney, sequence: number,
       policyVersion: prepared.disclosure.policyVersion,
     },
     phase: "ready",
-    actions: ["commit", "reveal", "stop"],
+    actions: ["commit", "stop"],
     revealed,
   } as const;
 }
@@ -234,7 +262,7 @@ export function projectCommittedJourney(
   revealed: false,
 ) {
   return {
-    actions: ["reveal", "stop", "route-recover", "arrival"],
+    actions: ["stop", "route-recover", "arrival"],
     contractVersion: 1,
     disclosure: prepared.disclosure,
     guidance: {
@@ -254,10 +282,8 @@ export function projectCommittedJourney(
 export function projectRevealedJourney<
   T extends ReturnType<typeof projectReadyJourney> | ReturnType<typeof projectCommittedJourney>,
 >(projection: T, identity: PreparedJourney["identity"], sequence: number) {
-  const actions = projection.actions.filter((action) => action !== "reveal");
   return {
     ...projection,
-    actions,
     reveal: identity,
     revealed: true,
     sequence,

@@ -7,6 +7,7 @@ import { jsonResponse, publicError } from "./http-response";
 import { buildJourneyPreparation } from "./journey-composition";
 import { consumeRecoveryDigest, findGuard, persistPreparation } from "./journey-persistence";
 import { projectLifecycleJourney } from "./journey-projection";
+import { resolvePreviousMemberDigest } from "./journey-recovery-digest";
 import {
   authError,
   authenticateMutation,
@@ -66,6 +67,7 @@ export async function createJourney(
     return publicError("invalid_transition");
   }
   const now = dependencies.now();
+  let previousMemberDigest: string | undefined;
   if (body.data.recoveryCapability === null) {
     if (
       guard?.previous_candidate_digest !== null &&
@@ -76,6 +78,16 @@ export async function createJourney(
       return publicError("recovery_review_required");
     }
   } else {
+    if (
+      guard?.previous_candidate_digest === null ||
+      guard?.previous_candidate_digest === undefined
+    ) {
+      return publicError("recovery_review_required");
+    }
+    previousMemberDigest = await resolvePreviousMemberDigest(
+      env.DB,
+      guard.previous_candidate_digest,
+    );
     const constraints = JSON.stringify(body.data.constraints);
     const capabilityDigest = await hmacDigest(
       dependencies.hmacKey,
@@ -108,6 +120,7 @@ export async function createJourney(
       journeyDigest,
       journeyId,
       now,
+      ...(previousMemberDigest === undefined ? {} : { previousMemberDigest }),
       session,
       stub,
     }),
@@ -142,6 +155,7 @@ async function createReservedJourney(
     journeyDigest: string;
     journeyId: string;
     now: number;
+    previousMemberDigest?: string;
     session: Awaited<ReturnType<typeof authenticateMutation>>;
     stub: DurableObjectStub<JourneyDurableObject>;
   }>,
@@ -169,6 +183,9 @@ async function createReservedJourney(
     body: input.body,
     journeyId: input.journeyId,
     now: new Date(input.now),
+    ...(input.previousMemberDigest === undefined
+      ? {}
+      : { previousMemberDigest: input.previousMemberDigest }),
     requestId: `req_v1.${randomBase64Url(16)}`,
   });
   if (prepared.kind === "error") {

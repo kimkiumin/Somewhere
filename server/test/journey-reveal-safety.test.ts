@@ -4,8 +4,8 @@ import {
   createReadyJourney,
   type JourneyCommand,
   type JourneyState,
+  transitionJourney,
 } from "../src/journey/aggregate";
-import { transitionJourney } from "../src/journey/aggregate";
 
 const DIGEST_A = "a".repeat(64);
 const DIGEST_B = "b".repeat(64);
@@ -86,10 +86,7 @@ function stateFor(phase: JourneyState["phase"]): JourneyState {
   }
 }
 
-function command(
-  action: "continue" | "external-map" | "reveal",
-  sequence: number,
-): JourneyCommand {
+function command(action: "continue" | "external-map" | "reveal", sequence: number): JourneyCommand {
   const common = {
     bodyDigest: DIGEST_A,
     expectedSequence: sequence,
@@ -127,7 +124,10 @@ describe("journey reveal and external-map safety", () => {
   it("allows safety Reveal while paused and Continue keeps the identity disclosed", () => {
     const paused = stateFor("paused");
     const revealed = transitionJourney(paused, command("reveal", paused.sequence));
-    const continued = transitionJourney(revealed.state, command("continue", revealed.state.sequence));
+    const continued = transitionJourney(
+      revealed.state,
+      command("continue", revealed.state.sequence),
+    );
 
     expect(revealed.kind).toBe("applied");
     expect(revealed.state.phase).toBe("paused");

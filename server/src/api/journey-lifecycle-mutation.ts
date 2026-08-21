@@ -104,9 +104,7 @@ export async function mutateJourney(
           bindingDigest: session.bindingDigest,
           database: env.DB,
           journeyDigest: await hmacDigest(dependencies.hmacKey, journeyId),
-          previousCandidateDigest:
-            snapshot.selectedSnapshot.receiptDigest ??
-            (await hmacDigest(dependencies.hmacKey, snapshot.selectedSnapshot.selectionReceiptId)),
+          previousCandidateDigest: prepared.receipt.selectedMemberDigest,
           stoppedAt: snapshot.stoppedAt ?? now,
         }
       : undefined;
