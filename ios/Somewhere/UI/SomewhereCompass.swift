@@ -8,6 +8,32 @@ enum SomewhereCompassMode: Equatable {
 }
 
 enum SomewhereCompassMotionPolicy {
+    static func shortestSignedDelta(from current: Double, to next: Double) -> Double {
+        let delta = (next - current).truncatingRemainder(dividingBy: 360)
+        if delta > 180 {
+            return delta - 360
+        }
+        if delta < -180 {
+            return delta + 360
+        }
+        return delta
+    }
+
+    static func unwrappedTarget(from current: Double, to next: Double) -> Double {
+        current + shortestSignedDelta(from: current, to: next)
+    }
+
+    static func hubCorrection(displaySize: CGFloat, frameScale: CGFloat) -> CGSize {
+        let artworkCanvas = CGFloat(1_254)
+        let pivot = CGPoint(x: 627, y: 627)
+        let measuredHub = CGPoint(x: 627.5, y: 718)
+        let scale = displaySize * frameScale / artworkCanvas
+        return CGSize(
+            width: (pivot.x - measuredHub.x) * scale,
+            height: (pivot.y - measuredHub.y) * scale
+        )
+    }
+
     static func shouldStartPulse(
         from previousMode: SomewhereCompassMode?,
         to nextMode: SomewhereCompassMode
@@ -27,7 +53,7 @@ struct SomewhereCompass: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var searchingRotation = 0.0
-    @State private var animatedBearing = -18.0
+    @State private var animatedNeedleTarget = -18.0
     @State private var needlePulse = false
 
     init(
@@ -72,22 +98,31 @@ struct SomewhereCompass: View {
                 .frame(width: size, height: size)
                 .accessibilityHidden(true)
 
-            Image("RollCompassNeedle")
-                .resizable()
-                .interpolation(.high)
-                .antialiased(true)
-                .scaledToFit()
-                .frame(width: size * 0.68, height: size * 0.68)
-                .rotationEffect(.degrees(needleAngle))
-                .scaleEffect(needlePulse ? 1.025 : 0.985)
-                .grayscale(isPaused ? 0.84 : 0)
-                .opacity(isPaused ? 0.62 : 1)
-                .shadow(color: SomewherePalette.ink.opacity(0.20), radius: size * 0.012, y: size * 0.008)
-                .animation(
-                    reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.76),
-                    value: needleAngle
-                )
-                .accessibilityHidden(true)
+            ZStack {
+                Image("RollCompassNeedle")
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .scaledToFit()
+                    .frame(width: size * 0.68, height: size * 0.68)
+                    .offset(
+                        SomewhereCompassMotionPolicy.hubCorrection(
+                            displaySize: size,
+                            frameScale: 0.68
+                        )
+                    )
+            }
+            .frame(width: size, height: size)
+            .rotationEffect(.degrees(needleAngle))
+            .scaleEffect(needlePulse ? 1.025 : 0.985)
+            .grayscale(isPaused ? 0.84 : 0)
+            .opacity(isPaused ? 0.62 : 1)
+            .shadow(color: SomewherePalette.ink.opacity(0.20), radius: size * 0.012, y: size * 0.008)
+            .animation(
+                reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.76),
+                value: needleAngle
+            )
+            .accessibilityHidden(true)
         }
         .frame(width: size, height: size)
         .contentShape(Circle())
@@ -98,12 +133,16 @@ struct SomewhereCompass: View {
 
     private func syncMotion(from previousMode: SomewhereCompassMode?, to newMode: SomewhereCompassMode) {
         if case .pointing(let bearing) = newMode {
+            let target = SomewhereCompassMotionPolicy.unwrappedTarget(
+                from: animatedNeedleTarget,
+                to: bearing
+            )
             if reduceMotion {
-                animatedBearing = bearing
+                animatedNeedleTarget = target
                 needlePulse = false
             } else {
                 withAnimation(.spring(response: 0.42, dampingFraction: 0.76)) {
-                    animatedBearing = bearing
+                    animatedNeedleTarget = target
                 }
                 if SomewhereCompassMotionPolicy.shouldStartPulse(from: previousMode, to: newMode) {
                     withAnimation(.easeInOut(duration: 1.15).repeatForever(autoreverses: true)) {
@@ -134,8 +173,8 @@ struct SomewhereCompass: View {
         switch mode {
         case .ready: -18
         case .searching: searchingRotation
-        case .pointing: animatedBearing
-        case .paused: animatedBearing
+        case .pointing: animatedNeedleTarget
+        case .paused: animatedNeedleTarget
         }
     }
 
