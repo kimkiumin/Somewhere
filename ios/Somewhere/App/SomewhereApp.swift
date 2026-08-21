@@ -74,22 +74,20 @@ struct SomewhereApp: App {
 private enum UITestProjectionFactory {
     static func make(_ state: String) -> JourneyProjection? {
         let common = #""contractVersion":1,"journeyId":"j_v1.AAAAAAAAAAAAAAAAAAAAAA","sequence":1"#
-        let disclosure = #""disclosure":{"routeDistanceM":700,"routeDurationMinutes":10,"representativeCategories":["cafe"],"priceBand":"medium","policyVersion":"policy-v1"}"#
-        let reveal = #""reveal":{"name":"Test destination","address":"Test address"}"#
+        let disclosure = #""disclosure":{"routeDistanceM":700,"routeDurationMinutes":10,"representativeCategories":["한식 국물 요리"],"priceBand":"medium","policyVersion":"policy-v1"}"#
+        let reveal = #""reveal":{"name":"소문난성수감자탕","address":"서울특별시 성동구 연무장길 45"}"#
         let json: String
         switch state {
         case "following":
-            json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":false,\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000},\"actions\":[\"reveal\",\"stop\",\"route-recover\",\"arrival\"]}"
+            json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":false,\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000},\"actions\":[\"stop\",\"route-recover\",\"arrival\"]}"
         case "following-revealed":
             json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":true,\(reveal),\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000},\"actions\":[\"stop\",\"route-recover\",\"arrival\"]}"
         case "route-recovery":
-            json = "{\(common),\(disclosure),\"phase\":\"route-recovery\",\"revealed\":false,\"guidance\":{\"kind\":\"unavailable\",\"reason\":\"provider\"},\"actions\":[\"reveal\",\"stop\",\"route-recover\"]}"
-        case "arrived-unrevealed":
-            json = "{\(common),\(disclosure),\"phase\":\"arrived\",\"revealed\":false,\"feedbackDueAt\":4102444800000,\"actions\":[\"reveal\"]}"
+            json = "{\(common),\(disclosure),\"phase\":\"route-recovery\",\"revealed\":false,\"guidance\":{\"kind\":\"unavailable\",\"reason\":\"provider\"},\"actions\":[\"stop\",\"route-recover\"]}"
         case "arrived-revealed":
             json = "{\(common),\(disclosure),\"phase\":\"arrived\",\"revealed\":true,\(reveal),\"feedbackDueAt\":4102444800000,\"actions\":[]}"
         case "arrived-rich":
-            json = "{\(common),\(disclosure),\"phase\":\"arrived\",\"revealed\":true,\"reveal\":{\"name\":\"Test destination\",\"address\":\"Test address\",\"building\":\"해빛가 빌딩\",\"floorUnit\":\"2층 201호\",\"recommendationReason\":\"도보 시간과 조건 충돌이 적은 곳이에요.\",\"reviewSummary\":\"담백한 메뉴와 빠른 동선이 좋다는 후기가 있어요.\"},\"feedbackDueAt\":4102444800000,\"actions\":[]}"
+            json = "{\(common),\(disclosure),\"phase\":\"arrived\",\"revealed\":true,\(reveal),\"feedbackDueAt\":4102444800000,\"actions\":[]}"
         case "paused":
             json = "{\(common),\(disclosure),\"phase\":\"paused\",\"phaseBeforePause\":\"following\",\"stopConfirmationId\":\"sc_v1.AAAAAAAAAAAAAAAAAAAAAA\",\"stopConfirmation\":{\"copyVersion\":\"v1\"},\"routeRepair\":{\"status\":\"idle\"},\"revealed\":false,\"actions\":[\"continue\",\"route-recover\",\"confirm-stop\",\"reveal\"]}"
         case "stopped":

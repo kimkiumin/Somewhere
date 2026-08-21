@@ -47,7 +47,21 @@ final class JourneyStoreTests: XCTestCase {
         let store = try await store(phase: "committed")
         XCTAssertEqual(store.projection?.phase, .committed)
     }
-    func testFollowingStartsGuidanceState() throws { XCTAssertEqual(try projection(phase: "following", revealed: false).actions.first, .reveal) }
+    func testFollowingStartsGuidanceStateWithoutRevealAction() throws {
+        let value = try projection(phase: "following", revealed: false)
+        XCTAssertTrue(value.actions.contains(.stop))
+        XCTAssertFalse(value.actions.contains(.reveal))
+    }
+    func testActiveUnrevealedProjectionCannotAdvertiseReveal() throws {
+        for phase in ["ready", "committed", "following", "route-recovery", "near"] {
+            let value = try projection(phase: phase, revealed: false)
+            XCTAssertFalse(value.actions.contains(.reveal), phase)
+        }
+    }
+    func testPausedSafetyRevealRemainsAvailable() throws {
+        let value = try projection(phase: "paused", revealed: false)
+        XCTAssertTrue(value.actions.contains(.reveal))
+    }
     func testNearPreservesHiddenIdentity() throws { XCTAssertNil(try projection(phase: "near", revealed: false).reveal) }
     func testArrivedProjectionIsAlreadyRevealed() throws {
         let value = try projection(phase: "arrived", revealed: true)

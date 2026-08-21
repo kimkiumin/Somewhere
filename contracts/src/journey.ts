@@ -112,7 +112,7 @@ function revealedSelected<T extends z.ZodRawShape>(shape: T) {
 
 const ReadyR0Schema = unrevealedSelected({
   phase: z.literal("ready"),
-  actions: z.tuple([z.literal("commit"), z.literal("reveal"), z.literal("stop")]),
+  actions: z.tuple([z.literal("commit"), z.literal("stop")]),
 });
 const ReadyR1Schema = revealedSelected({
   phase: z.literal("ready"),
@@ -122,7 +122,7 @@ const CommittedR0Schema = unrevealedSelected({
   phase: z.literal("committed"),
   pollAfterSeconds: z.number().int().min(1).max(3),
   guidance: RoutePendingGuidanceV1Schema,
-  actions: z.tuple([z.literal("poll"), z.literal("reveal"), z.literal("stop")]),
+  actions: z.tuple([z.literal("poll"), z.literal("stop")]),
 });
 const CommittedR1Schema = revealedSelected({
   phase: z.literal("committed"),
@@ -133,7 +133,7 @@ const CommittedR1Schema = revealedSelected({
 const FollowingR0Schema = unrevealedSelected({
   phase: z.literal("following"),
   guidance: RouteGuidanceV1Schema,
-  actions: z.tuple([z.literal("reveal"), z.literal("stop"), z.literal("route-recover"), z.literal("arrival")]),
+  actions: z.tuple([z.literal("stop"), z.literal("route-recover"), z.literal("arrival")]),
 });
 const FollowingR1Schema = revealedSelected({
   phase: z.literal("following"),
@@ -143,7 +143,7 @@ const FollowingR1Schema = revealedSelected({
 const RouteRecoveryR0Schema = unrevealedSelected({
   phase: z.literal("route-recovery"),
   guidance: GuidanceUnavailableV1Schema,
-  actions: z.tuple([z.literal("reveal"), z.literal("stop"), z.literal("route-recover")]),
+  actions: z.tuple([z.literal("stop"), z.literal("route-recover")]),
 });
 const RouteRecoveryR1Schema = revealedSelected({
   phase: z.literal("route-recovery"),
@@ -153,7 +153,7 @@ const RouteRecoveryR1Schema = revealedSelected({
 const NearR0Schema = unrevealedSelected({
   phase: z.literal("near"),
   guidance: RouteGuidanceV1Schema,
-  actions: z.tuple([z.literal("reveal"), z.literal("stop"), z.literal("route-recover"), z.literal("arrival")]),
+  actions: z.tuple([z.literal("stop"), z.literal("route-recover"), z.literal("arrival")]),
 });
 const NearR1Schema = revealedSelected({
   phase: z.literal("near"),
@@ -207,11 +207,6 @@ const CompletedNoRecoveryR1Schema = revealedSelected({
   stopReasonState: z.enum(["recorded", "skipped"]),
   actions: z.tuple([]),
 });
-const ArrivedR0Schema = unrevealedSelected({
-  phase: z.literal("arrived"),
-  feedbackDueAt: UnixMillisecondsSchema,
-  actions: z.tuple([z.literal("reveal")]),
-});
 const ArrivedR1Schema = revealedSelected({
   phase: z.literal("arrived"),
   feedbackDueAt: UnixMillisecondsSchema,
@@ -245,7 +240,6 @@ export const JourneyProjectionV1Schema = z.union([
   CompletedRecoveryR1Schema,
   CompletedNoRecoveryR0Schema,
   CompletedNoRecoveryR1Schema,
-  ArrivedR0Schema,
   ArrivedR1Schema,
   ExpiredV1Schema,
 ]);

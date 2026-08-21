@@ -136,13 +136,13 @@ struct JourneyProjection: Codable, Equatable, Sendable {
         let expected: [JourneyAction]
         switch (phase, revealed, recoveryExpiresAt != nil) {
         case (.finding, nil, _): expected = [.poll, .cancel]
-        case (.ready, false?, _): expected = [.commit, .reveal, .stop]
+        case (.ready, false?, _): expected = [.commit, .stop]
         case (.ready, true?, _): expected = [.commit, .stop]
-        case (.committed, false?, _): expected = [.poll, .reveal, .stop]
+        case (.committed, false?, _): expected = [.poll, .stop]
         case (.committed, true?, _): expected = [.poll, .stop]
-        case (.following, false?, _), (.near, false?, _): expected = [.reveal, .stop, .routeRecover, .arrival]
+        case (.following, false?, _), (.near, false?, _): expected = [.stop, .routeRecover, .arrival]
         case (.following, true?, _), (.near, true?, _): expected = [.stop, .routeRecover, .arrival]
-        case (.routeRecovery, false?, _): expected = [.reveal, .stop, .routeRecover]
+        case (.routeRecovery, false?, _): expected = [.stop, .routeRecover]
         case (.routeRecovery, true?, _): expected = [.stop, .routeRecover]
         case (.paused, false?, _): expected = [.continue, .routeRecover, .confirmStop, .reveal]
         case (.paused, true?, _): expected = [.continue, .routeRecover, .confirmStop]
@@ -150,7 +150,7 @@ struct JourneyProjection: Codable, Equatable, Sendable {
         case (.stopped, true?, _): expected = [.recordReason, .skipReason]
         case (.completed, false?, true): expected = [.reveal, .recovery]
         case (.completed, true?, true): expected = [.recovery]
-        case (.completed, false?, false), (.arrived, false?, _): expected = [.reveal]
+        case (.completed, false?, false): expected = [.reveal]
         case (.completed, true?, false), (.arrived, true?, _), (.expired, nil, _): expected = []
         default: throw ProjectionContractError.invalidPhasePayload
         }

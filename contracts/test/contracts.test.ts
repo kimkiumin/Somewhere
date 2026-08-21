@@ -29,10 +29,34 @@ const disclosure = {
 describe("phase-exact journey projections", () => {
   test("accepts every frozen phase/action tuple", () => {
     const fixtures = contractDocumentV1.projectionExamples;
-    expect(fixtures.length).toBe(22);
+    expect(fixtures.length).toBe(21);
     for (const fixture of fixtures) {
       expect(JourneyProjectionV1Schema.safeParse(fixture).success).toBe(true);
     }
+  });
+
+  test("keeps Reveal behind the Stop-first safety path", () => {
+    const fixtures = contractDocumentV1.projectionExamples;
+    const unrevealed = (phase: string) =>
+      fixtures.find((value) => value.phase === phase && value.revealed === false);
+
+    expect(unrevealed("ready")?.actions).toEqual(["commit", "stop"]);
+    expect(unrevealed("committed")?.actions).toEqual(["poll", "stop"]);
+    expect(unrevealed("following")?.actions).toEqual(["stop", "route-recover", "arrival"]);
+    expect(unrevealed("route-recovery")?.actions).toEqual(["stop", "route-recover"]);
+    expect(unrevealed("near")?.actions).toEqual(["stop", "route-recover", "arrival"]);
+    expect(unrevealed("paused")?.actions).toContain("reveal");
+    expect(unrevealed("stopped")?.actions).toContain("reveal");
+    expect(unrevealed("completed")?.actions).toContain("reveal");
+    expect(unrevealed("arrived")).toBeUndefined();
+
+    const following = unrevealed("following");
+    expect(
+      JourneyProjectionV1Schema.safeParse({
+        ...following,
+        actions: ["reveal", ...(following?.actions ?? [])],
+      }).success,
+    ).toBe(false);
   });
 
   test("rejects an action legal only in another phase", () => {
