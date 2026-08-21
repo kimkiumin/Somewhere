@@ -37,8 +37,12 @@ describe("phase-exact journey projections", () => {
 
   test("keeps Reveal behind the Stop-first safety path", () => {
     const fixtures = contractDocumentV1.projectionExamples;
-    const unrevealed = (phase: string) =>
-      fixtures.find((value) => value.phase === phase && value.revealed === false);
+    type UnrevealedProjection = Extract<(typeof fixtures)[number], { revealed: false }>;
+    const unrevealed = (phase: string): UnrevealedProjection | undefined =>
+      fixtures.find(
+        (value): value is UnrevealedProjection =>
+          "revealed" in value && value.phase === phase && value.revealed === false,
+      );
 
     expect(unrevealed("ready")?.actions).toEqual(["commit", "stop"]);
     expect(unrevealed("committed")?.actions).toEqual(["poll", "stop"]);

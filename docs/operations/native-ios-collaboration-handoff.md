@@ -206,6 +206,73 @@ Research anchors for future provider work:
 | Native UI | Slider identifier `somewhere.budget-slider`; profile form is absent from journey conditions; menu reaches the profile sheet; feedback exposes dislike/like plus did-not-visit. |
 | Simulator | `SomewhereTests` pass; `JourneyFlowUITests` exercise launch, conditions, guidance, stop, reveal, arrival, recovery, and feedback. Network-backed virtual field tests remain opt-in when the local Worker/proxy is available. |
 
+## Journey integrity review (2026-08-21)
+
+The following rules are now implemented across the TypeScript contract, Worker
+lifecycle, native projection decoder, SwiftUI screens, and regression tests:
+
+- Active unrevealed projections do not expose `Reveal`; `Stop` opens the safety
+  path, and Reveal is available only after a pause, stop, or completed journey.
+- External-map handoff is offered only after the journey is paused or already
+  revealed. Active route recovery has a visible Stop action but no direct map
+  escape.
+- Confirmed Stop persists `selected_member_digest`. Legacy guards that still
+  carry `randomness_digest` resolve through `selection_receipts` before
+  recovery eligibility is evaluated.
+- Recovery removes the previous selected member before pool sealing and returns
+  `no_fit` when no reviewed restaurant remains; a same-destination success is
+  not a valid recovery result.
+- The compass needle rotates around the measured artwork hub, not the image
+  bounding-box center, and uses an unwrapped shortest-angle target so a
+  `359° → 1°` change takes the two-degree path.
+
+Final evidence from this review:
+
+- Native source/field-flow gates: `bun run verify:ios-source` and
+  `bun run verify:native-evidence` pass after the canonical fixture/count
+  updates.
+- Complete Debug Simulator suite on iPhone 17 Pro / iOS 26.5: 59 discovered,
+  57 passed, 0 failed, 2 skipped. The skips are the two Worker-backed virtual
+  field tests when no local Worker is configured.
+- Worker-backed virtual field suite with the local D1 Worker and loopback
+  cookie proxy: 2 passed, 0 failed, 0 skipped. It covers real session/create/
+  commit, off-route suppression/recovery, multi-sample arrival, and automatic
+  restaurant reveal.
+- JavaScript regression: app 181 passed, server 238 passed, contracts 15
+  passed; all three workspaces typecheck successfully, lint has no errors, and
+  `bun audit` reports no vulnerabilities.
+- Final 368 × 800 visual captures are in the ignored local directory
+  `.local-artifacts/audit-2026-08-21-final/`: launch, following, paused,
+  route-recovery, arrived-rich, feedback, and credible-guidance heading.
+- The first combined Worker run exposed one stale native assertion expecting the
+  old address-hidden arrival behavior. It was corrected in
+  `0c56f16`; the focused Worker suite then passed without changing runtime
+  behavior.
+
+Focused reproduction commands:
+
+```sh
+bun run verify:ios-source
+bun run verify:native-evidence
+
+# Deterministic native suite through XcodeBuildMCP
+# extraArgs: CODE_SIGNING_ALLOWED=NO,
+#            SOMEWHERE_API_ORIGIN=https://example.invalid
+
+# Worker-backed native suite
+bash scripts/release/local-v2-start-for-qa.sh
+SOMEWHERE_PROXY_LOG=1 SOMEWHERE_UPSTREAM_PROTOCOL=https \
+  node scripts/ios/local-ios-loopback-proxy.mjs
+# extraArgs: CODE_SIGNING_ALLOWED=NO,
+#            SOMEWHERE_API_ORIGIN=http://127.0.0.1:8788
+# testRunnerEnv: {"SOMEWHERE_RUN_LOCAL_E2E":"1"}
+```
+
+This evidence does not close the external gates: Apple signing/TestFlight,
+physical walking accuracy, provider rights and dietary/allergen review, legal
+review, Cloudflare secrets/domains, and the Linux-only release authority gate
+still require their respective owners.
+
 ## Simulator build and automated tests
 
 ```sh
