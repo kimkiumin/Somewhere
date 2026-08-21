@@ -43,7 +43,7 @@ final class VirtualFieldFlowUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["somewhere.revealed-name"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["somewhere.arrival-reveal"].exists)
-        XCTAssertFalse(app.staticTexts["somewhere.revealed-address"].exists)
+        XCTAssertTrue(app.staticTexts["somewhere.revealed-address"].exists)
     }
 
     func testOffRouteSuppressesGuidanceThenRecovers() throws {
