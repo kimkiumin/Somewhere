@@ -51,7 +51,7 @@ struct RecoveryView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(RollCompassBrand.name)
                     .font(RollCompassBrand.wordmarkFont(size: 22))
-                Text(projection.phase == .stopped ? "STOPPED SAFELY" : "JOURNEY COMPLETE")
+                Text(projection.phase == .stopped ? "안전하게 종료됨" : "여정 완료")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(SomewherePalette.mutedInk)
             }

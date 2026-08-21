@@ -5,7 +5,7 @@ struct StopConfirmationView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            SomewhereSignalPill(icon: "pause.circle.fill", title: "SAFETY PAUSE", tint: SomewherePalette.accent)
+            SomewhereSignalPill(icon: "pause.circle.fill", title: "안전 일시정지", tint: SomewherePalette.accent)
             Image(systemName: "figure.walk.motion")
                 .font(.system(size: 42))
                 .foregroundStyle(SomewherePalette.accent)
@@ -28,6 +28,15 @@ struct StopConfirmationView: View {
             .buttonStyle(SomewhereSecondaryButtonStyle())
             .accessibilityLabel("중단 화면에서 목적지 정보 확인")
             .accessibilityIdentifier("somewhere.paused-reveal")
+            if store.isGuidancePaused || store.projection?.phase == .paused {
+                Button("외부 지도 열기") {
+                    store.showsStopConfirmation = false
+                    store.requestExternalMap()
+                }
+                .buttonStyle(SomewhereSecondaryButtonStyle())
+                .accessibilityLabel("외부 지도를 열고 목적지 공개")
+                .accessibilityIdentifier("somewhere.paused-external-map")
+            }
             Button("여정 끝내기", role: .destructive) {
                 SomewhereHaptics.impact()
                 Task { await store.confirmStop() }

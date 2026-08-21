@@ -18,7 +18,7 @@ struct ArrivalView: View {
                     .accessibilityLabel("외부 지도 열기")
                     .accessibilityIdentifier("somewhere.external-map")
                     Spacer()
-                    SomewhereSignalPill(icon: "checkmark.seal.fill", title: "ARRIVED", tint: SomewherePalette.success)
+                    SomewhereSignalPill(icon: "checkmark.seal.fill", title: "도착", tint: SomewherePalette.success)
                 }
                 if projection.revealed == true {
                     RevealView(projection: projection)

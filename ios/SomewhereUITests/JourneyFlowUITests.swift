@@ -79,7 +79,22 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["somewhere.route-recovery.recalibrate"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["somewhere.route-recovery.reroute"].exists)
         XCTAssertTrue(app.buttons["somewhere.route-recovery.cached-route"].exists)
-        XCTAssertTrue(app.buttons["somewhere.external-map"].exists)
+        XCTAssertFalse(app.buttons["somewhere.external-map"].exists)
+    }
+
+    func testRouteRecoveryRequiresStopBeforeExternalMap() {
+        let app = launchHarness("route-recovery")
+        XCTAssertTrue(app.buttons["somewhere.stop"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons["somewhere.external-map"].exists)
+    }
+
+    func testPausedStopSheetOffersExternalMapWarning() {
+        let app = launchHarness("following")
+        app.buttons["somewhere.stop"].tap()
+        let map = app.buttons["somewhere.paused-external-map"]
+        XCTAssertTrue(map.waitForExistence(timeout: 2))
+        map.tap()
+        XCTAssertTrue(app.buttons["somewhere.external-map-confirm"].waitForExistence(timeout: 2))
     }
 
     func testStopReasonKeepsSkipExitAvailable() {
@@ -91,9 +106,8 @@ final class JourneyFlowUITests: XCTestCase {
     func testRichArrivalHierarchyIsRendered() {
         let app = launchHarness("arrived-rich")
         XCTAssertTrue(app.staticTexts["somewhere.revealed-name"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.staticTexts["해빛가 빌딩"].exists)
-        XCTAssertTrue(app.staticTexts["2층 201호"].exists)
-        XCTAssertTrue(app.staticTexts["도보 시간과 조건 충돌이 적은 곳이에요."].exists)
+        XCTAssertTrue(app.staticTexts["소문난성수감자탕"].exists)
+        XCTAssertTrue(app.staticTexts["서울특별시 성동구 연무장길 45"].exists)
     }
 
     func testPrivateModeKeepsOnlyDirectionAndDistance() {
@@ -131,12 +145,22 @@ final class JourneyFlowUITests: XCTestCase {
     }
 
     func testExternalMapHandoffRequiresWarning() {
-        let app = launchHarness("following-revealed")
-        let externalMap = app.buttons["somewhere.external-map"]
+        let app = launchHarness("following")
+        app.buttons["somewhere.stop"].tap()
+        let externalMap = app.buttons["somewhere.paused-external-map"]
         XCTAssertTrue(externalMap.waitForExistence(timeout: 2))
         externalMap.tap()
         XCTAssertTrue(app.buttons["somewhere.external-map-confirm"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["somewhere.external-map-cancel"].exists)
+    }
+
+    func testKoreanSafetyAndArrivalLabelsAreUsed() {
+        let paused = launchHarness("following")
+        paused.buttons["somewhere.stop"].tap()
+        XCTAssertTrue(paused.staticTexts["안전 일시정지"].waitForExistence(timeout: 2))
+        let arrived = launchHarness("arrived-rich")
+        XCTAssertTrue(arrived.staticTexts["목적지 발견"].waitForExistence(timeout: 2))
+        XCTAssertFalse(arrived.staticTexts["DESTINATION FOUND"].exists)
     }
 
     func testPlaceReactionSheetUsesTwoPrimaryReactionsAndAVisitException() {
@@ -175,7 +199,7 @@ final class JourneyFlowUITests: XCTestCase {
     func testHarnessCanShowRevealedDestination() {
         let app = launchHarness("arrived-revealed")
         XCTAssertTrue(app.staticTexts["somewhere.revealed-name"].waitForExistence(timeout: 2))
-        XCTAssertFalse(app.staticTexts["somewhere.revealed-address"].exists)
+        XCTAssertTrue(app.staticTexts["somewhere.revealed-address"].exists)
     }
 
     func testHarnessCanShowGuardedRecovery() {

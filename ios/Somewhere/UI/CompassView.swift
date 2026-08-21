@@ -165,28 +165,26 @@ struct CompassView: View {
 
     @ViewBuilder
     private var actionArea: some View {
-        if projection.phase == .routeRecovery {
-            EmptyView()
-        } else {
-            VStack(spacing: 10) {
-                if projection.actions.contains(.commit) {
-                    Button("안내 시작") {
-                        SomewhereHaptics.impact()
-                        Task { await store.commit() }
-                    }
-                    .buttonStyle(SomewherePrimaryButtonStyle())
-                    .accessibilityLabel("숨은 목적지 안내 시작")
-                    .accessibilityIdentifier("somewhere.commit")
+        VStack(spacing: 10) {
+            if projection.phase != .routeRecovery, projection.actions.contains(.commit) {
+                Button("안내 시작") {
+                    SomewhereHaptics.impact()
+                    Task { await store.commit() }
                 }
-                if projection.actions.contains(.stop) {
-                    Button("멈춤") {
-                        SomewhereHaptics.impact()
-                        store.requestStop()
-                    }
-                    .buttonStyle(SomewhereDangerButtonStyle())
-                    .accessibilityLabel("여정 즉시 멈춤")
-                    .accessibilityIdentifier("somewhere.stop")
+                .buttonStyle(SomewherePrimaryButtonStyle())
+                .accessibilityLabel("숨은 목적지 안내 시작")
+                .accessibilityIdentifier("somewhere.commit")
+            }
+            if projection.actions.contains(.stop) {
+                Button("멈춤") {
+                    SomewhereHaptics.impact()
+                    store.requestStop()
                 }
+                .buttonStyle(SomewhereDangerButtonStyle())
+                .accessibilityLabel("여정 즉시 멈춤")
+                .accessibilityIdentifier("somewhere.stop")
+            }
+            if projection.phase != .routeRecovery {
                 HStack(spacing: 10) {
                     if projection.actions.contains(.cancel) {
                         Button("선택 취소") {
@@ -196,14 +194,6 @@ struct CompassView: View {
                         .buttonStyle(SomewhereSecondaryButtonStyle())
                         .accessibilityLabel("숨은 목적지 선택 취소")
                         .accessibilityIdentifier("somewhere.cancel-selection")
-                    }
-                    if projection.revealed == true, projection.phase != .arrived {
-                        Button("외부 지도") {
-                            store.requestExternalMap()
-                        }
-                        .buttonStyle(SomewhereSecondaryButtonStyle())
-                        .accessibilityLabel("외부 지도 열기")
-                        .accessibilityIdentifier("somewhere.external-map")
                     }
                     if showsRecoveryAction {
                         Button("방향 다시 잡기") {
@@ -216,8 +206,8 @@ struct CompassView: View {
                     }
                 }
             }
-            .padding(.top, 10)
         }
+        .padding(.top, 10)
     }
 
     private var phaseTitle: String {

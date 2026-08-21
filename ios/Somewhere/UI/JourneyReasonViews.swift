@@ -16,7 +16,7 @@ struct RevealReasonView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    SomewhereSignalPill(icon: "eye.fill", title: "DESTINATION CHECK", tint: SomewherePalette.accent)
+                    SomewhereSignalPill(icon: "eye.fill", title: "목적지 확인", tint: SomewherePalette.accent)
                     Text("왜 확인할까요?")
                         .font(.system(size: 30, weight: .bold, design: .serif))
                         .foregroundStyle(SomewherePalette.ink)
@@ -83,7 +83,7 @@ struct ExternalMapWarningView: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            SomewhereSignalPill(icon: "map.fill", title: "EXTERNAL MAP", tint: SomewherePalette.accent)
+            SomewhereSignalPill(icon: "map.fill", title: "외부 지도", tint: SomewherePalette.accent)
             Image(systemName: "map.circle.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(SomewherePalette.accent)
@@ -126,14 +126,6 @@ struct RouteRecoveryView: View {
                 recoveryButton("나침반 다시 맞추기", icon: "safari", choice: "recalibrate")
                 recoveryButton("경로 다시 찾기", icon: "arrow.triangle.2.circlepath", choice: "reroute")
                 recoveryButton("확인된 경로 이어가기", icon: "point.topleft.down.to.point.bottomright.curvepath", choice: "cached-route")
-                Button {
-                    store.requestExternalMap()
-                } label: {
-                    Label("외부 지도 열기 · 목적지 공개", systemImage: "map")
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(SomewhereSecondaryButtonStyle())
-                .accessibilityIdentifier("somewhere.external-map")
             }
         }
     }

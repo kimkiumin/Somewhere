@@ -7,7 +7,7 @@ struct RevealView: View {
         SomewhereCard(padding: 18) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    SomewhereSignalPill(icon: "sparkles", title: "DESTINATION FOUND", tint: SomewherePalette.accent)
+                    SomewhereSignalPill(icon: "sparkles", title: "목적지 발견", tint: SomewherePalette.accent)
                     Spacer()
                     Image(systemName: projection.phase == .arrived ? "checkmark.seal.fill" : "eye.fill")
                         .foregroundStyle(SomewherePalette.success)
@@ -22,7 +22,7 @@ struct RevealView: View {
                         .foregroundStyle(SomewherePalette.ink)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("somewhere.revealed-name")
-                    if projection.phase != .arrived, let address = projection.reveal?.address {
+                    if let address = projection.reveal?.address {
                         Label(address, systemImage: "mappin.and.ellipse")
                             .font(.subheadline)
                             .foregroundStyle(SomewherePalette.mutedInk)
@@ -69,16 +69,11 @@ struct RevealView: View {
                 .scaledToFit()
                 .frame(width: 112, height: 112)
                 .opacity(0.26)
-            Text("ROLL THE COMPASS / FOUND")
-                .font(.caption2.weight(.bold))
-                .tracking(1.4)
-                .foregroundStyle(SomewherePalette.ink.opacity(0.68))
-                .offset(y: 48)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 144)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .accessibilityLabel("도착한 장소 이미지")
+        .accessibilityHidden(true)
     }
 
     private var rationale: some View {
