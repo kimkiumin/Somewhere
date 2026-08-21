@@ -271,7 +271,10 @@ SOMEWHERE_PROXY_LOG=1 SOMEWHERE_UPSTREAM_PROTOCOL=https \
 This evidence does not close the external gates: Apple signing/TestFlight,
 physical walking accuracy, provider rights and dietary/allergen review, legal
 review, Cloudflare secrets/domains, and the Linux-only release authority gate
-still require their respective owners.
+still require their respective owners. On macOS, `bun run verify:v2` reaches
+the existing operations process tests but cannot finish their Linux-oriented
+cleanup fixtures because this host has BSD `realpath` and no `setsid`; run that
+gate in the repository's Ubuntu CI or Linux release environment.
 
 ## Simulator build and automated tests
 
