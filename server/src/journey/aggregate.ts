@@ -166,6 +166,14 @@ export function transitionJourney(state: JourneyState, command: JourneyCommand):
   if (command.expectedSequence !== state.sequence) {
     return unchanged(state, "sequence_conflict");
   }
+  if (
+    command.type === "reveal" &&
+    state.phase !== "paused" &&
+    state.phase !== "stopped" &&
+    state.phase !== "completed"
+  ) {
+    return unchanged(state, "illegal_transition");
+  }
   if (state.phase === "stopped" || state.phase === "completed" || state.phase === "arrived") {
     if (
       command.type !== "reveal" &&
@@ -241,11 +249,12 @@ export function transitionJourney(state: JourneyState, command: JourneyCommand):
         return unchanged(state, "illegal_transition");
       }
       if (command.choice === "external-map") {
+        if (state.phase !== "paused") {
+          return unchanged(state, "illegal_transition");
+        }
         return withOutcome(state, command, {
           revealed: true,
-          ...(state.phase === "paused"
-            ? { routeRepair: { status: "external-map-handed-off" } }
-            : {}),
+          routeRepair: { status: "external-map-handed-off" },
         });
       }
       return withOutcome(state, command, {

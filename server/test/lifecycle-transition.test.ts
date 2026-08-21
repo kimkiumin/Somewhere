@@ -170,13 +170,13 @@ function command(action: PublicAction, sequence: number, ordinal: number): Journ
 
 const ALLOWED = {
   arrived: [],
-  committed: ["reveal", "stop-request"],
+  committed: ["stop-request"],
   completed: ["reveal", "recovery-intent", "recovery-confirm"],
-  following: ["reveal", "stop-request", "route-recover", "arrival"],
-  near: ["reveal", "stop-request", "route-recover", "arrival"],
+  following: ["stop-request", "route-recover", "arrival"],
+  near: ["stop-request", "route-recover", "arrival"],
   paused: ["reveal", "continue", "confirm-stop", "route-recover"],
-  ready: ["commit", "reveal", "stop-request"],
-  "route-recovery": ["reveal", "stop-request", "route-recover"],
+  ready: ["commit", "stop-request"],
+  "route-recovery": ["stop-request", "route-recover"],
   stopped: ["reveal", "stop-reason"],
 } as const satisfies Readonly<Record<JourneyState["phase"], readonly PublicAction[]>>;
 
