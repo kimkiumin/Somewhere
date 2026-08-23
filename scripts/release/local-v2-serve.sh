@@ -25,10 +25,14 @@ cleanup() {
       sleep 0.05
     done
   fi
-  local port_closed=true
-  if curl --insecure --silent --max-time 1 "https://$HOST:$PORT/api/v1/health" >/dev/null 2>&1; then
-    port_closed=false
-  fi
+  local port_closed=false
+  for _ in $(seq 1 100); do
+    if ! curl --insecure --silent --max-time 1 "https://$HOST:$PORT/api/v1/health" >/dev/null 2>&1; then
+      port_closed=true
+      break
+    fi
+    sleep 0.05
+  done
   if [[ -d "$RUN_DIR" ]]; then
     find "$RUN_DIR" -depth -mindepth 1 -delete 2>/dev/null || true
     rmdir "$RUN_DIR" 2>/dev/null || true

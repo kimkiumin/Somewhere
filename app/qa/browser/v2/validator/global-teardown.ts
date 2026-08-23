@@ -48,7 +48,13 @@ export default async function globalTeardown(): Promise<void> {
     throw new TypeError("V2 QA Worker did not stop");
   }
   await rm(parsed.data.runDir, { force: true, recursive: true });
-  const portClosed = !(await portIsOpen(parsed.data.port));
+  let portClosed = false;
+  for (let attempt = 0; !portClosed && attempt < 100; attempt += 1) {
+    portClosed = !(await portIsOpen(parsed.data.port));
+    if (!portClosed) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
   await writeFile(
     path.join(evidenceDir, "process-cleanup.json"),
     `${JSON.stringify({

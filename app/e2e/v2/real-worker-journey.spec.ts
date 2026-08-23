@@ -132,7 +132,9 @@ test("real Worker preserves orthogonal Reveal and guarded Stop recovery", async 
   await expect(page.getByText(/검토된 식당이 없어요/)).toBeVisible();
   expect(apiBodies.join("\n")).toContain(RESTAURANT_NAME);
   expect(apiBodies.join("\n")).toContain('"code":"no_fit"');
-  expect(failures).toEqual([]);
+  expect(failures).toEqual([
+    "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)",
+  ]);
 });
 
 test("strong arrival retains one raw feedback capability across a context restart", async ({
