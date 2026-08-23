@@ -1,5 +1,6 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { createConnection } from "node:net";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { z } from "zod";
 
@@ -7,7 +8,7 @@ const receiptSchema = z
   .object({
     pid: z.number().int().positive(),
     port: z.literal(8787),
-    runDir: z.string().regex(/^\/tmp\/somewhere-v2-qa\.[A-Za-z0-9]+$/),
+    runDir: z.string().min(1),
     stateDir: z.string(),
   })
   .strict()
@@ -18,7 +19,11 @@ export default async function globalTeardown(): Promise<void> {
   const parsed = receiptSchema.safeParse(
     JSON.parse(await readFile(path.join(evidenceDir, "process-start.json"), "utf8")),
   );
-  if (!parsed.success || parsed.data.stateDir !== path.join(parsed.data.runDir, "state")) {
+  if (
+    !parsed.success ||
+    !isSafeRunDir(parsed.data.runDir) ||
+    parsed.data.stateDir !== path.join(parsed.data.runDir, "state")
+  ) {
     throw new TypeError("V2 QA process receipt is invalid");
   }
   let processAlive = true;
@@ -57,6 +62,14 @@ export default async function globalTeardown(): Promise<void> {
   if (!portClosed) {
     throw new TypeError("V2 QA port remains open");
   }
+}
+
+function isSafeRunDir(runDir: string): boolean {
+  const resolved = path.resolve(runDir);
+  return (
+    path.dirname(resolved) === path.resolve(tmpdir()) &&
+    /^somewhere-v2-qa\.[A-Za-z0-9.]+$/.test(path.basename(resolved))
+  );
 }
 
 function portIsOpen(port: number): Promise<boolean> {

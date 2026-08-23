@@ -127,6 +127,7 @@ export function createV2JourneyApplication(
   let arrivalSubmitted = false;
   let validationGeneration = 0;
   let creating = false;
+  let creationRequested = false;
   let directionSuppressed = false;
   let resumeAfterMs: number | null = null;
   let recoveryLocationReady: (() => void) | null = null;
@@ -158,7 +159,12 @@ export function createV2JourneyApplication(
   }
 
   async function createFromLiveLocation(): Promise<void> {
-    if (creating || projection() !== null || sensors.location.status !== "live") {
+    if (
+      !creationRequested ||
+      creating ||
+      projection() !== null ||
+      sensors.location.status !== "live"
+    ) {
       return;
     }
     creating = true;
@@ -169,21 +175,25 @@ export function createV2JourneyApplication(
       latitude: sample.coordinates.latitude,
       longitude: sample.coordinates.longitude,
     });
-    await options.store.create(
-      preferences === null
-        ? defaultBody
-        : {
-            ...defaultBody,
-            constraints: {
-              ...defaultBody.constraints,
-              budgetBand: preferences.budgetBand,
-              category: preferences.category,
-              maxWalkMinutes: preferences.maxWalkMinutes,
+    try {
+      await options.store.create(
+        preferences === null
+          ? defaultBody
+          : {
+              ...defaultBody,
+              constraints: {
+                ...defaultBody.constraints,
+                budgetBand: preferences.budgetBand,
+                category: preferences.category,
+                maxWalkMinutes: preferences.maxWalkMinutes,
+              },
+              disclosureLevel: preferences.disclosureLevel,
             },
-            disclosureLevel: preferences.disclosureLevel,
-          },
-    );
-    creating = false;
+      );
+    } finally {
+      creating = false;
+      creationRequested = false;
+    }
   }
 
   function routeFromProjection(
@@ -417,6 +427,7 @@ export function createV2JourneyApplication(
   return {
     async startAdventure(nextPreferences) {
       preferences = nextPreferences ?? null;
+      creationRequested = true;
       options.diagnostics.beginSession();
       await options.sensors.startFromUserGesture();
       sensors = options.sensors.snapshot();
