@@ -26,16 +26,7 @@ export default async function globalTeardown(): Promise<void> {
   ) {
     throw new TypeError("V2 QA process receipt is invalid");
   }
-  let processAlive = true;
-  try {
-    process.kill(-parsed.data.pid, "SIGTERM");
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ESRCH") {
-      processAlive = false;
-    } else {
-      throw error;
-    }
-  }
+  let processAlive = terminateProcess(parsed.data.pid);
   for (let attempt = 0; processAlive && attempt < 100; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 50));
     try {
@@ -67,6 +58,26 @@ export default async function globalTeardown(): Promise<void> {
   );
   if (!portClosed) {
     throw new TypeError("V2 QA port remains open");
+  }
+}
+
+function terminateProcess(pid: number): boolean {
+  try {
+    process.kill(-pid, "SIGTERM");
+    return true;
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) {
+      throw error;
+    }
+  }
+  try {
+    process.kill(pid, "SIGTERM");
+    return true;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ESRCH") {
+      return false;
+    }
+    throw error;
   }
 }
 
