@@ -14,6 +14,7 @@ import {
 } from "../../qa/browser/v2/fixtures/real-worker";
 
 const BASE_URL = process.env.SOMEWHERE_PREPARED_BASE_URL ?? "https://127.0.0.1:8787/";
+const RESTAURANT_NAME = "소문난성수감자탕";
 
 test("real browser session handshake reaches the Worker", async ({ page }, testInfo) => {
   // Given: an unmodified Chromium or WebKit same-origin browser request shape.
@@ -107,9 +108,9 @@ test("real Worker preserves orthogonal Reveal and guarded Stop recovery", async 
   expect(before).not.toBe(after);
   await capture(page, "real-following-390x844");
   await expect.poll(() => apiBodies.length).toBeGreaterThanOrEqual(3);
-  expect(apiBodies.join("\n")).not.toContain("센터커피 서울숲점");
+  expect(apiBodies.join("\n")).not.toContain(RESTAURANT_NAME);
   await page.getByRole("button", { name: "목적지 확인" }).click();
-  await expect(page.getByText("센터커피 서울숲점")).toBeVisible();
+  await expect(page.getByText(RESTAURANT_NAME)).toBeVisible();
   await expect(page.locator("[data-compass-needle]")).toBeVisible();
   await capture(page, "real-revealed-following-390x844");
   await page.getByRole("button", { name: "중단", exact: true }).click();
@@ -139,7 +140,7 @@ test("real Worker preserves orthogonal Reveal and guarded Stop recovery", async 
   await capture(page, "real-recovery-review-390x844");
   await page.getByRole("button", { name: "확인하고 다시 찾기" }).click();
   await expect(page.getByRole("heading", { name: "목적지는 아직 비밀이에요." })).toBeVisible();
-  expect(apiBodies.join("\n")).toContain("센터커피 서울숲점");
+  expect(apiBodies.join("\n")).toContain(RESTAURANT_NAME);
   expect(failures).toEqual([]);
 });
 
@@ -251,7 +252,7 @@ test("production mobile surface is private, offline-safe, accessible, and contai
   expect(cachePathnames.some((value) => value.endsWith(".js"))).toBe(true);
   expect(cachePathnames.some((value) => value.endsWith(".css"))).toBe(true);
   expect(cacheUrls.some((url) => url.includes("/api/"))).toBe(false);
-  expect(cacheUrls.join("\n")).not.toContain("센터커피 서울숲점");
+  expect(cacheUrls.join("\n")).not.toContain(RESTAURANT_NAME);
   expect(await page.evaluate(() => Reflect.has(window, "somewhereTest"))).toBe(false);
   await capture(page, "real-offline-reload-390x844");
 });
