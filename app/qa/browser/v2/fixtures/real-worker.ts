@@ -134,28 +134,29 @@ export async function installDeterministicClock(page: Page): Promise<void> {
 }
 
 export async function driveCredibleArrival(page: Page): Promise<void> {
-  const routePoints = [
-    [37.5442, 127.0377],
-    [37.5446, 127.0385],
-    [37.545, 127.0393],
-    [37.5452, 127.0401],
-    [37.54555, 127.04085],
-    [37.5459, 127.0416],
-    [37.54625, 127.04235],
-    [37.54645, 127.04306],
+  const routeSamples = [
+    [37.54365, 127.0385, 98],
+    [37.54345, 127.0402, 98],
+    [37.54325, 127.042, 98],
+    [37.54305, 127.044, 98],
+    [37.54295, 127.046, 95],
+    [37.54293, 127.048, 90],
+    [37.54292, 127.05, 90],
+    [37.54292, 127.052, 90],
+    [37.542915, 127.0542, 90],
   ] as const;
-  for (const [latitude, longitude] of routePoints) {
+  for (const [latitude, longitude, heading] of routeSamples) {
     await emitLocation(page, { accuracy: 8, latitude, longitude });
-    await emitHeading(page, 0);
+    await emitHeading(page, heading);
     await page.clock.fastForward(150);
   }
   for (let sample = 0; sample < 5; sample += 1) {
     await emitLocation(page, {
       accuracy: 8,
-      latitude: 37.54645,
-      longitude: 127.04307 + sample * 0.00001,
+      latitude: 37.542915,
+      longitude: 127.05467 + sample * 0.00001,
     });
-    await emitHeading(page, 0);
+    await emitHeading(page, 90);
     if (sample < 4) {
       await page.clock.fastForward(4_100);
     }

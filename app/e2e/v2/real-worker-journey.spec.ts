@@ -126,8 +126,12 @@ test("real Worker preserves orthogonal Reveal and guarded Stop recovery", async 
   await expect(page.getByRole("heading", { name: "바꿀 조건을 확인해요." })).toBeVisible();
   await capture(page, "real-recovery-review-390x844");
   await page.getByRole("button", { name: "확인하고 다시 찾기" }).click();
-  await expect(page.getByRole("heading", { name: "목적지는 아직 비밀이에요." })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "조건에 맞는 곳을 찾지 못했어요." }),
+  ).toBeVisible();
+  await expect(page.getByText(/검토된 식당이 없어요/)).toBeVisible();
   expect(apiBodies.join("\n")).toContain(RESTAURANT_NAME);
+  expect(apiBodies.join("\n")).toContain('"code":"no_fit"');
   expect(failures).toEqual([]);
 });
 
@@ -157,7 +161,7 @@ test("strong arrival retains one raw feedback capability across a context restar
   await ready(page);
   expect(await control(page, 0, true)).toMatchObject({ status: 200 });
   await page.getByRole("button", { name: "이곳으로 출발" }).click();
-  await emitHeading(page, 0);
+  await emitHeading(page, 98);
   const arrivalResponse = page.waitForResponse(
     (response) => response.request().method() === "POST" && response.url().endsWith("/arrival"),
   );

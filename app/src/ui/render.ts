@@ -143,6 +143,22 @@ function recoveryReview(main: HTMLElement, intent: RecoveryIntent): void {
   main.append(panel);
 }
 
+function failureScreen(main: HTMLElement, code: string): void {
+  const noFit = code === "no_fit";
+  main.append(
+    element("p", "eyebrow", noFit ? "조건을 다시 볼까요?" : "안내를 준비하지 못했어요."),
+    element("h1", undefined, noFit ? "조건에 맞는 곳을 찾지 못했어요." : "잠시 문제가 생겼어요."),
+    element(
+      "p",
+      "body-copy muted",
+      noFit
+        ? "지금 조건을 모두 만족하는 검토된 식당이 없어요. 조건을 바꾸면 다시 찾아볼 수 있어요."
+        : "안내를 준비하지 못했어요. 처음으로 돌아가 잠시 뒤 다시 시도해 주세요.",
+    ),
+    actionButton("처음으로", "restart", "button--primary button--wide"),
+  );
+}
+
 function feedbackScreen(main: HTMLElement, prompt: FeedbackPrompt): void {
   main.append(
     element("p", "eyebrow", "한 번만 여쭤볼게요"),
@@ -187,6 +203,9 @@ export function renderSomewhere(
   } else if (snapshot.projection?.phase === "completed") {
     appScreen = "completed";
     completedScreen(main, snapshot);
+  } else if (snapshot.failure !== null && snapshot.projection === null) {
+    appScreen = "failure";
+    failureScreen(main, snapshot.failure.code);
   } else if (snapshot.projection?.phase === "finding" || snapshot.journey.phase === "selecting") {
     appScreen = "finding";
     findingScreen(main);
