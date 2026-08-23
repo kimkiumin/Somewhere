@@ -22,7 +22,7 @@ test("completes a hidden V2 journey without leaking identity", async ({ page }) 
   expect((await harnessSnapshot(page)).guidance.status).toBe("inactive");
 });
 
-test("keeps Reveal and Stop in the first viewport on target phones", async ({ page }) => {
+test("keeps the active Stop control in the first viewport on target phones", async ({ page }) => {
   for (const viewport of [
     { width: 320, height: 780 },
     { width: 390, height: 844 },
@@ -32,11 +32,10 @@ test("keeps Reveal and Stop in the first viewport on target phones", async ({ pa
     await ready(page);
     await page.getByRole("button", { name: "이곳으로 출발" }).click();
     await harnessCommand(page, "emitDistance", 180, 10);
-    for (const name of ["목적지 확인", "중단"] as const) {
-      const box = await page.getByRole("button", { name, exact: true }).boundingBox();
-      expect(box).not.toBeNull();
-      expect((box?.y ?? 10_000) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
-    }
+    await expect(page.getByRole("button", { name: "목적지 확인", exact: true })).toHaveCount(0);
+    const box = await page.getByRole("button", { name: "중단", exact: true }).boundingBox();
+    expect(box).not.toBeNull();
+    expect((box?.y ?? 10_000) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
   }
 });
 

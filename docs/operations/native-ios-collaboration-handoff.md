@@ -148,6 +148,9 @@ continue the work without reconstructing the discussion:
   reaction tiles, and primary/secondary buttons live in
   `ios/Somewhere/UI/SomewhereStyle.swift`; screen composition stays in small
   SwiftUI views rather than a screenshot or a generated canvas.
+- The browser consumer surface now follows the same restaurant-only and
+  stop-first reveal contract as native: an active journey exposes Stop but not
+  Reveal, and the revealed name/address is rendered after a completed journey.
 
 ## Restaurant recommendation algorithm
 
@@ -238,6 +241,14 @@ Final evidence from this review:
   cookie proxy: 2 passed, 0 failed, 0 skipped. It covers real session/create/
   commit, off-route suppression/recovery, multi-sample arrival, and automatic
   restaurant reveal.
+- Browser consumer E2E: run `bun run --cwd app test:e2e` for the deterministic
+  harness suite, or `bun run test:e2e:v2` for the real production bundle against
+  the local Worker. The dedicated V2 Playwright config writes an absolute
+  evidence directory so Worker startup/cleanup receipts are reproducible from
+  any checkout working directory. The real browser flow asserts that the
+  restaurant identity is absent during active guidance, Reveal is unavailable
+  until the stop/reason path completes, and the revealed restaurant is shown
+  before guarded recovery.
 - JavaScript regression: app 181 passed, server 238 passed, contracts 15
   passed; all three workspaces typecheck successfully, lint has no errors, and
   `bun audit` reports no vulnerabilities.

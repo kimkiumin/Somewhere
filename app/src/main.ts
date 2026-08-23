@@ -45,7 +45,7 @@ function renderFatal(root: HTMLElement, error: Error): void {
 function preferences(root: HTMLElement): JourneyPreferences {
   const form = root.querySelector<HTMLFormElement>("#constraints-form");
   const values = form === null ? new FormData() : new FormData(form);
-  const category = values.get("category") === "restaurant" ? "restaurant" : "cafe";
+  const category = "restaurant" as const;
   const budgetValue = values.get("budgetBand");
   const budgetBand = budgetValue === "low" || budgetValue === "high" ? budgetValue : "medium";
   const walkValue = Number(values.get("maxWalkMinutes"));

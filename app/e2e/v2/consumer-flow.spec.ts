@@ -22,10 +22,7 @@ test("TASK17_V2_CONSUMER completes Stop, Continue, reason, and guarded recovery"
   await page.getByRole("button", { name: "이곳으로 출발" }).click();
   await harnessCommand(page, "emitDistance", 300, 10);
   await expect(page.locator("[data-compass-needle]")).toBeVisible();
-
-  await page.getByRole("button", { name: "목적지 확인" }).click();
-  await expect(page.getByRole("heading", { name: "조용한 정원" })).toBeVisible();
-  await expect(page.locator("[data-compass-needle]")).toBeVisible();
+  await expect(page.getByRole("button", { name: "목적지 확인", exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "중단", exact: true }).click();
   await expect(page.locator("[data-compass-needle]")).toHaveCount(0);
@@ -58,6 +55,8 @@ test("TASK17_V2_CONSUMER completes Stop, Continue, reason, and guarded recovery"
     mutation: { action: "stop-reason", body: { reason: "route-or-sensor" } },
   });
 
+  await page.getByRole("button", { name: "목적지 확인", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "조용한 정원" })).toBeVisible();
   await page.getByRole("button", { name: "새 장소 찾기" }).click();
   await expect(page.getByRole("heading", { name: "바꿀 조건을 확인해요." })).toBeVisible();
   await page.getByRole("button", { name: "확인하고 다시 찾기" }).click();

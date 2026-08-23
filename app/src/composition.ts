@@ -40,7 +40,7 @@ export function createProductionComposition(): SomewhereComposition {
         accessibility: [],
         allergies: [],
         budgetBand: "medium",
-        category: "cafe",
+        category: "restaurant",
         dietary: [],
         maxWalkMinutes: 30,
       },

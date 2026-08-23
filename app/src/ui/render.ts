@@ -87,6 +87,16 @@ function completedScreen(main: HTMLElement, snapshot: JourneyApplicationSnapshot
   );
   if (snapshot.revealedDestination === null) {
     main.append(actionButton("목적지 확인", "reveal"));
+  } else {
+    const reveal = element("aside", "reveal-inline");
+    const name = element("h2", undefined, snapshot.revealedDestination.name);
+    name.lang = snapshot.revealedDestination.language;
+    reveal.append(
+      element("p", "eyebrow", "확인한 목적지"),
+      name,
+      element("p", "body-copy", snapshot.revealedDestination.description),
+    );
+    main.append(reveal);
   }
   if (snapshot.projection?.phase === "completed" && "recoveryExpiresAt" in snapshot.projection) {
     main.append(actionButton("새 장소 찾기", "request-recovery", "button--primary button--wide"));
