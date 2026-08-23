@@ -249,7 +249,12 @@ Final evidence from this review:
   restaurant identity is absent during active guidance, Reveal is unavailable
   until the stop/reason path completes, and the revealed restaurant is shown
   before guarded recovery.
-- JavaScript regression: app 181 passed, server 238 passed, contracts 15
+- The 2026-08-23 browser verification passed: deterministic consumer E2E is
+  34 passed and 3 skipped (existing WebKit focus-automation limitation), while
+  the real Worker E2E is 5 passed and 0 failed. The Worker run also verifies
+  the guarded replacement `no_fit` screen and confirms its process, port, and
+  temporary state cleanup receipts on macOS.
+- JavaScript regression: app 183 passed, server 238 passed, contracts 15
   passed; all three workspaces typecheck successfully, lint has no errors, and
   `bun audit` reports no vulnerabilities.
 - Final 368 × 800 visual captures are in the ignored local directory
