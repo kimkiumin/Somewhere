@@ -26,7 +26,7 @@ enum SomewhereCompassMotionPolicy {
     static func hubCorrection(displaySize: CGFloat, frameScale: CGFloat) -> CGSize {
         let artworkCanvas = CGFloat(1_254)
         let pivot = CGPoint(x: 627, y: 627)
-        let measuredHub = CGPoint(x: 627.5, y: 718)
+        let measuredHub = CGPoint(x: 628, y: 1_000)
         let scale = displaySize * frameScale / artworkCanvas
         return CGSize(
             width: (pivot.x - measuredHub.x) * scale,
@@ -41,6 +41,29 @@ enum SomewhereCompassMotionPolicy {
         guard case .pointing = nextMode else { return false }
         if let previousMode, case .pointing = previousMode { return false }
         return true
+    }
+}
+
+struct CompassDirectionCue: Equatable {
+    let symbolName: String
+    let label: String
+
+    init(bearingDegrees: Double) {
+        let normalized = bearingDegrees.isFinite
+            ? bearingDegrees.truncatingRemainder(dividingBy: 360) + (bearingDegrees < 0 ? 360 : 0)
+            : 0
+        let sector = Int(((normalized + 22.5) / 45).rounded(.down)) % 8
+        let cues = [
+            ("arrow.up", "앞"),
+            ("arrow.up.right", "오른쪽 앞"),
+            ("arrow.right", "오른쪽"),
+            ("arrow.down.right", "오른쪽 뒤"),
+            ("arrow.down", "뒤"),
+            ("arrow.down.left", "왼쪽 뒤"),
+            ("arrow.left", "왼쪽"),
+            ("arrow.up.left", "왼쪽 앞"),
+        ]
+        (symbolName, label) = cues[sector]
     }
 }
 
@@ -104,11 +127,11 @@ struct SomewhereCompass: View {
                     .interpolation(.high)
                     .antialiased(true)
                     .scaledToFit()
-                    .frame(width: size * 0.68, height: size * 0.68)
+                    .frame(width: size * 0.44, height: size * 0.44)
                     .offset(
                         SomewhereCompassMotionPolicy.hubCorrection(
                             displaySize: size,
-                            frameScale: 0.68
+                            frameScale: 0.44
                         )
                     )
             }

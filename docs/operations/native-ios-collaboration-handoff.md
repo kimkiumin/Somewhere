@@ -292,6 +292,44 @@ the existing operations process tests but cannot finish their Linux-oriented
 cleanup fixtures because this host has BSD `realpath` and no `setsid`; run that
 gate in the repository's Ubuntu CI or Linux release environment.
 
+## vNext collaborator compass sync (2026-08-24)
+
+The owner approved a new collaborator-supplied shell and red needle as the
+native visual source. This is a targeted visual sync, not a merge of the
+unrelated visual-prototype branch. Asset source hashes and the byte-preserving
+background-alpha transformation are recorded in
+[`../../ios/Somewhere/Resources/README.md`](../../ios/Somewhere/Resources/README.md).
+
+Implementation rules for future collaborators and AI agents:
+
+- Keep the supplied shell and needle as separate assets. The needle hub is
+  measured at `(628, 1000)` on the 1254 × 1254 source canvas and is translated
+  to the shell center before the shared rotation container turns.
+- `GuidanceReading.arrowDegrees` is a device-relative rotation, not an absolute
+  north/east/south/west bearing. Visible copy therefore uses relative movement
+  cues such as `앞`, `오른쪽`, and `왼쪽 앞`.
+- A provider `nextStep` is labeled as a future `다음 동작`; it must not replace
+  or contradict the current needle-derived direction.
+- Unrevealed `following` and `near` remain non-scrolling. `ViewThatFits`
+  progressively reduces the compass while preserving direction, distance,
+  safety copy, and the fixed outline `멈춤` action. At accessibility text sizes,
+  decorative wordmark/status copy and restaurant metadata collapse before any
+  safety control does.
+
+Fresh evidence for this sync:
+
+- iPhone 17 Pro / iOS 26.5 complete Simulator suite: 64 discovered, 62 passed,
+  0 failed, 2 skipped. The two skips are the opt-in local-Worker virtual GPS
+  tests.
+- iPhone 17e / iOS 26.5 focused default, future-next-step, and accessibility
+  layout scenarios: 3 passed, 0 failed, 0 skipped.
+- Native field-flow source gate: 8 passed, 0 failed; 27 regular UI scenarios are
+  now counted in the gate.
+- The 368 × 800 review capture is tracked at
+  [`../assets/roll-compass-vnext-guidance-2026-08-24.jpg`](../assets/roll-compass-vnext-guidance-2026-08-24.jpg).
+
+![vNext native guidance](../assets/roll-compass-vnext-guidance-2026-08-24.jpg)
+
 ## Simulator build and automated tests
 
 ```sh

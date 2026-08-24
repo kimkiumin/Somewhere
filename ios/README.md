@@ -2,8 +2,9 @@
 
 This directory is the contract-driven iOS 17+ client required by the approved blueprint. It is a native SwiftUI/Core Location surface; it does not embed the web application. `Roll the compass!` is the public app name; `Somewhere` remains the internal Xcode target and API namespace.
 
-The current visual system uses the generated `RollCompassShell` and independently
-animated `RollCompassNeedle` assets in `Somewhere/Resources/Assets.xcassets`.
+The current visual system uses the owner-approved vNext `RollCompassShell` and
+independently animated `RollCompassNeedle` assets in
+`Somewhere/Resources/Assets.xcassets`.
 The opaque `RollCompassAppIcon` set is packaged for device and Simulator builds.
 The wordmark uses the checked-in OFL-licensed `UnifrakturCook-Bold.ttf` font.
 
@@ -93,7 +94,7 @@ Pass `--ui-test-no-notifications` to suppress delayed-feedback scheduling while
 manually inspecting a screen. The supported `--ui-test-state` values are:
 
 ```text
-following, following-revealed, arrived-unrevealed, arrived-revealed, paused,
+following, following-next-step, following-revealed, arrived-unrevealed, arrived-revealed, paused,
 stopped, stopped-revealed, completed, completed-revealed, route-recovery,
 arrived-rich, expired
 ```
@@ -102,6 +103,12 @@ Add `--ui-test-credible-guidance` to a following/near state to inject a stable
 420 m, 315° guidance reading. It drives the same separately animated needle and
 distance presentation as a live credible sensor reading without changing the
 Release build.
+
+The active `following` and `near` guidance surface is intentionally a single
+non-scrolling viewport: a short bearing-derived direction cue, the shared
+compass, remaining distance, safety note, and fixed outline `멈춤` action. The
+summary icon and needle both derive from the same credible bearing, so they must
+not claim conflicting directions.
 
 The native vNext surface also includes first-use onboarding, dietary/allergy
 profile pickers, party size, walking-time and budget controls, minimal/private

@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 @MainActor
@@ -42,6 +43,60 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertEqual(compass.label, "진행 방향 315도")
         XCTAssertTrue(app.staticTexts["남은 경로 약 420미터"].exists)
         XCTAssertFalse(app.buttons["somewhere.reveal"].exists)
+    }
+
+    func testCredibleGuidanceUsesRelativeCueWithoutScrollableCoreContent() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-test-state", "following",
+            "--ui-test-credible-guidance",
+            "--ui-test-no-notifications",
+        ]
+        app.launch()
+
+        let summary = app.descendants(matching: .any)["somewhere.direction-summary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 2))
+        XCTAssertTrue(summary.label.contains("왼쪽 앞"))
+        XCTAssertTrue(app.staticTexts["목적지 숨김"].exists)
+        XCTAssertFalse(app.staticTexts["보물 숨김"].exists)
+        XCTAssertEqual(app.scrollViews.count, 0)
+        XCTAssertTrue(app.buttons["somewhere.stop"].isHittable)
+    }
+
+    func testNextStepIsPresentedAsFutureDetailWithoutOverridingCurrentDirection() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-test-state", "following-next-step",
+            "--ui-test-credible-guidance",
+            "--ui-test-no-notifications",
+        ]
+        app.launch()
+
+        let summary = app.descendants(matching: .any)["somewhere.direction-summary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 2))
+        XCTAssertTrue(summary.label.contains("왼쪽 앞 방향으로 이동"))
+        XCTAssertTrue(summary.label.contains("다음 동작"))
+        XCTAssertTrue(summary.label.contains("우회전"))
+    }
+
+    func testAccessibilityTextKeepsStopVisibleWithoutScrolling() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-test-state", "following",
+            "--ui-test-credible-guidance",
+            "--ui-test-no-notifications",
+            "-UIPreferredContentSizeCategoryName",
+            UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue,
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["somewhere.stop"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["somewhere.stop"].isHittable)
+        XCTAssertTrue(app.images["somewhere.hidden-status"].exists)
+        XCTAssertFalse(app.staticTexts["목적지 숨김"].exists)
+        XCTAssertFalse(app.staticTexts["한식 국물 요리"].exists)
+        XCTAssertFalse(app.staticTexts["나침반 바늘과 남은 거리만 확인하세요."].exists)
+        XCTAssertEqual(app.scrollViews.count, 0)
     }
 
     func testBackControlIsVisibleDuringGuidance() {

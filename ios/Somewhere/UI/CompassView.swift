@@ -1,12 +1,30 @@
 import SwiftUI
 
 struct CompassView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var store: JourneyStore
     let projection: JourneyProjection
 
     var body: some View {
         VStack(spacing: 0) {
             journeyHeader
+                .layoutPriority(2)
+            journeyContent
+            actionArea
+                .layoutPriority(3)
+        }
+    }
+
+    @ViewBuilder
+    private var journeyContent: some View {
+        if usesCompactGuidanceLayout {
+            ViewThatFits(in: .vertical) {
+                compactGuidanceStack(compassSize: 250, spacing: 12, verticalPadding: 10)
+                compactGuidanceStack(compassSize: 210, spacing: 8, verticalPadding: 6)
+                compactGuidanceStack(compassSize: 156, spacing: 6, verticalPadding: 2)
+            }
+            .frame(maxHeight: .infinity)
+        } else {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 22) {
                     if projection.revealed == true {
@@ -17,14 +35,27 @@ struct CompassView: View {
                         RouteRecoveryView(store: store)
                     }
                     directionSummary
-                    compassDial
+                    compassDial(size: 286)
                     distanceCard
                     safetyNote
                 }
                 .padding(.vertical, 18)
             }
-            actionArea
         }
+    }
+
+    private func compactGuidanceStack(
+        compassSize: CGFloat,
+        spacing: CGFloat,
+        verticalPadding: CGFloat
+    ) -> some View {
+        VStack(spacing: spacing) {
+            directionSummary
+            compassDial(size: compassSize)
+            distanceCard
+            safetyNote
+        }
+        .padding(.vertical, verticalPadding)
     }
 
     private var journeyHeader: some View {
@@ -37,7 +68,7 @@ struct CompassView: View {
                 }
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.subheadline.weight(.bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(SomewherePalette.ink)
                     .frame(width: 42, height: 42)
                     .background(SomewherePalette.cardStrong, in: Circle())
@@ -47,19 +78,35 @@ struct CompassView: View {
             .accessibilityLabel("뒤로가기")
             .accessibilityIdentifier("somewhere.back")
             .disabled(!projection.actions.contains(.cancel) && !projection.actions.contains(.stop))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(RollCompassBrand.name)
-                    .font(RollCompassBrand.wordmarkFont(size: 23))
+            if usesAccessibilityGuidanceLayout {
                 Text("안내 중")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(SomewherePalette.mutedInk)
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(SomewherePalette.ink)
+                    .lineLimit(1)
+                Spacer()
+                Image(systemName: projection.revealed == true ? "eye.fill" : "eye.slash.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(projection.revealed == true ? SomewherePalette.success : SomewherePalette.accent)
+                    .frame(width: 44, height: 44)
+                    .background(SomewherePalette.cardStrong, in: Circle())
+                    .overlay { Circle().stroke(SomewherePalette.border, lineWidth: 1) }
+                    .accessibilityLabel(projection.revealed == true ? "목적지 공개됨" : "목적지 숨김")
+                    .accessibilityIdentifier("somewhere.hidden-status")
+            } else {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(RollCompassBrand.name)
+                        .font(RollCompassBrand.wordmarkFont(size: 23))
+                    Text("안내 중")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(SomewherePalette.mutedInk)
+                }
+                Spacer()
+                SomewhereSignalPill(
+                    icon: projection.revealed == true ? "eye.fill" : "eye.slash.fill",
+                    title: projection.revealed == true ? "공개됨" : "목적지 숨김",
+                    tint: projection.revealed == true ? SomewherePalette.success : SomewherePalette.accent
+                )
             }
-            Spacer()
-            SomewhereSignalPill(
-                icon: projection.revealed == true ? "eye.fill" : "eye.slash.fill",
-                title: projection.revealed == true ? "공개됨" : "보물 숨김",
-                tint: projection.revealed == true ? SomewherePalette.success : SomewherePalette.accent
-            )
         }
     }
 
@@ -76,8 +123,8 @@ struct CompassView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var compassDial: some View {
-        SomewhereCompass(mode: compassMode, size: 286)
+    private func compassDial(size: CGFloat) -> some View {
+        SomewhereCompass(mode: compassMode, size: size)
             .accessibilityIdentifier("somewhere.guidance-compass")
     }
 
@@ -114,7 +161,9 @@ struct CompassView: View {
                         .accessibilityLabel(distanceAccessibilityLabel)
                 }
                 Spacer()
-                if shouldShowDisclosureRows, let disclosure = projection.disclosure {
+                if !usesAccessibilityGuidanceLayout,
+                   shouldShowDisclosureRows,
+                   let disclosure = projection.disclosure {
                     VStack(alignment: .trailing, spacing: 3) {
                         Text(disclosure.representativeCategories.joined(separator: " · "))
                             .font(.caption.weight(.semibold))
@@ -139,24 +188,25 @@ struct CompassView: View {
                     Text(directionTitle)
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(SomewherePalette.ink)
-                    Text(directionDetail)
-                        .font(.caption)
-                        .foregroundStyle(SomewherePalette.mutedInk)
+                    if !usesAccessibilityGuidanceLayout {
+                        Text(directionDetail)
+                            .font(.caption)
+                            .foregroundStyle(SomewherePalette.mutedInk)
+                    }
                 }
                 Spacer()
             }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(directionTitle). \(directionDetail)")
+        .accessibilityIdentifier("somewhere.direction-summary")
     }
 
     private var safetyNote: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "hand.raised.fill")
                 .foregroundStyle(SomewherePalette.success)
-            Text(projection.phase == .arrived
-                ? "도착을 확인했어요. 목적지를 공개했어요."
-                : "필요하면 멈춤을 누른 뒤 목적지를 확인할 수 있어요.")
+            Text(safetyNoteText)
                 .font(.caption)
                 .foregroundStyle(SomewherePalette.mutedInk)
         }
@@ -228,12 +278,27 @@ struct CompassView: View {
 
     private var phaseSubtitle: String {
         switch projection.phase {
-        case .ready: "안내를 시작하면 보물의 이름은 계속 숨겨진 채로 남아요."
+        case .ready: "안내를 시작하면 목적지 이름은 계속 숨겨진 채로 남아요."
         case .following, .near: "화살표는 진행 방향을, 거리는 남은 길을 보여줘요."
         case .arrived: "도착을 확인해 이곳의 이름을 공개했어요."
         case .routeRecovery: "잠시 멈춰 표시가 안정되면 다시 안내받을 수 있어요."
-        default: "보물은 숨기고, 지금 필요한 신호만 보여드려요."
+        default: "목적지는 숨기고, 지금 필요한 신호만 보여드려요."
         }
+    }
+
+    private var usesCompactGuidanceLayout: Bool {
+        guard projection.revealed != true else { return false }
+        return projection.phase == .following || projection.phase == .near
+    }
+
+    private var usesAccessibilityGuidanceLayout: Bool {
+        dynamicTypeSize.isAccessibilitySize
+    }
+
+    private var safetyNoteText: String {
+        if projection.phase == .arrived { return "도착을 확인했고 목적지를 공개했어요." }
+        if usesAccessibilityGuidanceLayout { return "멈춤 후 목적지를 확인할 수 있어요." }
+        return "필요하면 멈춤을 누른 뒤 목적지를 확인할 수 있어요."
     }
 
     private var distanceIcon: String {
@@ -276,6 +341,7 @@ struct CompassView: View {
     }
 
     private var directionIcon: String {
+        if let directionCue { return directionCue.symbolName }
         switch projection.phase {
         case .finding, .committed: return "sparkle.magnifyingglass"
         case .paused, .routeRecovery: return "location.slash.fill"
@@ -299,11 +365,7 @@ struct CompassView: View {
         case .ready: return "출발하면 방향만 보여드려요"
         case .committed: return "걸을 길을 확인하는 중"
         case .following:
-            if case .credible = store.guidance,
-               let instruction = projection.guidance?.nextStep?.instruction,
-               !instruction.isEmpty {
-                return instruction
-            }
+            if let directionCue { return "\(directionCue.label) 방향으로 이동" }
             return store.guidanceTitle
         case .near: return "거의 다 왔어요"
         case .paused: return "안내를 멈췄어요"
@@ -318,11 +380,17 @@ struct CompassView: View {
         case .following:
             if case .credible = store.guidance {
                 if let step = projection.guidance?.nextStep {
-                    let distance = step.distanceM.map { "약 \(Int($0))m 뒤" }
-                    let road = step.road.map { " · \($0)" } ?? ""
-                    if let distance { return "\(distance)\(road)." }
+                    var parts = ["다음 동작"]
+                    if let distanceM = step.distanceM { parts.append("약 \(Int(distanceM))m 뒤") }
+                    if let maneuver = maneuverLabel(step.maneuver) {
+                        parts.append(maneuver)
+                    } else if let instruction = step.instruction, !instruction.isEmpty {
+                        parts.append(instruction)
+                    }
+                    if let road = step.road, !road.isEmpty { parts.append(road) }
+                    return parts.joined(separator: " · ")
                 }
-                return "화살표와 남은 거리만 가볍게 확인하세요."
+                return "나침반 바늘과 남은 거리만 확인하세요."
             }
             return "신뢰할 수 있는 방향이 돌아오면 다시 표시할게요."
         case .near: return "주변을 살피며 마지막 거리를 천천히 확인하세요."
@@ -330,6 +398,23 @@ struct CompassView: View {
         case .routeRecovery: return "복구 방법을 선택하기 전에는 방향을 표시하지 않아요."
         case .arrived: return "도착과 함께 목적지를 공개했어요."
         default: return "목적지 이름과 주소는 기본으로 숨겨져 있어요."
+        }
+    }
+
+    private var directionCue: CompassDirectionCue? {
+        guard projection.phase == .following || projection.phase == .near else { return nil }
+        guard case .credible(let reading) = store.guidance else { return nil }
+        return CompassDirectionCue(bearingDegrees: reading.arrowDegrees)
+    }
+
+    private func maneuverLabel(_ value: String?) -> String? {
+        switch value {
+        case "STRAIGHT": "직진"
+        case "TURN_RIGHT": "우회전"
+        case "TURN_LEFT": "좌회전"
+        case "U_TURN": "유턴"
+        case "ARRIVE": "도착"
+        default: nil
         }
     }
 
