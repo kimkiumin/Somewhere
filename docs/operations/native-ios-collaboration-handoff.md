@@ -267,41 +267,59 @@ examples, 17 endpoints, 12 actions, and 14 required sources; the field-flow
 gate reported 23 required files, 21 unit scenarios, 28 UI scenarios, and 44
 minimum control points.
 
-### Worker-backed virtual field diagnostics
+### Corrected Worker-backed virtual field evidence
 
-The Task 6 QA Worker was started with `bun run local:v2:start-for-qa`; health
-was observed at HTTP 200 on `https://127.0.0.1:8787/api/v1/health`. The raw
-shell environment did not reach the XCTest runner, so the first diagnostic
-bundle skipped both tests (0 passed, 0 failed, 2 skipped). A temporary ignored
-generated test-run configuration then enabled the runner variable without
-changing the project or native source.
+The earlier Task 6 virtual-field conclusion was incorrect. Systematic
+reproduction proved that the failures were caused by the test environment:
+the app had been built against the direct self-signed
+`https://127.0.0.1:8787` Worker origin, bypassing the required iOS loopback
+cookie proxy, and the fresh target Simulators had not been granted location
+permission. The correct Simulator app origin is
+`http://127.0.0.1:8788`, with
+`scripts/ios/local-ios-loopback-proxy.mjs` forwarding to the Worker on port
+8787. After location was granted to the exact iPad Simulator, proxy traffic
+immediately showed session `200`, journey `201`, and commit `200` responses.
 
-With the runner variable enabled and
-`SOMEWHERE_API_ORIGIN=https://127.0.0.1:8787`, the exact-device virtual field
-runs were:
+The corrected XcodeBuildMCP runs used app/test products compiled with the
+loopback-proxy origin, passed `SOMEWHERE_RUN_LOCAL_E2E=1` through
+`testRunnerEnv`, and granted location to bundle `example.somewhere.field` on
+each exact target:
 
 | Device/run | Exact result | Evidence |
 | --- | --- | --- |
-| iPad Pro (11-inch) (2nd generation), initial enabled run | 2 total, 0 passed, 2 failed, 0 skipped; 7 assertion failures; exit 65 | `.local-artifacts/ios-exhibition/1787671690781/virtual-field/ipad-pro-11-2nd-gen-xctestrun.xcresult` |
-| iPad Pro (11-inch) (2nd generation), one allowed retry after Worker health was restored | 2 total, 0 passed, 2 failed, 0 skipped; 7 assertion failures; exit 65 | `.local-artifacts/ios-exhibition/1787671690781/virtual-field/ipad-pro-11-2nd-gen-stable-retry.xcresult` |
-| iPhone 13 | 2 total, 0 passed, 2 failed, 0 skipped; 7 assertion failures; exit 65 | `.local-artifacts/ios-exhibition/1787671690781/virtual-field/iphone-13.xcresult` |
+| iPad Pro (11-inch) (2nd generation), location granted | PASS; 2 total, 2 passed, 0 failed, 0 skipped | `.local-artifacts/ios-exhibition/1787671690781/virtual-field-corrected/ipad-location-granted.xcresult` |
+| iPhone 13, location granted | PASS; 2 total, 2 passed, 0 failed, 0 skipped | `.local-artifacts/ios-exhibition/1787671690781/virtual-field-corrected/iphone-13-location-granted.xcresult` |
 
-Both tests launched and reached the app, but the Worker-backed start/commit
-flow did not expose the expected active guidance surface (`somewhere.stop`),
-and the same failures repeated after health was stable. This is an honest
-local Worker/app connectivity blocker for the virtual field evidence, not a
-skip and not evidence of physical-device behavior. It requires a follow-up
-diagnosis outside this documentation-only task; no implementation, backend,
-contract, recommendation, or persistence change was made here.
+The original direct-origin bundles remain useful as superseded diagnostics,
+not acceptance failures: the enabled iPad run and its one allowed retry each
+reported 0 passed and 2 failed, and the original iPhone run reported 0 passed
+and 2 failed. Their evidence remains under
+`.local-artifacts/ios-exhibition/1787671690781/virtual-field/`. No app,
+backend, contract, recommendation, or persistence change was required.
 
-After both exact-device runs, the Worker wrapper was stopped cleanly. The
-health probe failed afterward, no QA Worker/Wrangler/Workerd process remained,
-and `.local-artifacts/ios-exhibition/1787671690781/virtual-field/process-cleanup.json`
-records `portClosed:true` and `stateRemoved:true` for the Task 6 QA start.
+Reproduce the corrected flow in this order:
+
+1. Start the local QA Worker with `bun run local:v2:start-for-qa`; wait for the
+   Worker health endpoint on port 8787.
+2. In a separate process, start the loopback cookie proxy with
+   `SOMEWHERE_PROXY_LOG=1 SOMEWHERE_UPSTREAM_PROTOCOL=https node
+   scripts/ios/local-ios-loopback-proxy.mjs`; confirm port 8788 is listening.
+3. Compile the Simulator app with
+   `SOMEWHERE_API_ORIGIN=http://127.0.0.1:8788` and
+   `CODE_SIGNING_ALLOWED=NO`.
+4. Before testing each target, run `xcrun simctl privacy <simulator-udid>
+   grant location example.somewhere.field`.
+5. With XcodeBuildMCP, select that exact Simulator, pass
+   `testRunnerEnv: {"SOMEWHERE_RUN_LOCAL_E2E":"1"}`, and run only
+   `SomewhereUITests/VirtualFieldFlowUITests` against the correctly compiled
+   test products.
+6. Stop only the Worker and proxy processes started for the run, then confirm
+   that neither port 8787 nor port 8788 remains open.
 
 The primary acceptance target remains portrait iPad Pro (11-inch) (2nd
 generation); secondary acceptance remains portrait iPhone 13. The owner
-iPhone 15 Pro Max remains development regression only. Physical installation,
+iPhone 15 Pro Max remains development regression only. The corrected
+exact-device virtual-field suite is no longer a blocker. Physical installation,
 real walking accuracy, and physical compass/BLE/ESP32 hardware integration
 remain separate follow-up gates.
 
@@ -523,6 +541,17 @@ An AI agent using XcodeBuildMCP should pass
 `testRunnerEnv: {"SOMEWHERE_RUN_LOCAL_E2E":"1"}` instead of editing the
 scheme. The API origin is still an app build setting and must be supplied in
 `extraArgs`; setting only the test-runner environment is insufficient.
+
+Grant location permission on every fresh exact-target Simulator before the
+test. Without this grant the app can launch while making no session or journey
+requests:
+
+```sh
+xcrun simctl privacy <simulator-udid> grant location example.somewhere.field
+```
+
+After the suite, stop the Worker and proxy processes started for the run and
+confirm that ports 8787 and 8788 are closed.
 
 The two tests cover a real one-tap session/commit, off-route suppression and
 recovery, multi-sample arrival, and automatic reveal. The proxy is loopback-only
