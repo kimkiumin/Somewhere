@@ -3,73 +3,98 @@ import SwiftUI
 struct RootView: View {
     @ObservedObject var store: JourneyStore
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        ZStack {
-            SomewhereBackground()
-            Group {
-                if store.showsNoFit {
-                    NoFitView(store: store)
-                } else if let projection = store.projection {
-                    journey(projection)
-                } else if store.isOnboardingRequired {
-                    OnboardingView { store.completeOnboarding() }
+        GeometryReader { proxy in
+            let layout = SomewhereLayoutMetrics.resolve(
+                width: proxy.size.width,
+                height: proxy.size.height,
+                isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
+            )
+
+            ZStack {
+                SomewhereBackground()
+                SomewhereBoundedSurface { rootContent }
+                    .padding(.horizontal, layout.horizontalPadding)
+                    .padding(.vertical, 18)
+            }
+            .environment(\.somewhereLayout, layout)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("somewhere.layout.\(layout.mode.rawValue)")
+            .overlay(alignment: .top) {
+                if let error = store.presentedError {
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text(errorMessage(error)).font(.footnote)
+                        Button("닫기") { store.dismissError() }
+                            .frame(minHeight: 44)
+                            .accessibilityLabel("오류 안내 닫기")
+                    }
+                    .padding(.horizontal, 16)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.white.opacity(0.8), lineWidth: 1)
+                    }
+                    .padding(.top, 8)
+                    .accessibilityLabel("여정 오류: \(errorMessage(error))")
+                }
+            }
+            .sheet(isPresented: $store.showsStopConfirmation) {
+                SomewhereBoundedSheet {
+                    StopConfirmationView(store: store)
+                }
+            }
+            .sheet(isPresented: $store.showsFeedback) {
+                SomewhereBoundedSheet {
+                    FeedbackView(store: store)
+                }
+            }
+            .sheet(isPresented: $store.showsRevealReason) {
+                SomewhereBoundedSheet {
+                    RevealReasonView(store: store)
+                }
+            }
+            .sheet(isPresented: $store.showsExternalMapWarning) {
+                SomewhereBoundedSheet {
+                    ExternalMapWarningView(store: store)
+                }
+            }
+            .sheet(isPresented: $store.showsProfileSetup) {
+                SomewhereBoundedSheet {
+                    ProfileSettingsView(profile: store.profile) { dietary, allergies in
+                        store.saveProfile(dietary: dietary, allergies: allergies)
+                    }
+                }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    store.notificationController.refreshFallback()
+                    if let projection = store.projection { store.locationController.apply(phase: projection.phase) }
                 } else {
-                    ConstraintView(store: store)
+                    store.locationController.applicationDidEnterBackground()
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 18)
+            // The V2 surface is intentionally a warm, light canvas. On a device
+            // configured for Dark Mode, SwiftUI's default text color becomes white
+            // while this custom background remains light, making the UI unreadable.
+            .preferredColorScheme(.light)
         }
-        .overlay(alignment: .top) {
-            if let error = store.presentedError {
-                HStack(spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                    Text(errorMessage(error)).font(.footnote)
-                    Button("닫기") { store.dismissError() }
-                        .frame(minHeight: 44)
-                        .accessibilityLabel("오류 안내 닫기")
-                }
-                .padding(.horizontal, 16)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.white.opacity(0.8), lineWidth: 1)
-                }
-                .padding(.top, 8)
-                .accessibilityLabel("여정 오류: \(errorMessage(error))")
-            }
+    }
+
+    @ViewBuilder
+    private var rootContent: some View {
+        if store.showsNoFit {
+            NoFitView(store: store)
+        } else if let projection = store.projection {
+            journey(projection)
+        } else if store.isOnboardingRequired {
+            OnboardingView { store.completeOnboarding() }
+        } else {
+            ConstraintView(store: store)
         }
-        .sheet(isPresented: $store.showsStopConfirmation) {
-            StopConfirmationView(store: store)
-        }
-        .sheet(isPresented: $store.showsFeedback) {
-            FeedbackView(store: store)
-        }
-        .sheet(isPresented: $store.showsRevealReason) {
-            RevealReasonView(store: store)
-        }
-        .sheet(isPresented: $store.showsExternalMapWarning) {
-            ExternalMapWarningView(store: store)
-        }
-        .sheet(isPresented: $store.showsProfileSetup) {
-            ProfileSettingsView(profile: store.profile) { dietary, allergies in
-                store.saveProfile(dietary: dietary, allergies: allergies)
-            }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                store.notificationController.refreshFallback()
-                if let projection = store.projection { store.locationController.apply(phase: projection.phase) }
-            } else {
-                store.locationController.applicationDidEnterBackground()
-            }
-        }
-        // The V2 surface is intentionally a warm, light canvas. On a device
-        // configured for Dark Mode, SwiftUI's default text color becomes white
-        // while this custom background remains light, making the UI unreadable.
-        .preferredColorScheme(.light)
     }
 
     private func errorMessage(_ error: JourneyStoreError) -> String {

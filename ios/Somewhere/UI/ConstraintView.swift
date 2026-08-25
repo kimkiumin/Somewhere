@@ -2,13 +2,9 @@ import SwiftUI
 import UIKit
 
 struct ConstraintView: View {
-    private enum Section: Hashable {
-        case launch
-        case conditions
-    }
-
     @ObservedObject var store: JourneyStore
     @ObservedObject private var locationController: LocationController
+    @Environment(\.somewhereLayout) private var layout
     @State private var draft: SomewherePreferences
     @State private var budgetSliderValue: Double
     @State private var showsAdvanced = false
@@ -25,40 +21,18 @@ struct ConstraintView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            ScrollViewReader { proxy in
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        launchPage(height: geometry.size.height, width: geometry.size.width) {
-                            isShowingConditions = true
-                            withAnimation(.snappy(duration: 0.42)) {
-                                proxy.scrollTo(Section.conditions, anchor: .top)
-                            }
-                        }
-                        .id(Section.launch)
-
-                        VStack(alignment: .leading, spacing: 15) {
-                            conditionsHeader {
-                                isShowingConditions = false
-                                withAnimation(.snappy(duration: 0.42)) {
-                                    proxy.scrollTo(Section.launch, anchor: .top)
-                                }
-                            }
-                            conditions
-                            locationStatus
-                        }
-                        .padding(.top, 24)
-                        .padding(.bottom, 28)
-                        .id(Section.conditions)
+            Group {
+                if isShowingConditions {
+                    conditionsPage(height: geometry.size.height)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                } else {
+                    launchPage(height: geometry.size.height, width: geometry.size.width) {
+                        withAnimation(.snappy(duration: 0.32)) { isShowingConditions = true }
                     }
-                    .scrollTargetLayout()
-                }
-                .onAppear {
-                    Task { @MainActor in
-                        await Task.yield()
-                        proxy.scrollTo(Section.launch, anchor: .top)
-                    }
+                    .transition(.move(edge: .leading).combined(with: .opacity))
                 }
             }
+            .animation(.snappy(duration: 0.32), value: isShowingConditions)
         }
         .onAppear {
             draft = store.preferences.normalized
@@ -70,19 +44,55 @@ struct ConstraintView: View {
             budgetSliderValue = Double(Self.index(for: value.budgetAmount))
         }
         .sheet(isPresented: $showsProfile) {
-            ProfileSettingsView(profile: store.profile) { dietary, allergies in
-                store.saveProfile(dietary: dietary, allergies: allergies)
-                draft.dietary = dietary
-                draft.allergies = allergies
+            SomewhereBoundedSheet {
+                ProfileSettingsView(profile: store.profile) { dietary, allergies in
+                    store.saveProfile(dietary: dietary, allergies: allergies)
+                    draft.dietary = dietary
+                    draft.allergies = allergies
+                }
             }
         }
+    }
+
+    @ViewBuilder
+    private func conditionsPage(height: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            conditionsHeader {
+                withAnimation(.snappy(duration: 0.32)) { isShowingConditions = false }
+            }
+            if layout.isExhibition {
+                HStack(alignment: .top, spacing: layout.columnSpacing) {
+                    VStack(spacing: 12) {
+                        categoryCard
+                        partyCard
+                        locationStatus
+                    }
+                    VStack(spacing: 12) {
+                        walkingCard
+                        budgetCard
+                        if showsAdvanced { advancedCard }
+                        startButton
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 15) {
+                        conditions
+                        locationStatus
+                    }
+                    .padding(.bottom, 24)
+                }
+            }
+        }
+        .frame(minHeight: height, alignment: .top)
     }
 
     private func launchPage(height: CGFloat, width: CGFloat, scrollToConditions: @escaping () -> Void) -> some View {
         VStack(spacing: 0) {
             launchHeader(scrollToConditions: scrollToConditions)
             Spacer(minLength: 24)
-            launchCompass(size: min(width + 42, 360))
+            launchCompass(size: layout.compassDiameter)
             Spacer(minLength: 18)
             VStack(spacing: 0) {
                 Text("나침반을 눌러 출발")
@@ -100,8 +110,6 @@ struct ConstraintView: View {
                 .accessibilityHint("인원, 도보 시간과 예산을 조정해요.")
                 .accessibilityIdentifier("somewhere.conditions-link")
             }
-            .opacity(isShowingConditions ? 0 : 1)
-            .accessibilityHidden(isShowingConditions)
         }
         .frame(maxWidth: .infinity)
         .frame(minHeight: max(height, 560), alignment: .top)
