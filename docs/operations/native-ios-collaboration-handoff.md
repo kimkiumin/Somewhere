@@ -245,14 +245,21 @@ timing assertion, one had a separate UI timing assertion, and one lost the
 Simulator test service with `NSMachErrorDomain -308`; no further blind matrix
 run was made after the active `1787671690781` run passed.
 
-The owner-phone regression used a named iPhone 15 Pro Max Simulator on iOS
-26.5 (`Somewhere Owner iPhone 15 Pro Max`). Its full `SomewhereTests` plus
-`JourneyFlowUITests` run was 69 total, 68 passed, 1 failed, 0 skipped. The one
-failure was the timing-sensitive
-`JourneyFlowUITests/testGuardedRecoveryRequiresExplicitReview()` assertion;
-the focused retry passed 1 total, 1 passed, 0 failed, 0 skipped. This is
-Simulator-only development regression evidence. It is not physical-device
-verification and is not exhibition acceptance.
+The authoritative owner-phone regression used the named
+`Somewhere Owner iPhone 15 Pro Max` Simulator on iOS 26.5. XcodeBuildMCP ran
+the complete `SomewhereTests` plus `JourneyFlowUITests` selection from reusable
+test products with code signing disabled: 69 total, 69 passed, 0 failed,
+0 skipped, result Passed. Evidence is
+`.local-artifacts/ios-exhibition/1787671690781/owner-iphone-15-pro-max-clean-rerun.xcresult`.
+
+The earlier full run remains a superseded timing diagnostic: 69 total,
+68 passed, 1 failed, 0 skipped, exit 65. Its sole failure was the
+timing-sensitive
+`JourneyFlowUITests/testGuardedRecoveryRequiresExplicitReview()` assertion,
+and its focused retry passed 1 total, 1 passed, 0 failed, 0 skipped. The clean
+69/69 rerun above is current regression evidence. All owner-phone results are
+Simulator-only; they are not physical-device verification or exhibition
+acceptance.
 
 | Root command | Exit | Exact result |
 | --- | ---: | --- |

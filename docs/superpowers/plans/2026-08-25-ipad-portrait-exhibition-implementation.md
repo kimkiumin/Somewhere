@@ -1021,29 +1021,56 @@ Expected: every command exits zero. Record iPhone 15 Pro Max only as regression 
 
 - [ ] **Step 3: Run virtual field E2E on both exhibition simulators**
 
-In one terminal, run the real local Worker/proxy:
+Start the real local Worker on port 8787 in one terminal:
 
 ```bash
 bun run local:v2:start-for-qa
 ```
 
-After its health endpoint is ready, run in a second terminal:
+After its health endpoint is ready, start the required loopback cookie proxy
+on port 8788 in a second terminal:
 
 ```bash
-cd ios
-SOMEWHERE_RUN_LOCAL_E2E=1 xcodebuild test \
-  -project Somewhere.xcodeproj -scheme Somewhere \
-  -destination 'platform=iOS Simulator,name=iPad Pro (11-inch) (2nd generation)' \
-  -only-testing:SomewhereUITests/VirtualFieldFlowUITests \
-  SOMEWHERE_API_ORIGIN=https://127.0.0.1:8787 CODE_SIGNING_ALLOWED=NO
-SOMEWHERE_RUN_LOCAL_E2E=1 xcodebuild test \
-  -project Somewhere.xcodeproj -scheme Somewhere \
-  -destination 'platform=iOS Simulator,name=iPhone 13' \
-  -only-testing:SomewhereUITests/VirtualFieldFlowUITests \
-  SOMEWHERE_API_ORIGIN=https://127.0.0.1:8787 CODE_SIGNING_ALLOWED=NO
+SOMEWHERE_PROXY_LOG=1 SOMEWHERE_UPSTREAM_PROTOCOL=https \
+  node scripts/ios/local-ios-loopback-proxy.mjs
 ```
 
-Expected: restaurant route replay arrives and reveals automatically, and off-route guidance suppresses then recovers on both exhibition destinations. Stop the Worker terminal with Control-C after both commands finish.
+Use XcodeBuildMCP for the build and test run. First call
+`session_show_defaults`, then set a non-persistent profile for the exact
+matrix-owned Simulator (`Somewhere iPad Pro 11 2nd Gen`, then
+`Somewhere iPhone 13`), `ios/Somewhere.xcodeproj`, scheme `Somewhere`, Debug,
+and `preferXcodebuild: true`. Compile reusable test products with:
+
+```text
+extraArgs: [
+  "SOMEWHERE_API_ORIGIN=http://127.0.0.1:8788",
+  "CODE_SIGNING_ALLOWED=NO"
+]
+```
+
+Before testing each exact Simulator, grant location permission to the app:
+
+```bash
+xcrun simctl privacy <exact-simulator-udid> \
+  grant location example.somewhere.field
+```
+
+Run `test_sim` from the correctly compiled test products with:
+
+```text
+testRunnerEnv: {"SOMEWHERE_RUN_LOCAL_E2E":"1"}
+extraArgs: ["-only-testing:SomewhereUITests/VirtualFieldFlowUITests"]
+```
+
+Expected: both `VirtualFieldFlowUITests` pass on each exact target; restaurant
+route replay arrives and reveals automatically, and off-route guidance
+suppresses then recovers. Stop only the Worker and proxy processes owned by
+this run, then verify that neither port remains open:
+
+```bash
+lsof -nP -iTCP:8787 -sTCP:LISTEN
+lsof -nP -iTCP:8788 -sTCP:LISTEN
+```
 
 - [ ] **Step 4: Run unchanged app, server, contract, and blueprint suites**
 
