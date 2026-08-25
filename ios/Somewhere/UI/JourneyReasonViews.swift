@@ -34,6 +34,8 @@ struct RevealReasonView: View {
                             .accessibilityIdentifier("somewhere.reveal-reason-cancel")
                     }
                 }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("somewhere.reveal-reason-surface")
             }
         }
         .tint(SomewherePalette.accent)
@@ -99,6 +101,8 @@ struct ExternalMapWarningView: View {
         SomewhereBoundedSheet {
             existingContent
                 .padding(28)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("somewhere.external-map-warning-surface")
         }
         .presentationDetents([.medium])
     }

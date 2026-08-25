@@ -118,6 +118,50 @@ final class ExhibitionLayoutUITests: XCTestCase {
         XCTAssertTrue(window.frame.contains(save.frame))
     }
 
+    func testBoundedSheetsStayWithinIPadFrame() {
+        let noFit = XCUIApplication()
+        noFit.launchArguments = ["--ui-test-no-fit", "--ui-test-no-notifications"]
+        noFit.launch()
+        assertBoundedSurface(
+            noFit,
+            identifier: "somewhere.no-fit-surface",
+            actionIdentifier: "somewhere.no-fit-review",
+            maxWidth: 762
+        )
+        noFit.terminate()
+
+        let stopped = launchHarness("following")
+        stopped.buttons["somewhere.stop"].tap()
+        assertBoundedSurface(
+            stopped,
+            identifier: "somewhere.stop-confirmation-surface",
+            actionIdentifier: "somewhere.continue-journey",
+            maxWidth: 620
+        )
+        stopped.terminate()
+
+        let revealReason = launchHarness("following")
+        revealReason.buttons["somewhere.stop"].tap()
+        revealReason.buttons["somewhere.paused-reveal"].tap()
+        assertBoundedSurface(
+            revealReason,
+            identifier: "somewhere.reveal-reason-surface",
+            actionIdentifier: "somewhere.reveal-reason.safety",
+            maxWidth: 620
+        )
+        revealReason.terminate()
+
+        let externalMap = launchHarness("following")
+        externalMap.buttons["somewhere.stop"].tap()
+        externalMap.buttons["somewhere.paused-external-map"].tap()
+        assertBoundedSurface(
+            externalMap,
+            identifier: "somewhere.external-map-warning-surface",
+            actionIdentifier: "somewhere.external-map-confirm",
+            maxWidth: 620
+        )
+    }
+
     private func launchHarness(_ state: String, credibleGuidance: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-test-state", state, "--ui-test-no-notifications"]
@@ -139,5 +183,24 @@ final class ExhibitionLayoutUITests: XCTestCase {
         let save = app.buttons["somewhere.profile-save"]
         if save.exists { save.tap() }
         return app
+    }
+
+    private func assertBoundedSurface(
+        _ app: XCUIApplication,
+        identifier: String,
+        actionIdentifier: String,
+        maxWidth: CGFloat
+    ) {
+        let window = app.windows.firstMatch
+        let surface = app.descendants(matching: .any)[identifier]
+        let action = app.buttons[actionIdentifier]
+        let renderingTolerance: CGFloat = 8
+
+        XCTAssertTrue(surface.waitForExistence(timeout: 3))
+        XCTAssertTrue(window.frame.contains(surface.frame))
+        XCTAssertLessThanOrEqual(surface.frame.width, maxWidth + renderingTolerance)
+        XCTAssertGreaterThanOrEqual(surface.frame.minY, window.frame.minY - renderingTolerance)
+        XCTAssertLessThanOrEqual(surface.frame.maxY, window.frame.maxY + renderingTolerance)
+        XCTAssertTrue(action.isHittable)
     }
 }

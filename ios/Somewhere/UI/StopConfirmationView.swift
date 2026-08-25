@@ -6,6 +6,8 @@ struct StopConfirmationView: View {
     var body: some View {
         SomewhereBoundedSheet {
             existingContent
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("somewhere.stop-confirmation-surface")
         }
     }
 

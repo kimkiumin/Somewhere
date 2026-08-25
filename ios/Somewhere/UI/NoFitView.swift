@@ -6,6 +6,8 @@ struct NoFitView: View {
     var body: some View {
         SomewhereBoundedSurface {
             existingContent
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("somewhere.no-fit-surface")
         }
     }
 
