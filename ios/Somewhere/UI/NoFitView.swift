@@ -4,6 +4,13 @@ struct NoFitView: View {
     @ObservedObject var store: JourneyStore
 
     var body: some View {
+        SomewhereBoundedSurface {
+            existingContent
+        }
+    }
+
+    @ViewBuilder
+    private var existingContent: some View {
         VStack(spacing: 20) {
             SomewhereSignalPill(icon: "magnifyingglass", title: "아직 찾는 중", tint: SomewherePalette.accent)
             SomewhereCompass(mode: .paused, size: 96)

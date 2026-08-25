@@ -4,6 +4,13 @@ struct StopConfirmationView: View {
     @ObservedObject var store: JourneyStore
 
     var body: some View {
+        SomewhereBoundedSheet {
+            existingContent
+        }
+    }
+
+    @ViewBuilder
+    private var existingContent: some View {
         VStack(spacing: 20) {
             SomewhereSignalPill(icon: "pause.circle.fill", title: "안전 일시정지", tint: SomewherePalette.accent)
             Image(systemName: "figure.walk.motion")

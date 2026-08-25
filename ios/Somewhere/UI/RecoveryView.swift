@@ -3,6 +3,7 @@ import SwiftUI
 struct RecoveryView: View {
     @ObservedObject var store: JourneyStore
     let projection: JourneyProjection
+    @Environment(\.somewhereLayout) private var layout
 
     private let stopReasons: [(String, String, String)] = [
         ("safety-concern", "안전이 걱정돼요", "안내를 끝내고 안전을 먼저 챙겨요."),
@@ -14,21 +15,53 @@ struct RecoveryView: View {
     ]
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 18) {
-                header
-                if projection.revealed == true {
-                    RevealView(projection: projection)
-                } else {
-                    statusCard
-                }
-                if projection.phase == .stopped {
-                    stopReasonPanel
-                } else {
-                    completionActions
+        Group {
+            if layout.isExhibition {
+                adaptiveContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    adaptiveContent
+                        .padding(.vertical, 8)
                 }
             }
-            .padding(.vertical, 8)
+        }
+    }
+
+    @ViewBuilder
+    private var adaptiveContent: some View {
+        if layout.isExhibition {
+            HStack(alignment: .top, spacing: layout.columnSpacing) {
+                primaryPane.frame(maxWidth: .infinity)
+                secondaryPane.frame(maxWidth: .infinity)
+            }
+        } else {
+            VStack(spacing: 18) {
+                primaryPane
+                secondaryPane
+            }
+        }
+    }
+
+    private var primaryPane: some View {
+        VStack(spacing: 18) {
+            header
+            if projection.revealed == true {
+                RevealView(projection: projection)
+            } else {
+                statusCard
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var secondaryPane: some View {
+        VStack(spacing: 18) {
+            if projection.phase == .stopped {
+                stopReasonPanel
+            } else {
+                completionActions
+            }
         }
     }
 
@@ -92,39 +125,55 @@ struct RecoveryView: View {
             Text("선택하지 않고 건너뛰어도 바로 나갈 수 있어요.")
                 .font(.subheadline)
                 .foregroundStyle(SomewherePalette.mutedInk)
-            ForEach(stopReasons, id: \.0) { reason in
-                Button {
-                    SomewhereHaptics.impact()
-                    Task { await store.submitStopReason(reason.0) }
-                } label: {
-                    HStack(spacing: 11) {
-                        Image(systemName: "circle")
-                            .foregroundStyle(SomewherePalette.accent)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(reason.1).font(.subheadline.weight(.semibold))
-                            Text(reason.2).font(.caption).foregroundStyle(SomewherePalette.mutedInk)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                    }
-                    .foregroundStyle(SomewherePalette.ink)
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(SomewherePalette.cardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(SomewherePalette.border, lineWidth: 1) }
+            if layout.isExhibition {
+                ScrollView(showsIndicators: true) {
+                    stopReasonList
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("중단 이유 \(reason.1)")
-                .accessibilityIdentifier("somewhere.stop-reason.\(reason.0)")
+                .frame(maxHeight: 390)
+            } else {
+                stopReasonList
             }
-            Button("건너뛰기") {
-                Task { await store.skipStopReason() }
-            }
-            .buttonStyle(SomewhereSecondaryButtonStyle())
-            .accessibilityLabel("멈춘 이유 건너뛰기")
-            .accessibilityIdentifier("somewhere.skip-stop-reason")
+            skipStopReasonButton
         }
+    }
+
+    @ViewBuilder
+    private var stopReasonList: some View {
+        ForEach(stopReasons, id: \.0) { reason in
+            Button {
+                SomewhereHaptics.impact()
+                Task { await store.submitStopReason(reason.0) }
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "circle")
+                        .foregroundStyle(SomewherePalette.accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(reason.1).font(.subheadline.weight(.semibold))
+                        Text(reason.2).font(.caption).foregroundStyle(SomewherePalette.mutedInk)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                }
+                .foregroundStyle(SomewherePalette.ink)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(SomewherePalette.cardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(SomewherePalette.border, lineWidth: 1) }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("중단 이유 \(reason.1)")
+            .accessibilityIdentifier("somewhere.stop-reason.\(reason.0)")
+        }
+    }
+
+    private var skipStopReasonButton: some View {
+        Button("건너뛰기") {
+            Task { await store.skipStopReason() }
+        }
+        .buttonStyle(SomewhereSecondaryButtonStyle())
+        .accessibilityLabel("멈춘 이유 건너뛰기")
+        .accessibilityIdentifier("somewhere.skip-stop-reason")
     }
 
     private var completionActions: some View {
@@ -157,9 +206,7 @@ struct RecoveryView: View {
                             Text("이전 장소는 제외하고 새 목적지 한 곳을 찾아요.")
                                 .font(.caption)
                                 .foregroundStyle(SomewherePalette.mutedInk)
-                            Toggle("종료 이유와 새 조건을 확인했어요", isOn: $store.recoveryReviewAcknowledged)
-                                .tint(SomewherePalette.accent)
-                                .accessibilityIdentifier("somewhere.recovery-reviewed")
+                            recoveryReviewToggle
                         }
                     }
                     Button("확인하고 다시 찾기") {
@@ -184,6 +231,27 @@ struct RecoveryView: View {
                     .accessibilityIdentifier("somewhere.request-recovery")
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var recoveryReviewToggle: some View {
+        if layout.isExhibition {
+            HStack(spacing: 12) {
+                Text("종료 이유와 새 조건을 확인했어요")
+                    .font(.body)
+                Spacer(minLength: 12)
+                Toggle("", isOn: $store.recoveryReviewAcknowledged)
+                    .labelsHidden()
+                    .tint(SomewherePalette.accent)
+                    .accessibilityLabel("종료 이유와 새 조건을 확인했어요")
+                    .accessibilityIdentifier("somewhere.recovery-reviewed")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            Toggle("종료 이유와 새 조건을 확인했어요", isOn: $store.recoveryReviewAcknowledged)
+                .tint(SomewherePalette.accent)
+                .accessibilityIdentifier("somewhere.recovery-reviewed")
         }
     }
 
