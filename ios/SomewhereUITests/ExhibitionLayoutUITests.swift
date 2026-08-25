@@ -55,35 +55,44 @@ final class ExhibitionLayoutUITests: XCTestCase {
         XCTAssertEqual(compass.label, "방향이 숨겨진 나침반")
     }
 
-    func testArrivalAndRecoveryPrimaryActionsAreVisible() throws {
-        guard UIDevice.current.userInterfaceIdiom == .pad else {
-            throw XCTSkip("Bounded arrival and recovery assertions are iPad-specific")
-        }
+    func testArrivalAndRecoveryPrimaryActionsAreVisible() {
         let arrived = launchHarness("arrived-rich")
         let arrivedWindow = arrived.windows.firstMatch
         let revealedName = arrived.staticTexts["somewhere.revealed-name"]
         let externalMap = arrived.buttons["somewhere.external-map"]
         XCTAssertTrue(revealedName.waitForExistence(timeout: 3))
         XCTAssertTrue(revealedName.isHittable)
+        XCTAssertTrue(externalMap.waitForExistence(timeout: 3))
         XCTAssertTrue(externalMap.isHittable)
-        XCTAssertTrue(arrivedWindow.frame.contains(revealedName.frame))
-        XCTAssertTrue(arrivedWindow.frame.contains(externalMap.frame))
-        XCTAssertEqual(arrived.scrollViews.count, 0)
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            XCTAssertTrue(arrivedWindow.frame.contains(revealedName.frame))
+            XCTAssertTrue(arrivedWindow.frame.contains(externalMap.frame))
+            XCTAssertEqual(arrived.scrollViews.count, 0)
+        }
         arrived.terminate()
 
         let stopped = launchHarness("stopped")
         let stoppedWindow = stopped.windows.firstMatch
         let reasonList = stopped.scrollViews.firstMatch
         let skip = stopped.buttons["somewhere.skip-stop-reason"]
-        XCTAssertEqual(stopped.scrollViews.count, 1)
         XCTAssertTrue(reasonList.waitForExistence(timeout: 3))
-        XCTAssertTrue(reasonList.buttons["somewhere.stop-reason.safety-concern"].exists)
-        XCTAssertLessThanOrEqual(reasonList.frame.height, 400)
+        let safetyReason = stopped.buttons["somewhere.stop-reason.safety-concern"]
+        XCTAssertTrue(safetyReason.waitForExistence(timeout: 3))
+        XCTAssertTrue(safetyReason.isHittable)
         XCTAssertTrue(skip.waitForExistence(timeout: 3))
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            for _ in 0..<6 where !skip.isHittable {
+                reasonList.swipeUp()
+            }
+        }
         XCTAssertTrue(skip.isHittable)
-        XCTAssertTrue(stoppedWindow.frame.contains(reasonList.frame))
-        XCTAssertTrue(stoppedWindow.frame.contains(skip.frame))
-        XCTAssertFalse(reasonList.frame.contains(skip.frame))
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            XCTAssertEqual(stopped.scrollViews.count, 1)
+            XCTAssertLessThanOrEqual(reasonList.frame.height, 400)
+            XCTAssertTrue(stoppedWindow.frame.contains(reasonList.frame))
+            XCTAssertTrue(stoppedWindow.frame.contains(skip.frame))
+            XCTAssertFalse(reasonList.frame.contains(skip.frame))
+        }
     }
 
     func testProfileUsesBoundedSettingsSurface() throws {

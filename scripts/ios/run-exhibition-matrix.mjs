@@ -3,8 +3,6 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dir, "../..");
 const outputRoot = resolve(root, ".local-artifacts/ios-exhibition", String(Date.now()));
-const requiredRuntimeIdentifier = "com.apple.CoreSimulator.SimRuntime.iOS-26-5";
-const requiredRuntimeVersion = "26.5";
 
 mkdirSync(outputRoot, { recursive: true });
 
@@ -74,21 +72,32 @@ console.log("XcodeGen: " + xcodegenVersion + " (" + xcodegen + ")");
 run(xcodegen, ["generate", "--spec", "ios/project.yml"]);
 
 const runtimes = JSON.parse(run("xcrun", ["simctl", "list", "runtimes", "--json"]).stdout).runtimes;
-const runtime = runtimes.find(
-  (value) =>
-    value.identifier === requiredRuntimeIdentifier &&
-    value.version === requiredRuntimeVersion &&
-    value.isAvailable,
-);
-if (!runtime) {
-  throw new Error(
-    "Required available iOS Simulator runtime " +
-      requiredRuntimeVersion +
-      " (" +
-      requiredRuntimeIdentifier +
-      ") was not found.",
-  );
+function parseNumericVersion(version) {
+  const components = String(version).split(".").map(Number);
+  if (components.length === 0 || components.some((value) => !Number.isInteger(value) || value < 0)) {
+    return null;
+  }
+  return components;
 }
+
+function compareNumericVersions(left, right) {
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+const runtime = runtimes
+  .filter((value) => value.platform === "iOS" && value.isAvailable)
+  .map((value) => ({ value, version: parseNumericVersion(value.version) }))
+  .filter((value) => value.version !== null)
+  .sort((left, right) => compareNumericVersions(right.version, left.version))[0]?.value;
+if (!runtime) {
+  throw new Error("No available iOS Simulator runtime was found.");
+}
+console.log("Runtime: " + runtime.name + " " + runtime.version + " (" + runtime.identifier + ")");
 
 const deviceTypes = JSON.parse(run("xcrun", ["simctl", "list", "devicetypes", "--json"]).stdout).devicetypes;
 const listedDevices = JSON.parse(run("xcrun", ["simctl", "list", "devices", "--json"]).stdout).devices;
@@ -99,19 +108,23 @@ for (const target of targets) {
     throw new Error("Missing Simulator device type: " + target.type);
   }
 
-  const sameName = runtimeDevices.find((value) => value.name === target.name);
-  if (sameName && !sameName.isAvailable) {
-    throw new Error(
-      "Simulator exists but is unavailable: " + target.name + " (" + sameName.udid + ")",
-    );
-  }
-  if (sameName && sameName.deviceTypeIdentifier !== target.type) {
+  const sameNameDevices = runtimeDevices.filter((value) => value.name === target.name);
+  const conflictingDevice = sameNameDevices.find(
+    (value) => value.deviceTypeIdentifier !== target.type,
+  );
+  if (conflictingDevice) {
     throw new Error(
       "Simulator name is owned by another device type: " +
         target.name +
         " (" +
-        sameName.deviceTypeIdentifier +
+        conflictingDevice.deviceTypeIdentifier +
         ")",
+    );
+  }
+  const sameName = sameNameDevices.find((value) => value.deviceTypeIdentifier === target.type);
+  if (sameName && !sameName.isAvailable) {
+    throw new Error(
+      "Simulator exists but is unavailable: " + target.name + " (" + sameName.udid + ")",
     );
   }
 
