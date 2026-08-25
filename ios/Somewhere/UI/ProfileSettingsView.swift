@@ -144,7 +144,11 @@ struct ProfileSettingsView: View {
                 .accessibilityIdentifier("somewhere.profile-search-\(identifier)")
             SomewhereCard(padding: 8) {
                 if layout.isExhibition {
-                    optionRows(visible: visible, selection: selection, identifier: identifier)
+                    ScrollView(.vertical, showsIndicators: true) {
+                        optionRows(visible: visible, selection: selection, identifier: identifier)
+                    }
+                    .frame(height: 236)
+                    .accessibilityIdentifier("somewhere.profile-list-\(identifier)")
                 } else {
                     ScrollView(.vertical, showsIndicators: true) {
                         optionRows(visible: visible, selection: selection, identifier: identifier)
@@ -153,6 +157,7 @@ struct ProfileSettingsView: View {
                     // keep the picker compact without making the option set feel
                     // like an endless form.
                     .frame(height: 236)
+                    .accessibilityIdentifier("somewhere.profile-list-\(identifier)")
                 }
             }
             .accessibilityLabel("\(title) 선택 목록. 네 항목씩 보입니다.")
