@@ -91,6 +91,45 @@ xcodebuild archive \
   SOMEWHERE_API_ORIGIN="$SOMEWHERE_API_ORIGIN"
 ```
 
+## Exhibition device matrix
+
+The exhibition acceptance devices are portrait iPad Pro (11-inch)
+(2nd generation) and iPhone 13 on the available iOS 26.5 Simulator
+runtime. Run:
+
+~~~sh
+bun scripts/ios/run-exhibition-matrix.mjs
+~~~
+
+The runner uses XCODEGEN_BIN when set, or discovers xcodegen on PATH
+otherwise. A portable invocation with a locally built XcodeGen is:
+
+~~~sh
+export XCODEGEN_BIN="/path/to/xcodegen"
+bun scripts/ios/run-exhibition-matrix.mjs
+~~~
+
+It idempotently creates or reuses the named Somewhere iPad Pro 11 2nd Gen
+and Somewhere iPhone 13 simulators. Timestamped result bundles and kept
+screenshot attachments are written below
+.local-artifacts/ios-exhibition/. The iPhone 15 Pro Max remains a development
+regression device and does not substitute for either exhibition target.
+
+The verified Task 5 run on 2026-08-25 is under
+`.local-artifacts/ios-exhibition/1787667940327/`: the iPad bundle passed 50/50
+tests and the iPhone bundle passed 48/50 with two iPad-only layout checks
+skipped. Both bundles have zero failures and 18 kept PNG screenshots (11
+approved states plus 7 secondary surfaces). Inspect attachments with:
+
+~~~sh
+xcrun xcresulttool export attachments \
+  --path .local-artifacts/ios-exhibition/1787667940327/ipad-pro-11-2nd-gen.xcresult \
+  --output-path .local-artifacts/ios-exhibition/1787667940327/attachments-ipad
+xcrun xcresulttool export attachments \
+  --path .local-artifacts/ios-exhibition/1787667940327/iphone-13.xcresult \
+  --output-path .local-artifacts/ios-exhibition/1787667940327/attachments-iphone
+~~~
+
 ## Simulator test harness and local Worker
 
 The Debug app has deterministic launch-only states so the hidden destination
@@ -99,7 +138,7 @@ Pass `--ui-test-no-notifications` to suppress delayed-feedback scheduling while
 manually inspecting a screen. The supported `--ui-test-state` values are:
 
 ```text
-following, following-next-step, following-revealed, arrived-unrevealed, arrived-revealed, paused,
+finding, ready, following, following-next-step, following-revealed, near, arrived-unrevealed, arrived-revealed, paused,
 stopped, stopped-revealed, completed, completed-revealed, route-recovery,
 arrived-rich, expired
 ```

@@ -51,6 +51,12 @@ struct SomewhereApp: App {
         if ProcessInfo.processInfo.arguments.contains("--ui-test-feedback") {
             value.presentFeedbackForTesting()
         }
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-profile-settings") {
+            value.showsProfileSetup = true
+        }
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-error") {
+            value.presentErrorForTesting()
+        }
         if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--ui-test-state"),
            ProcessInfo.processInfo.arguments.indices.contains(index + 1),
            let projection = UITestProjectionFactory.make(ProcessInfo.processInfo.arguments[index + 1]) {
@@ -78,12 +84,18 @@ private enum UITestProjectionFactory {
         let reveal = #""reveal":{"name":"소문난성수감자탕","address":"서울특별시 성동구 연무장길 45"}"#
         let json: String
         switch state {
+        case "finding":
+            json = "{\(common),\"phase\":\"finding\",\"pollAfterSeconds\":2,\"actions\":[\"poll\",\"cancel\"]}"
+        case "ready":
+            json = "{\(common),\(disclosure),\"phase\":\"ready\",\"revealed\":false,\"actions\":[\"commit\",\"stop\"]}"
         case "following":
             json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":false,\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000},\"actions\":[\"stop\",\"route-recover\",\"arrival\"]}"
         case "following-next-step":
             json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":false,\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000,\"nextStep\":{\"maneuver\":\"TURN_RIGHT\",\"instruction\":\"오른쪽으로 이동\",\"distanceM\":180,\"road\":\"테스트로\"}},\"actions\":[\"stop\",\"route-recover\",\"arrival\"]}"
         case "following-revealed":
             json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":true,\(reveal),\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000},\"actions\":[\"stop\",\"route-recover\",\"arrival\"]}"
+        case "near":
+            json = "{\(common),\(disclosure),\"phase\":\"near\",\"revealed\":false,\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000},\"actions\":[\"stop\",\"route-recover\",\"arrival\"]}"
         case "route-recovery":
             json = "{\(common),\(disclosure),\"phase\":\"route-recovery\",\"revealed\":false,\"guidance\":{\"kind\":\"unavailable\",\"reason\":\"provider\"},\"actions\":[\"stop\",\"route-recover\"]}"
         case "arrived-revealed":

@@ -318,6 +318,10 @@ final class JourneyStore: ObservableObject {
         showsFeedback = true
     }
 
+    func presentErrorForTesting() {
+        presentedError = .unavailable
+    }
+
     func presentGuidanceForTesting(bearing: Double = 315, remainingM: Double = 420) {
         isGuidancePaused = false
         guidance = .credible(GuidanceReading(

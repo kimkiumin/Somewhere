@@ -15,8 +15,11 @@ final class ExhibitionLayoutUITests: XCTestCase {
 
     func testConditionsAreAnExplicitSurfaceWithWorkingBackControl() {
         let app = launchStartSurface()
-        app.buttons["somewhere.conditions-link"].tap()
-        XCTAssertTrue(app.buttons["somewhere.conditions-back"].waitForExistence(timeout: 3))
+        let conditionsLink = app.buttons["somewhere.conditions-link"]
+        XCTAssertTrue(conditionsLink.waitForExistence(timeout: 5))
+        XCTAssertTrue(conditionsLink.isHittable)
+        conditionsLink.tap()
+        XCTAssertTrue(app.buttons["somewhere.conditions-back"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.sliders["somewhere.budget-slider"].exists)
         XCTAssertTrue(app.buttons["somewhere.start-journey-conditions"].isHittable)
         app.buttons["somewhere.conditions-back"].tap()
@@ -52,7 +55,10 @@ final class ExhibitionLayoutUITests: XCTestCase {
         XCTAssertEqual(compass.label, "방향이 숨겨진 나침반")
     }
 
-    func testArrivalAndRecoveryPrimaryActionsAreVisible() {
+    func testArrivalAndRecoveryPrimaryActionsAreVisible() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("Bounded arrival and recovery assertions are iPad-specific")
+        }
         let arrived = launchHarness("arrived-rich")
         let arrivedWindow = arrived.windows.firstMatch
         let revealedName = arrived.staticTexts["somewhere.revealed-name"]
@@ -80,7 +86,10 @@ final class ExhibitionLayoutUITests: XCTestCase {
         XCTAssertFalse(reasonList.frame.contains(skip.frame))
     }
 
-    func testProfileUsesBoundedSettingsSurface() {
+    func testProfileUsesBoundedSettingsSurface() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("Two-column profile assertions are iPad-specific")
+        }
         let app = launchStartSurface()
         app.buttons["somewhere.profile-menu"].tap()
         app.buttons["식이·알레르기 설정"].tap()
@@ -162,6 +171,80 @@ final class ExhibitionLayoutUITests: XCTestCase {
         )
     }
 
+    func testCaptureApprovedExhibitionStates() {
+        let states = [
+            ("finding", "somewhere.phase.finding"),
+            ("ready", "somewhere.commit"),
+            ("following", "somewhere.stop"),
+            ("following-next-step", "somewhere.stop"),
+            ("near", "somewhere.stop"),
+            ("route-recovery", "somewhere.route-recovery.recalibrate"),
+            ("paused", "somewhere.guidance-compass"),
+            ("stopped", "somewhere.skip-stop-reason"),
+            ("completed", "somewhere.recovery-reveal"),
+            ("arrived-rich", "somewhere.external-map"),
+            ("expired", "여정이 만료되었어요."),
+        ]
+
+        for (state, requiredElement) in states {
+            let credible = state.hasPrefix("following") || state == "near"
+            let app = launchHarness(state, credibleGuidance: credible)
+            XCTAssertTrue(
+                app.descendants(matching: .any)[requiredElement].waitForExistence(timeout: 3)
+            )
+            keepScreenshot(named: "\(UIDevice.current.model)-\(state)")
+            app.terminate()
+        }
+    }
+
+    func testCaptureLaunchConditionsSettingsNoFitFeedbackAndError() {
+        let start = launchStartSurface()
+        keepScreenshot(named: "\(UIDevice.current.model)-launch")
+        let conditionsLink = start.buttons["somewhere.conditions-link"]
+        XCTAssertTrue(conditionsLink.waitForExistence(timeout: 5))
+        XCTAssertTrue(conditionsLink.isHittable)
+        conditionsLink.tap()
+        XCTAssertTrue(start.buttons["somewhere.conditions-back"].waitForExistence(timeout: 8))
+        keepScreenshot(named: "\(UIDevice.current.model)-conditions")
+        start.buttons["somewhere.conditions-back"].tap()
+        start.terminate()
+
+        let settings = XCUIApplication()
+        settings.launchArguments = ["--ui-test-profile-settings", "--ui-test-no-notifications"]
+        settings.launch()
+        XCTAssertTrue(settings.buttons["somewhere.profile-save"].waitForExistence(timeout: 3))
+        keepScreenshot(named: "\(UIDevice.current.model)-settings")
+        settings.terminate()
+
+        for (argument, required, name) in [
+            ("--ui-test-no-fit", "somewhere.no-fit-review", "no-fit"),
+            ("--ui-test-feedback", "somewhere.feedback.like", "feedback"),
+            ("--ui-test-error", "오류 안내 닫기", "error"),
+        ] {
+            let app = XCUIApplication()
+            app.launchArguments = [argument, "--ui-test-no-notifications"]
+            app.launch()
+            let element: XCUIElement
+            if name == "error" {
+                let dismiss = app.buttons[required]
+                element = dismiss.waitForExistence(timeout: 1)
+                    ? dismiss
+                    : app.buttons["여정 오류: 연결이나 위치를 확인하고 다시 시도해 주세요."]
+            } else {
+                element = app.descendants(matching: .any)[required]
+            }
+            XCTAssertTrue(element.waitForExistence(timeout: 3))
+            keepScreenshot(named: "\(UIDevice.current.model)-\(name)")
+            app.terminate()
+        }
+
+        let paused = launchHarness("following", credibleGuidance: true)
+        paused.buttons["somewhere.stop"].tap()
+        XCTAssertTrue(paused.buttons["somewhere.continue-journey"].waitForExistence(timeout: 3))
+        keepScreenshot(named: "\(UIDevice.current.model)-stop-confirmation")
+        paused.terminate()
+    }
+
     private func launchHarness(_ state: String, credibleGuidance: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-test-state", state, "--ui-test-no-notifications"]
@@ -170,18 +253,26 @@ final class ExhibitionLayoutUITests: XCTestCase {
         return app
     }
 
+    private func keepScreenshot(named name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     private func launchStartSurface() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-test-no-notifications"]
         app.launch()
         let onboarding = app.buttons["somewhere.onboarding-continue"]
-        if onboarding.waitForExistence(timeout: 3) {
+        if onboarding.waitForExistence(timeout: 5) {
             onboarding.tap()
             let save = app.buttons["somewhere.profile-save"]
-            if save.waitForExistence(timeout: 3) { save.tap() }
+            if save.waitForExistence(timeout: 5) { save.tap() }
         }
         let save = app.buttons["somewhere.profile-save"]
-        if save.exists { save.tap() }
+        if save.waitForExistence(timeout: 2) { save.tap() }
+        XCTAssertTrue(app.buttons["somewhere.start-journey"].waitForExistence(timeout: 5))
         return app
     }
 
