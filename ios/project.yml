@@ -39,6 +39,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: example.somewhere.field
         INFOPLIST_FILE: Somewhere/Resources/Info.plist
+        TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: RollCompassAppIcon
         SOMEWHERE_API_ORIGIN: https://example.invalid
         CODE_SIGN_STYLE: Automatic
