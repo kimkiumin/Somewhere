@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-25
 
-**Status:** Proposed for owner review
+**Status:** Approved by owner
 
 ## Purpose
 
@@ -12,11 +12,10 @@ compass concept convincingly on a portrait-mounted iPad. Preserve the current
 backend, recommendation behavior, journey state machine, hidden-destination
 rules, and iPhone experience.
 
-The target exhibition hardware is described as an M1 iPad Pro. Apple names the
-M1 11-inch model `iPad Pro (11-inch) (3rd generation)` and the M1 12.9-inch
-model `iPad Pro (12.9-inch) (5th generation)`. The layout must support both so
-the naming discrepancy does not block implementation. It must also remain
-usable on the collaborator's iPhone 13.
+The primary exhibition hardware is `iPad Pro (11-inch) (2nd generation)`.
+The collaborator's `iPhone 13` is the secondary exhibition device. The
+owner's connected iPhone 15 Pro Max remains useful for development regression
+checks, but it is not a target exhibition device.
 
 ## Authority and Scope
 
@@ -71,9 +70,10 @@ available container:
 - Exhibition compass diameter: 410 to 520 points, clamped by available height.
 - Minimum interactive target: 44 points.
 
-The thresholds are layout policy, not device detection. The 11-inch M1
-portrait canvas is approximately 834 by 1,194 points, while the iPhone 13 is
-390 by 844 points; both remain first-class verification sizes.
+The thresholds are layout policy, not device detection. The 11-inch
+second-generation iPad Pro portrait canvas is approximately 834 by 1,194
+points, while the iPhone 13 is 390 by 844 points; both remain first-class
+verification sizes.
 
 ## Screen Composition
 
@@ -134,8 +134,8 @@ portrait canvas is approximately 834 by 1,194 points, while the iPhone 13 is
 
 ## Exhibition Sensor Behavior
 
-All M1 iPad Pro models provide a digital compass, but only Wi-Fi + Cellular
-models provide GPS/GNSS. Therefore:
+The 11-inch second-generation iPad Pro provides a digital compass, but only
+the Wi-Fi + Cellular configuration provides GPS/GNSS. Therefore:
 
 - Release behavior continues to use real Core Location and heading.
 - A Cellular iPad can be field-tested with real GPS after signing and device
@@ -167,11 +167,10 @@ connection control or change the BLE contract.
 
 ### Simulator
 
-- iPad Pro (11-inch) (3rd generation), portrait, iOS 26.5.
-- iPad Pro (12.9-inch) (5th generation), portrait, iOS 26.5.
-- iPad Pro 11-inch (M4), portrait, iOS 26.5 as a nearby-width regression.
+- iPad Pro (11-inch) (2nd generation), portrait, iOS 26.5.
 - iPhone 13, portrait, iOS 26.5.
-- Existing iPhone 15 Pro Max lane remains intact.
+- Existing iPhone 15 Pro Max lane remains development regression evidence but
+  is not exhibition acceptance evidence.
 
 For each primary device, verify launch, conditions, ready, following, near,
 route recovery, paused, stop confirmation, stopped, completed, arrived,
@@ -181,9 +180,11 @@ reveal, feedback, no-fit, settings, and error presentation.
 
 - Unit-test the layout classification and metric clamps.
 - Run all native unit tests on iPad and iPhone destinations.
-- Run native UI journey tests on the M1 11-inch iPad and iPhone 13.
+- Run native UI journey tests on the 11-inch second-generation iPad Pro and
+  iPhone 13.
 - Run virtual field E2E with deterministic Simulator location and heading.
-- Capture named screenshots for each primary state on the M1 11-inch iPad.
+- Capture named screenshots for each primary state on the 11-inch
+  second-generation iPad Pro.
 - Assert that primary controls are present and hittable without scrolling at
   the default content size.
 - Re-run the existing app, server, contract, and Worker E2E suites as unchanged
@@ -193,8 +194,7 @@ reveal, feedback, no-fit, settings, and error presentation.
 
 - Install the signed Debug build on the owner's iPad after it is connected and
   paired with the Mac.
-- Record the model identifier to resolve 11-inch versus 12.9-inch and Wi-Fi
-  versus Cellular.
+- Record the model identifier to resolve Wi-Fi versus Wi-Fi + Cellular.
 - Verify portrait presentation, taps, relaunch, location permission, heading,
   screen idle behavior, and a complete demonstration journey.
 - Install the same Universal build on the collaborator's connected iPhone 13
