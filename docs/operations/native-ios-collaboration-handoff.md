@@ -152,6 +152,23 @@ continue the work without reconstructing the discussion:
   stop-first reveal contract as native: an active journey exposes Stop but not
   Reveal, and the revealed name/address is rendered after a completed journey.
 
+## Portrait exhibition handoff (2026-08-26)
+
+Branch to review: `codex/ipad-exhibition`. Do not use
+`codex/roll-compass-native-app` as the review branch for this handoff.
+
+| Device | Role | Completion evidence |
+| --- | --- | --- |
+| iPad Pro (11-inch) (2nd generation) | primary portrait exhibition target | full UI matrix, screenshots, then physical install |
+| iPhone 13 | secondary exhibition target | compact UI matrix, then physical install |
+| Owner iPhone 15 Pro Max | development regression only | existing signed/debug evidence; not exhibition acceptance |
+
+Primary acceptance is portrait iPad Pro (11-inch) (2nd generation). Secondary
+acceptance is portrait iPhone 13. The owner iPhone 15 Pro Max is development
+regression only, not exhibition acceptance. No backend, API contract,
+recommendation, or persistence changes are included in this handoff. Physical
+compass/BLE/ESP32 hardware integration remains a separate follow-up.
+
 ## Restaurant recommendation algorithm
 
 The selection is not a ranking feed. The product promise is one hidden,
@@ -208,6 +225,85 @@ Research anchors for future provider work:
 | Native unit | Legacy `cafe` preference normalizes to `restaurant`; profile taxonomy remains stable. |
 | Native UI | Slider identifier `somewhere.budget-slider`; profile form is absent from journey conditions; menu reaches the profile sheet; feedback exposes dislike/like plus did-not-visit. |
 | Simulator | `SomewhereTests` pass; `JourneyFlowUITests` exercise launch, conditions, guidance, stop, reveal, arrival, recovery, and feedback. Network-backed virtual field tests remain opt-in when the local Worker/proxy is available. |
+
+### Task 6 branch/device run (2026-08-26)
+
+This is additive evidence for `codex/ipad-exhibition`; it does not overwrite
+the historical matrix or earlier Worker-backed evidence above. The branch to
+review is `codex/ipad-exhibition`, not `codex/roll-compass-native-app`.
+
+| Device/run | Exact result | Evidence |
+| --- | --- | --- |
+| iPad Pro (11-inch) (2nd generation), final matrix run `1787671690781` | PASS; 50 total, 50 passed, 0 failed, 0 skipped; 18 PNG screenshot attachments (19 exported files including the manifest) | `.local-artifacts/ios-exhibition/1787671690781/ipad-pro-11-2nd-gen.xcresult` |
+| iPhone 13, final matrix run `1787671690781` | PASS; 50 total, 49 passed, 0 failed, 1 skipped; the skip is the intentional iPad-only two-column profile assertion; 18 PNG screenshot attachments (19 exported files including the manifest) | `.local-artifacts/ios-exhibition/1787671690781/iphone-13.xcresult` |
+
+The final matrix command exited zero. The iPad model was the exact
+`iPad Pro (11-inch) (2nd generation)` on iOS 26.5, and the iPhone model was the
+exact `iPhone 13` on iOS 26.5. The final run above is authoritative for this
+branch. Earlier attempts are retained as diagnostics: one had a single UI
+timing assertion, one had a separate UI timing assertion, and one lost the
+Simulator test service with `NSMachErrorDomain -308`; no further blind matrix
+run was made after the active `1787671690781` run passed.
+
+The owner-phone regression used a named iPhone 15 Pro Max Simulator on iOS
+26.5 (`Somewhere Owner iPhone 15 Pro Max`). Its full `SomewhereTests` plus
+`JourneyFlowUITests` run was 69 total, 68 passed, 1 failed, 0 skipped. The one
+failure was the timing-sensitive
+`JourneyFlowUITests/testGuardedRecoveryRequiresExplicitReview()` assertion;
+the focused retry passed 1 total, 1 passed, 0 failed, 0 skipped. This is
+Simulator-only development regression evidence. It is not physical-device
+verification and is not exhibition acceptance.
+
+| Root command | Exit | Exact result |
+| --- | ---: | --- |
+| `bun run verify` | 0 | Prototype 11 passed; app unit 183 passed; browser E2E 34 passed and 3 skipped; contracts 15 passed. |
+| `bun run test:server` | 0 | 65 test files passed; 238 tests passed. Expected negative-path SQLite/runtime diagnostics were emitted. |
+| `bun run test:e2e:v2` | 0 | 5 real-Worker browser tests passed, 0 failed. |
+| `bun run verify:blueprint` | 0 | Study 31 passed; completion 22 passed; iOS source/field tests 29 passed; native-evidence tests 14 passed. Authority output remains service slice PASS, blueprint project BLOCK, public release BLOCK for the existing external gates. |
+
+Native source and field-flow verification also passed: 29 tests, 0 failed,
+with the native source gate reporting deployment target 17, 21 projection
+examples, 17 endpoints, 12 actions, and 14 required sources; the field-flow
+gate reported 23 required files, 21 unit scenarios, 28 UI scenarios, and 44
+minimum control points.
+
+### Worker-backed virtual field diagnostics
+
+The Task 6 QA Worker was started with `bun run local:v2:start-for-qa`; health
+was observed at HTTP 200 on `https://127.0.0.1:8787/api/v1/health`. The raw
+shell environment did not reach the XCTest runner, so the first diagnostic
+bundle skipped both tests (0 passed, 0 failed, 2 skipped). A temporary ignored
+generated test-run configuration then enabled the runner variable without
+changing the project or native source.
+
+With the runner variable enabled and
+`SOMEWHERE_API_ORIGIN=https://127.0.0.1:8787`, the exact-device virtual field
+runs were:
+
+| Device/run | Exact result | Evidence |
+| --- | --- | --- |
+| iPad Pro (11-inch) (2nd generation), initial enabled run | 2 total, 0 passed, 2 failed, 0 skipped; 7 assertion failures; exit 65 | `.local-artifacts/ios-exhibition/1787671690781/virtual-field/ipad-pro-11-2nd-gen-xctestrun.xcresult` |
+| iPad Pro (11-inch) (2nd generation), one allowed retry after Worker health was restored | 2 total, 0 passed, 2 failed, 0 skipped; 7 assertion failures; exit 65 | `.local-artifacts/ios-exhibition/1787671690781/virtual-field/ipad-pro-11-2nd-gen-stable-retry.xcresult` |
+| iPhone 13 | 2 total, 0 passed, 2 failed, 0 skipped; 7 assertion failures; exit 65 | `.local-artifacts/ios-exhibition/1787671690781/virtual-field/iphone-13.xcresult` |
+
+Both tests launched and reached the app, but the Worker-backed start/commit
+flow did not expose the expected active guidance surface (`somewhere.stop`),
+and the same failures repeated after health was stable. This is an honest
+local Worker/app connectivity blocker for the virtual field evidence, not a
+skip and not evidence of physical-device behavior. It requires a follow-up
+diagnosis outside this documentation-only task; no implementation, backend,
+contract, recommendation, or persistence change was made here.
+
+After both exact-device runs, the Worker wrapper was stopped cleanly. The
+health probe failed afterward, no QA Worker/Wrangler/Workerd process remained,
+and `.local-artifacts/ios-exhibition/1787671690781/virtual-field/process-cleanup.json`
+records `portClosed:true` and `stateRemoved:true` for the Task 6 QA start.
+
+The primary acceptance target remains portrait iPad Pro (11-inch) (2nd
+generation); secondary acceptance remains portrait iPhone 13. The owner
+iPhone 15 Pro Max remains development regression only. Physical installation,
+real walking accuracy, and physical compass/BLE/ESP32 hardware integration
+remain separate follow-up gates.
 
 ## Journey integrity review (2026-08-21)
 
