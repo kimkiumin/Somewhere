@@ -135,6 +135,44 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["somewhere.route-recovery.reroute"].exists)
         XCTAssertTrue(app.buttons["somewhere.route-recovery.cached-route"].exists)
         XCTAssertFalse(app.buttons["somewhere.external-map"].exists)
+
+        let compass = app.otherElements["somewhere.guidance-compass"]
+        let stop = app.buttons["somewhere.stop"]
+        XCTAssertTrue(compass.exists)
+        XCTAssertEqual(compass.label, "방향이 숨겨진 나침반")
+        XCTAssertTrue(stop.isHittable)
+        XCTAssertLessThanOrEqual(compass.frame.maxY + 8, stop.frame.minY)
+        XCTAssertEqual(app.scrollViews.count, 0)
+        XCTAssertTrue(app.staticTexts["안내 복구"].exists)
+        XCTAssertFalse(app.staticTexts["GUIDANCE RECOVERY"].exists)
+    }
+
+    func testAccessibilityRouteRecoveryKeepsChoicesAndStopInOneViewport() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-test-state", "route-recovery",
+            "--ui-test-no-notifications",
+            "-UIPreferredContentSizeCategoryName",
+            UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue,
+        ]
+        app.launch()
+
+        let recalibrate = app.buttons["somewhere.route-recovery.recalibrate"]
+        let reroute = app.buttons["somewhere.route-recovery.reroute"]
+        let cachedRoute = app.buttons["somewhere.route-recovery.cached-route"]
+        let stop = app.buttons["somewhere.stop"]
+        XCTAssertTrue(recalibrate.waitForExistence(timeout: 2))
+        XCTAssertEqual(recalibrate.label, "나침반 맞추기")
+        XCTAssertEqual(reroute.label, "새 경로 찾기")
+        XCTAssertEqual(cachedRoute.label, "기존 경로 계속")
+        XCTAssertTrue(app.staticTexts["위치 복구"].exists)
+        XCTAssertTrue(app.staticTexts["복구 방법"].exists)
+        XCTAssertTrue(recalibrate.isHittable)
+        XCTAssertTrue(reroute.isHittable)
+        XCTAssertTrue(cachedRoute.isHittable)
+        XCTAssertTrue(stop.isHittable)
+        XCTAssertEqual(app.scrollViews.count, 0)
+        XCTAssertFalse(app.otherElements["somewhere.guidance-compass"].exists)
     }
 
     func testRouteRecoveryRequiresStopBeforeExternalMap() {
@@ -178,6 +216,11 @@ final class JourneyFlowUITests: XCTestCase {
         app.launchArguments = ["--ui-test-no-fit", "--ui-test-no-notifications"]
         app.launch()
         XCTAssertTrue(app.buttons["somewhere.no-fit-review"].waitForExistence(timeout: 2))
+        let compass = app.otherElements["somewhere.no-fit-compass"]
+        XCTAssertTrue(compass.exists)
+        XCTAssertEqual(compass.label, "방향이 숨겨진 나침반")
+        XCTAssertTrue(app.staticTexts["아직 찾는 중"].exists)
+        XCTAssertFalse(app.staticTexts["NO FIT YET"].exists)
         XCTAssertTrue(app.staticTexts["예산"].exists)
         XCTAssertTrue(app.staticTexts["식이 조건"].exists)
     }
@@ -222,6 +265,7 @@ final class JourneyFlowUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-test-feedback", "--ui-test-no-notifications"]
         app.launch()
+        XCTAssertTrue(app.staticTexts["somewhere.feedback-brand"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["somewhere.feedback.dislike"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["somewhere.feedback.like"].exists)
         XCTAssertTrue(app.buttons["somewhere.feedback.did_not_visit"].exists)
@@ -231,7 +275,8 @@ final class JourneyFlowUITests: XCTestCase {
     func testConditionsUseABudgetSliderAndKeepDietarySettingsOutOfTheJourneyForm() {
         let app = launchStartSurface()
         let conditions = app.buttons["somewhere.conditions-link"]
-        XCTAssertTrue(conditions.waitForExistence(timeout: 2))
+        XCTAssertTrue(conditions.waitForExistence(timeout: 5))
+        XCTAssertEqual(conditions.label, "탐색 조건")
         conditions.tap()
 
         XCTAssertTrue(app.sliders["somewhere.budget-slider"].waitForExistence(timeout: 2))
@@ -286,10 +331,10 @@ final class JourneyFlowUITests: XCTestCase {
         app.launchArguments = ["--ui-test-no-notifications"]
         app.launch()
         let onboarding = app.buttons["somewhere.onboarding-continue"]
-        if onboarding.waitForExistence(timeout: 2) {
+        if onboarding.waitForExistence(timeout: 5) {
             onboarding.tap()
             let profileSave = app.buttons["somewhere.profile-save"]
-            if profileSave.waitForExistence(timeout: 2) { profileSave.tap() }
+            if profileSave.waitForExistence(timeout: 5) { profileSave.tap() }
         }
         let profileSave = app.buttons["somewhere.profile-save"]
         if profileSave.exists { profileSave.tap() }

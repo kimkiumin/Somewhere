@@ -7,6 +7,11 @@ independently animated `RollCompassNeedle` assets in
 `Somewhere/Resources/Assets.xcassets`.
 The opaque `RollCompassAppIcon` set is packaged for device and Simulator builds.
 The wordmark uses the checked-in OFL-licensed `UnifrakturCook-Bold.ttf` font.
+The same shell is reused as the native visual anchor on launch, active guidance,
+route recovery, arrival, feedback, and no-fit states. Active guidance alone may
+show the red needle; paused or direction-unavailable states deliberately show
+the shell without a needle. This is a presentation rule only and does not alter
+the V2 journey, selection, or server contracts.
 
 Before changing the current interface, read the
 [native product requirements](../docs/product/roll-the-compass-ios-requirements.md).

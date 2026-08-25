@@ -7,6 +7,13 @@ enum SomewhereCompassMode: Equatable {
     case paused
 }
 
+enum SomewhereCompassPresentationPolicy {
+    static func showsNeedle(for mode: SomewhereCompassMode) -> Bool {
+        if case .pointing = mode { return true }
+        return false
+    }
+}
+
 enum SomewhereCompassMotionPolicy {
     static func shortestSignedDelta(from current: Double, to next: Double) -> Double {
         let delta = (next - current).truncatingRemainder(dividingBy: 360)
@@ -75,7 +82,6 @@ struct SomewhereCompass: View {
     let onActivate: (() -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var searchingRotation = 0.0
     @State private var animatedNeedleTarget = -18.0
     @State private var needlePulse = false
 
@@ -121,31 +127,31 @@ struct SomewhereCompass: View {
                 .frame(width: size, height: size)
                 .accessibilityHidden(true)
 
-            ZStack {
-                Image("RollCompassNeedle")
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFit()
-                    .frame(width: size * 0.44, height: size * 0.44)
-                    .offset(
-                        SomewhereCompassMotionPolicy.hubCorrection(
-                            displaySize: size,
-                            frameScale: 0.44
+            if SomewhereCompassPresentationPolicy.showsNeedle(for: mode) {
+                ZStack {
+                    Image("RollCompassNeedle")
+                        .resizable()
+                        .interpolation(.high)
+                        .antialiased(true)
+                        .scaledToFit()
+                        .frame(width: size * 0.44, height: size * 0.44)
+                        .offset(
+                            SomewhereCompassMotionPolicy.hubCorrection(
+                                displaySize: size,
+                                frameScale: 0.44
+                            )
                         )
-                    )
+                }
+                .frame(width: size, height: size)
+                .rotationEffect(.degrees(needleAngle))
+                .scaleEffect(needlePulse ? 1.025 : 0.985)
+                .shadow(color: SomewherePalette.ink.opacity(0.20), radius: size * 0.012, y: size * 0.008)
+                .animation(
+                    reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.76),
+                    value: needleAngle
+                )
+                .accessibilityHidden(true)
             }
-            .frame(width: size, height: size)
-            .rotationEffect(.degrees(needleAngle))
-            .scaleEffect(needlePulse ? 1.025 : 0.985)
-            .grayscale(isPaused ? 0.84 : 0)
-            .opacity(isPaused ? 0.62 : 1)
-            .shadow(color: SomewherePalette.ink.opacity(0.20), radius: size * 0.012, y: size * 0.008)
-            .animation(
-                reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.76),
-                value: needleAngle
-            )
-            .accessibilityHidden(true)
         }
         .frame(width: size, height: size)
         .contentShape(Circle())
@@ -177,33 +183,13 @@ struct SomewhereCompass: View {
             needlePulse = false
         }
 
-        guard !reduceMotion else {
-            searchingRotation = 0
-            return
-        }
-
-        if case .searching = newMode {
-            searchingRotation = 0
-            withAnimation(.linear(duration: 2.4).repeatForever(autoreverses: false)) {
-                searchingRotation = 360
-            }
-        } else {
-            searchingRotation = 0
-        }
     }
 
     private var needleAngle: Double {
         switch mode {
-        case .ready: -18
-        case .searching: searchingRotation
         case .pointing: animatedNeedleTarget
-        case .paused: animatedNeedleTarget
+        case .ready, .searching, .paused: 0
         }
-    }
-
-    private var isPaused: Bool {
-        if case .paused = mode { return true }
-        return false
     }
 
     private var accessibilityLabel: String {
@@ -211,7 +197,7 @@ struct SomewhereCompass: View {
         case .ready: "출발 준비 나침반"
         case .searching: "목적지와 경로를 확인 중"
         case .pointing(let bearing): "진행 방향 \(Int(bearing.rounded()))도"
-        case .paused: "방향 안내 일시정지"
+        case .paused: "방향이 숨겨진 나침반"
         }
     }
 }

@@ -5,10 +5,9 @@ struct NoFitView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            SomewhereSignalPill(icon: "magnifyingglass", title: "NO FIT YET", tint: SomewherePalette.accent)
-            Image(systemName: "location.magnifyingglass")
-                .font(.system(size: 48, weight: .light))
-                .foregroundStyle(SomewherePalette.accent)
+            SomewhereSignalPill(icon: "magnifyingglass", title: "아직 찾는 중", tint: SomewherePalette.accent)
+            SomewhereCompass(mode: .paused, size: 96)
+                .accessibilityIdentifier("somewhere.no-fit-compass")
             Text("조건에 맞는 한 곳을\n아직 찾지 못했어요")
                 .font(.system(size: 29, weight: .bold, design: .serif))
                 .foregroundStyle(SomewherePalette.ink)

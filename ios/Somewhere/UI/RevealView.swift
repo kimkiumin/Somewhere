@@ -62,17 +62,31 @@ struct RevealView: View {
 
     private var photoPlaceholder: some View {
         ZStack {
-            SomewherePalette.cardStrong
-            Image("RollCompassShell")
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(width: 112, height: 112)
-                .opacity(0.26)
+            LinearGradient(
+                colors: [
+                    SomewherePalette.cardStrong,
+                    SomewherePalette.canvasDeep.opacity(0.34),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            Circle()
+                .fill(SomewherePalette.cardStrong.opacity(0.72))
+                .frame(width: 126, height: 126)
+            SomewhereCompass(mode: .paused, size: 108)
+                .opacity(0.86)
+            Image(systemName: "sparkles")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(SomewherePalette.gold)
+                .offset(x: 60, y: -48)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 144)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(SomewherePalette.border, lineWidth: 1)
+        }
         .accessibilityHidden(true)
     }
 

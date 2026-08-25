@@ -330,6 +330,52 @@ Fresh evidence for this sync:
 
 ![vNext native guidance](../assets/roll-compass-vnext-guidance-2026-08-24.jpg)
 
+## Full-surface mood continuity pass (2026-08-25)
+
+The collaborator compass is now the visual anchor across the complete native
+journey without replacing the existing V2 implementation. This change is
+intentionally presentation-scoped: no `app/`, `server/`, contract, selection,
+session, arrival, recovery, or feedback-wire behavior was removed or replaced.
+
+Implementation decisions:
+
+- Active guidance keeps the approved red needle and existing live relative
+  rotation. Paused, recovery, reveal-placeholder, and no-fit states reuse the
+  approved shell without a needle so they never imply a direction that the app
+  cannot currently justify.
+- Route recovery is a fixed one-viewport safety surface rather than a scrolling
+  form. Its compact accessibility layout preserves every recovery choice and
+  the fixed `멈춤` control without clipped labels at large text sizes.
+- Launch conditions, reveal, delayed feedback, and no-fit screens now share the
+  warm parchment, burgundy, gold, serif, and Gothic wordmark language. Existing
+  actions, data, and state transitions remain unchanged.
+- No new map, restaurant ranking, destination preview, or unrelated illustration
+  was introduced. Destination identity remains hidden until the approved reveal
+  path.
+
+Fresh verification for this pass:
+
+- iPhone 17 Pro / iOS 26.5 complete Simulator suite: 66 discovered, 64 passed,
+  0 failed, 2 skipped. The skips are the opt-in local-Worker virtual GPS tests.
+- iPhone 17e / iOS 26.5 focused recovery, accessibility, no-fit, feedback, and
+  condition scenarios: 5 passed, 0 failed, 0 skipped.
+- Native field-flow source gate: 8 passed, 0 failed; 28 regular UI scenarios are
+  counted in the gate.
+- JavaScript regression: app 183 passed, server 238 passed, contracts 15 passed;
+  typecheck, lint, and Blueprint verification pass.
+
+Review captures:
+
+- [Launch](../assets/roll-compass-vnext-home-2026-08-25.jpg)
+- [Active guidance](../assets/roll-compass-vnext-following-2026-08-25.jpg)
+- [Route recovery](../assets/roll-compass-vnext-route-recovery-2026-08-25.jpg)
+- [Route recovery — accessibility text](../assets/roll-compass-vnext-route-recovery-accessibility-2026-08-25.jpg)
+- [Arrival and reveal](../assets/roll-compass-vnext-arrival-2026-08-25.jpg)
+- [Delayed feedback](../assets/roll-compass-vnext-feedback-2026-08-25.jpg)
+- [No-fit recovery](../assets/roll-compass-vnext-no-fit-2026-08-25.jpg)
+
+![Native full-surface route recovery](../assets/roll-compass-vnext-route-recovery-2026-08-25.jpg)
+
 ## Simulator build and automated tests
 
 ```sh

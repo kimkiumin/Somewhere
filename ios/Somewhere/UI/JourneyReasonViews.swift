@@ -112,20 +112,25 @@ struct ExternalMapWarningView: View {
 
 struct RouteRecoveryView: View {
     @ObservedObject var store: JourneyStore
+    var compact = false
 
     var body: some View {
-        SomewhereCard(padding: 18) {
-            VStack(alignment: .leading, spacing: 12) {
-                SomewhereSignalPill(icon: "location.slash.fill", title: "GUIDANCE RECOVERY", tint: SomewherePalette.accent)
-                Text("어떻게 이어갈까요?")
-                    .font(.title3.weight(.bold))
+        SomewhereCard(padding: compact ? 13 : 18) {
+            VStack(alignment: .leading, spacing: compact ? 8 : 12) {
+                if !compact {
+                    SomewhereSignalPill(icon: "location.slash.fill", title: "안내 복구", tint: SomewherePalette.accent)
+                }
+                Text(compact ? "복구 방법" : "어떻게 이어갈까요?")
+                    .font(compact ? .headline.weight(.bold) : .title3.weight(.bold))
                     .foregroundStyle(SomewherePalette.ink)
-                Text("선택하기 전에는 방향을 표시하지 않아요.")
-                    .font(.subheadline)
-                    .foregroundStyle(SomewherePalette.mutedInk)
-                recoveryButton("나침반 다시 맞추기", icon: "safari", choice: "recalibrate")
-                recoveryButton("경로 다시 찾기", icon: "arrow.triangle.2.circlepath", choice: "reroute")
-                recoveryButton("확인된 경로 이어가기", icon: "point.topleft.down.to.point.bottomright.curvepath", choice: "cached-route")
+                if !compact {
+                    Text("선택하기 전에는 방향을 표시하지 않아요.")
+                        .font(.subheadline)
+                        .foregroundStyle(SomewherePalette.mutedInk)
+                }
+                recoveryButton(compact ? "나침반 맞추기" : "나침반 다시 맞추기", icon: "safari", choice: "recalibrate")
+                recoveryButton(compact ? "새 경로 찾기" : "경로 다시 찾기", icon: "arrow.triangle.2.circlepath", choice: "reroute")
+                recoveryButton(compact ? "기존 경로 계속" : "확인된 경로 이어가기", icon: "point.topleft.down.to.point.bottomright.curvepath", choice: "cached-route")
             }
         }
     }

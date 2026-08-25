@@ -24,6 +24,8 @@ struct CompassView: View {
                 compactGuidanceStack(compassSize: 156, spacing: 6, verticalPadding: 2)
             }
             .frame(maxHeight: .infinity)
+        } else if projection.phase == .routeRecovery {
+            routeRecoveryContent
         } else {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 22) {
@@ -31,9 +33,6 @@ struct CompassView: View {
                         RevealView(projection: projection)
                     }
                     phaseHeader
-                    if projection.phase == .routeRecovery {
-                        RouteRecoveryView(store: store)
-                    }
                     directionSummary
                     compassDial(size: 286)
                     distanceCard
@@ -56,6 +55,40 @@ struct CompassView: View {
             safetyNote
         }
         .padding(.vertical, verticalPadding)
+    }
+
+    @ViewBuilder
+    private var routeRecoveryContent: some View {
+        if usesAccessibilityGuidanceLayout {
+            routeRecoveryStack(compassSize: nil, compact: true)
+                .frame(maxHeight: .infinity, alignment: .top)
+        } else {
+            ViewThatFits(in: .vertical) {
+                routeRecoveryStack(compassSize: 112, compact: false)
+                routeRecoveryStack(compassSize: 88, compact: false)
+                routeRecoveryStack(compassSize: nil, compact: true)
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    private func routeRecoveryStack(compassSize: CGFloat?, compact: Bool) -> some View {
+        VStack(spacing: compact ? 8 : 12) {
+            if compact {
+                Text("위치 복구")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(SomewherePalette.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("somewhere.phase.route-recovery")
+            } else {
+                phaseHeader
+            }
+            if let compassSize {
+                compassDial(size: compassSize)
+            }
+            RouteRecoveryView(store: store, compact: compact)
+        }
+        .padding(.vertical, compact ? 6 : 10)
     }
 
     private var journeyHeader: some View {
@@ -130,9 +163,9 @@ struct CompassView: View {
 
     private var compassMode: SomewhereCompassMode {
         switch projection.phase {
-        case .finding, .committed, .routeRecovery:
+        case .finding, .committed:
             return .searching
-        case .paused:
+        case .paused, .routeRecovery:
             return .paused
         case .following, .near:
             if case .credible(let reading) = store.guidance {

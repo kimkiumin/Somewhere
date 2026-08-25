@@ -89,14 +89,15 @@ struct ConstraintView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(SomewherePalette.mutedInk)
                 Button(action: scrollToConditions) {
-                    Text("Conditions")
+                    Text("탐색 조건")
                         .font(.title3.weight(.bold))
                         .underline()
-                        .foregroundStyle(SomewherePalette.link)
+                        .foregroundStyle(SomewherePalette.accent)
                         .frame(minHeight: 44)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("탐색 조건 보기")
+                .accessibilityLabel("탐색 조건")
+                .accessibilityHint("인원, 도보 시간과 예산을 조정해요.")
                 .accessibilityIdentifier("somewhere.conditions-link")
             }
             .opacity(isShowingConditions ? 0 : 1)
@@ -131,10 +132,11 @@ struct ConstraintView: View {
             } label: {
                 Image(systemName: "gearshape.fill")
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(Color(red: 0.42, green: 0.43, blue: 0.46))
+                    .foregroundStyle(SomewherePalette.accent)
                     .frame(width: 54, height: 54)
-                    .background(Color(red: 0.965, green: 0.965, blue: 0.972), in: Circle())
-                    .overlay { Circle().stroke(Color.black.opacity(0.12), lineWidth: 1) }
+                    .background(SomewherePalette.cardStrong, in: Circle())
+                    .overlay { Circle().stroke(SomewherePalette.border, lineWidth: 1) }
+                    .shadow(color: SomewherePalette.ink.opacity(0.06), radius: 12, y: 6)
             }
             .accessibilityLabel("프로필 및 앱 메뉴")
             .accessibilityIdentifier("somewhere.profile-menu")

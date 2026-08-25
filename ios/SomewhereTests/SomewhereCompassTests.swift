@@ -2,6 +2,13 @@ import XCTest
 @testable import Somewhere
 
 final class SomewhereCompassTests: XCTestCase {
+    func testNeedleIsVisibleOnlyForCrediblePointingMode() {
+        XCTAssertFalse(SomewhereCompassPresentationPolicy.showsNeedle(for: .ready))
+        XCTAssertFalse(SomewhereCompassPresentationPolicy.showsNeedle(for: .searching))
+        XCTAssertTrue(SomewhereCompassPresentationPolicy.showsNeedle(for: .pointing(45)))
+        XCTAssertFalse(SomewhereCompassPresentationPolicy.showsNeedle(for: .paused))
+    }
+
     func testHubCorrectionMovesMeasuredHubToTheRotationCenter() {
         let correction = SomewhereCompassMotionPolicy.hubCorrection(displaySize: 286, frameScale: 0.44)
         XCTAssertEqual(correction.width, -0.10, accuracy: 0.02)

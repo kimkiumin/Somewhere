@@ -9,7 +9,6 @@ enum SomewherePalette {
     static let accent = Color(red: 0.55, green: 0.09, blue: 0.075)
     static let gold = Color(red: 0.64, green: 0.39, blue: 0.12)
     static let success = Color(red: 0.12, green: 0.34, blue: 0.29)
-    static let link = Color(red: 0.0, green: 0.39, blue: 0.94)
     static let card = Color(red: 0.965, green: 0.925, blue: 0.84).opacity(0.72)
     static let cardStrong = Color(red: 1.0, green: 0.985, blue: 0.95).opacity(0.96)
     static let border = Color(red: 0.37, green: 0.24, blue: 0.12).opacity(0.25)
