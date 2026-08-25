@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CompassView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.somewhereLayout) private var layout
     @ObservedObject var store: JourneyStore
     let projection: JourneyProjection
 
@@ -17,29 +18,74 @@ struct CompassView: View {
 
     @ViewBuilder
     private var journeyContent: some View {
-        if usesCompactGuidanceLayout {
-            ViewThatFits(in: .vertical) {
-                compactGuidanceStack(compassSize: 250, spacing: 12, verticalPadding: 10)
-                compactGuidanceStack(compassSize: 210, spacing: 8, verticalPadding: 6)
-                compactGuidanceStack(compassSize: 156, spacing: 6, verticalPadding: 2)
-            }
-            .frame(maxHeight: .infinity)
+        if layout.isExhibition {
+            exhibitionJourneyContent
+        } else if usesCompactGuidanceLayout {
+            compactJourneyContent
         } else if projection.phase == .routeRecovery {
             routeRecoveryContent
         } else {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 22) {
-                    if projection.revealed == true {
-                        RevealView(projection: projection)
-                    }
-                    phaseHeader
-                    directionSummary
-                    compassDial(size: 286)
-                    distanceCard
-                    safetyNote
-                }
-                .padding(.vertical, 18)
+            existingScrollableJourneyContent
+        }
+    }
+
+    @ViewBuilder
+    private var exhibitionJourneyContent: some View {
+        if projection.phase == .routeRecovery {
+            HStack(spacing: layout.columnSpacing) {
+                compassDial(size: min(360, layout.compassDiameter))
+                    .frame(maxWidth: .infinity)
+                RouteRecoveryView(store: store).frame(width: 300)
             }
+            .frame(maxHeight: .infinity)
+        } else if projection.revealed == true {
+            HStack(alignment: .center, spacing: layout.columnSpacing) {
+                RevealView(projection: projection).frame(maxWidth: .infinity)
+                VStack(spacing: 14) {
+                    phaseHeader
+                    compassDial(size: min(320, layout.compassDiameter))
+                    directionSummary
+                    distanceCard
+                }
+                .frame(width: 310)
+            }
+            .frame(maxHeight: .infinity)
+        } else {
+            HStack(alignment: .center, spacing: layout.columnSpacing) {
+                VStack(spacing: 10) {
+                    if !usesCompactGuidanceLayout { phaseHeader }
+                    compassDial(size: layout.compassDiameter)
+                }
+                .frame(maxWidth: .infinity)
+                VStack(spacing: 14) { directionSummary; distanceCard; safetyNote }
+                    .frame(width: 300)
+            }
+            .frame(maxHeight: .infinity)
+        }
+    }
+
+    private var compactJourneyContent: some View {
+        ViewThatFits(in: .vertical) {
+            compactGuidanceStack(compassSize: 250, spacing: 12, verticalPadding: 10)
+            compactGuidanceStack(compassSize: 210, spacing: 8, verticalPadding: 6)
+            compactGuidanceStack(compassSize: 156, spacing: 6, verticalPadding: 2)
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    private var existingScrollableJourneyContent: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 22) {
+                if projection.revealed == true {
+                    RevealView(projection: projection)
+                }
+                phaseHeader
+                directionSummary
+                compassDial(size: 286)
+                distanceCard
+                safetyNote
+            }
+            .padding(.vertical, 18)
         }
     }
 

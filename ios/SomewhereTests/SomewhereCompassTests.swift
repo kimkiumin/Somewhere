@@ -57,4 +57,15 @@ final class SomewhereCompassTests: XCTestCase {
         XCTAssertEqual(CompassDirectionCue(bearingDegrees: 337.49).label, "왼쪽 앞")
         XCTAssertEqual(CompassDirectionCue(bearingDegrees: 337.5).label, "앞")
     }
+
+    func testNeedleArtworkRemainsInsideSecondGenerationIPadDial() {
+        let dial = CGFloat(490)
+        let needleFrame = dial * 0.44
+        let correction = SomewhereCompassMotionPolicy.hubCorrection(
+            displaySize: dial,
+            frameScale: 0.44
+        )
+        XCTAssertLessThan(abs(correction.width) + needleFrame / 2, dial / 2)
+        XCTAssertLessThan(abs(correction.height) + needleFrame / 2, dial / 2)
+    }
 }

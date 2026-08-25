@@ -23,6 +23,35 @@ final class ExhibitionLayoutUITests: XCTestCase {
         XCTAssertTrue(app.buttons["somewhere.start-journey"].waitForExistence(timeout: 3))
     }
 
+    func testGuidanceFitsIPadAndKeepsStopVisible() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-test-state", "following-next-step",
+            "--ui-test-credible-guidance",
+            "--ui-test-no-notifications",
+        ]
+        app.launch()
+
+        let compass = app.otherElements["somewhere.guidance-compass"]
+        let direction = app.descendants(matching: .any)["somewhere.direction-summary"]
+        let stop = app.buttons["somewhere.stop"]
+        XCTAssertTrue(compass.waitForExistence(timeout: 3))
+        XCTAssertTrue(direction.exists)
+        XCTAssertTrue(stop.isHittable)
+        XCTAssertEqual(app.scrollViews.count, 0)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(compass.frame))
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(stop.frame))
+    }
+
+    func testPausedGuidanceKeepsNeedleHiddenOnIPad() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-state", "paused", "--ui-test-no-notifications"]
+        app.launch()
+        let compass = app.otherElements["somewhere.guidance-compass"]
+        XCTAssertTrue(compass.waitForExistence(timeout: 3))
+        XCTAssertEqual(compass.label, "방향이 숨겨진 나침반")
+    }
+
     private func launchStartSurface() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-test-no-notifications"]
