@@ -125,14 +125,7 @@ struct RecoveryView: View {
             Text("선택하지 않고 건너뛰어도 바로 나갈 수 있어요.")
                 .font(.subheadline)
                 .foregroundStyle(SomewherePalette.mutedInk)
-            if layout.isExhibition {
-                ScrollView(showsIndicators: true) {
-                    stopReasonList
-                }
-                .frame(maxHeight: 390)
-            } else {
-                stopReasonList
-            }
+            stopReasonList
             skipStopReasonButton
         }
     }

@@ -435,6 +435,25 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["보물 숨김"].exists)
     }
 
+    func testIPadStopReasonsFitWithoutScrolling() {
+        let app = launchHarness("stopped")
+        let identifiers = [
+            "safety-concern",
+            "route-or-sensor",
+            "hard-condition",
+            "venue-situation",
+            "changed-mind",
+            "schedule-changed",
+        ]
+
+        XCTAssertTrue(app.buttons["somewhere.stop-reason.safety-concern"].waitForExistence(timeout: 2))
+        XCTAssertEqual(app.scrollViews.count, 0)
+        for identifier in identifiers {
+            XCTAssertTrue(app.buttons["somewhere.stop-reason.\(identifier)"].isHittable, identifier)
+        }
+        XCTAssertTrue(app.buttons["somewhere.skip-stop-reason"].isHittable)
+    }
+
     func testRichArrivalHierarchyIsRendered() {
         let app = launchHarness("arrived-rich")
         XCTAssertTrue(app.staticTexts["somewhere.revealed-name"].waitForExistence(timeout: 2))
