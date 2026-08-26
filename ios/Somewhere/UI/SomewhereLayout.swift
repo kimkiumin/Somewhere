@@ -33,7 +33,7 @@ struct SomewhereLayoutMetrics: Equatable, Sendable {
 
         let padding: CGFloat = width >= 900 ? 52 : 36
         let contentWidth = min(1_080, width - padding * 2)
-        let compassDiameter = contentWidth * 0.62
+        let compassDiameter = min(contentWidth * 0.72, height * 0.46, 620)
         return SomewhereLayoutMetrics(
             mode: .exhibition,
             contentMaxWidth: contentWidth,

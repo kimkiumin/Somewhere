@@ -15,12 +15,12 @@ final class SomewhereLayoutTests: XCTestCase {
         XCTAssertEqual(value.mode, .exhibition)
         XCTAssertEqual(value.contentMaxWidth, 762)
         XCTAssertEqual(value.horizontalPadding, 36)
-        XCTAssertEqual(value.compassDiameter, value.contentMaxWidth * 0.62, accuracy: 0.5)
+        XCTAssertEqual(value.compassDiameter, value.contentMaxWidth * 0.72, accuracy: 0.5)
         let compassWidthRatio = value.compassDiameter / value.contentMaxWidth
-        XCTAssertGreaterThanOrEqual(compassWidthRatio, 0.58)
-        XCTAssertLessThanOrEqual(compassWidthRatio, 0.64)
-        XCTAssertGreaterThanOrEqual(value.compassDiameter, 410)
-        XCTAssertLessThanOrEqual(value.compassDiameter, 520)
+        XCTAssertGreaterThanOrEqual(compassWidthRatio, 0.70)
+        XCTAssertLessThanOrEqual(compassWidthRatio, 0.73)
+        XCTAssertGreaterThanOrEqual(value.compassDiameter, 530)
+        XCTAssertLessThanOrEqual(value.compassDiameter, 570)
         XCTAssertEqual(value.sheetMaxWidth, 620)
     }
 

@@ -212,8 +212,8 @@ final class JourneyFlowUITests: XCTestCase {
 
         let availableWidth = window.frame.width - (36 * 2)
         let compassWidthRatio = compass.frame.width / availableWidth
-        XCTAssertGreaterThanOrEqual(compassWidthRatio, 0.58)
-        XCTAssertLessThanOrEqual(compassWidthRatio, 0.64)
+        XCTAssertGreaterThanOrEqual(compassWidthRatio, 0.66)
+        XCTAssertLessThanOrEqual(compassWidthRatio, 0.70)
     }
 
     func testIPadArrivalUsesVerticalRevealAtApproximateEightyPercentWidth() throws {
@@ -303,8 +303,8 @@ final class JourneyFlowUITests: XCTestCase {
 
         let availableWidth = window.frame.width - (36 * 2)
         let compassWidthRatio = compass.frame.width / availableWidth
-        XCTAssertGreaterThanOrEqual(compassWidthRatio, 0.58)
-        XCTAssertLessThanOrEqual(compassWidthRatio, 0.64)
+        XCTAssertGreaterThanOrEqual(compassWidthRatio, 0.66)
+        XCTAssertLessThanOrEqual(compassWidthRatio, 0.70)
     }
 
     func testIPadEarlyRevealedGuidanceUsesVerticalDirectionCompassAndRemainingInformationOrder() throws {
@@ -332,8 +332,8 @@ final class JourneyFlowUITests: XCTestCase {
 
         let availableWidth = window.frame.width - (36 * 2)
         let compassWidthRatio = compass.frame.width / availableWidth
-        XCTAssertGreaterThanOrEqual(compassWidthRatio, 0.58)
-        XCTAssertLessThanOrEqual(compassWidthRatio, 0.64)
+        XCTAssertGreaterThanOrEqual(compassWidthRatio, 0.66)
+        XCTAssertLessThanOrEqual(compassWidthRatio, 0.70)
     }
 
     func testBackControlIsVisibleDuringGuidance() {
@@ -568,6 +568,21 @@ final class JourneyFlowUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["somewhere.continue-journey"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["somewhere.confirm-stop"].exists)
+    }
+
+    func testDisconnectedPhysicalCompassCannotAuthorizeStopEvent() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-test-state", "following",
+            "--ui-test-board-state", "disconnected",
+            "--ui-test-board-event", "stop",
+            "--ui-test-no-notifications",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["somewhere.stop"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["somewhere.continue-journey"].exists)
+        XCTAssertFalse(app.buttons["somewhere.confirm-stop"].exists)
     }
 
     func testPhysicalCompassSettingsRemainOperableAtAccessibilityTextSize() {
