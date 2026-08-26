@@ -202,12 +202,16 @@ push된 다음, 동일한 LVGL 8.4 화면·runtime 소스를 SDL2 어댑터에�
 - 로컬 Simulator ZIP SHA-256:
   `56a267536882b19f857e7fe61f71f596b50568bbf99532f8408b7ceed14b92c7`
 
-새 workflow가 기본 브랜치에 아직 등록되지 않은 이 최초 push에서는 GitHub
-Actions API가 workflow 조회를 `404`로 거부했고 hosted artifact run은 생성되지
-않았다. 따라서 위 결과를 GitHub hosted `PASS`로 바꾸어 기록하지 않는다.
-workflow가 기본 브랜치에 반영된 뒤 수동 실행하여 macOS artifact ZIP과 manifest를
-다시 받아야 한다. 로컬 ZIP은 build 명령·manifest 계약의 검증 근거이며 GitHub
-artifact를 대신하는 장기 배포본이 아니다.
+최초 hosted run
+[`32984412855`](https://github.com/kimkiumin/Somewhere/actions/runs/32984412855)는
+job 시작 전 `startup_failure`로 종료됐다. 같은 시각 GitHub Status는 Actions를
+`major outage`로 공지했고 run annotation도 GitHub 내부 unexpected error로
+표시했다. workflow runtime을 30분으로 제한한 SHA `7e7786c` push에서 두 번째
+run
+[`32985450887`](https://github.com/kimkiumin/Somewhere/actions/runs/32985450887)이
+정상 생성됐지만 장애 중 queue에 남아 있다. 따라서 위 로컬 결과를 GitHub hosted
+`PASS`로 바꾸어 기록하지 않는다. 로컬 ZIP은 build 명령·manifest 계약의 검증
+근거이며 GitHub artifact를 대신하는 장기 배포본이 아니다.
 
 보드 브랜치 SHA `8088d81ded88da56c9d3d9fc41e8de1e4365a6f8`도
 별도로 확인했다.
@@ -221,8 +225,10 @@ artifact를 대신하는 장기 배포본이 아니다.
   global RAM 9%
 
 이 검증 호스트에는 `pwsh`가 없어 PowerShell 자체와 COM 포트·플래시는 실행하지
-않았다. 새 Windows workflow 역시 기본 브랜치 반영 전에는 hosted run이 생성되지
-않으므로, 실제 Windows runner와 물리 보드 증거는 별도 상태로 유지한다.
+않았다. Windows hosted run
+[`32985318102`](https://github.com/kimkiumin/Somewhere/actions/runs/32985318102)도
+같은 GitHub Actions 장애 중 queue에 남아 있다. 따라서 실제 Windows runner와
+물리 보드 증거는 별도 상태로 유지한다.
 
 ## 외부 근거
 
@@ -231,3 +237,4 @@ artifact를 대신하는 장기 배포본이 아니다.
 - [Appetize build 공유와 권한](https://docs.appetize.io/platform/sharing-apps)
 - [Appetize 제한 무료 계정 안내](https://support.appetize.io/may-i-test-appetize.io-for-free-before-paying-for-an-account)
 - [GitHub Actions workflow artifact](https://docs.github.com/en/actions/concepts/workflows-and-actions/workflow-artifacts)
+- [2026-08-27 GitHub Actions 장애](https://www.githubstatus.com/incidents/y1t7p9fzrlj2)
