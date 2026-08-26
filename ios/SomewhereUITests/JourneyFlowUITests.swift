@@ -3,6 +3,41 @@ import XCTest
 
 @MainActor
 final class JourneyFlowUITests: XCTestCase {
+    func testExhibitionDemoStartsWithoutNetworkAndShowsLiveGuidance() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--exhibition-demo",
+            "--ui-test-no-notifications",
+            "--ui-test-reset-preferences",
+        ]
+        app.launch()
+
+        let onboarding = app.buttons["somewhere.onboarding-continue"]
+        if onboarding.waitForExistence(timeout: 3) {
+            onboarding.tap()
+            let profileSave = app.buttons["somewhere.profile-save"]
+            if profileSave.waitForExistence(timeout: 3) { profileSave.tap() }
+        }
+        let profileSave = app.buttons["somewhere.profile-save"]
+        if profileSave.exists { profileSave.tap() }
+
+        let start = app.buttons["somewhere.start-journey"]
+        XCTAssertTrue(start.waitForExistence(timeout: 3))
+        start.tap()
+
+        let stop = app.buttons["somewhere.stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.otherElements["somewhere.guidance-compass"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.descendants(matching: .any)["somewhere.error"].exists)
+
+        stop.tap()
+        let resume = app.buttons["somewhere.continue-journey"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 3))
+        resume.tap()
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["somewhere.error"].exists)
+    }
+
     func testStartSurfaceHidesDestinationIdentity() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-test-no-notifications"]

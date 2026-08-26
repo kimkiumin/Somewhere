@@ -22,6 +22,22 @@ The checked-in bundle identifiers are intentionally non-production examples. Lin
 
 `SOMEWHERE_API_ORIGIN` is deliberately `https://example.invalid` in the checked-in project. An authorized field build must override it with the canonical HTTPS service origin; source code rejects credentials, paths, query strings, fragments, non-HTTPS origins, and non-loopback HTTP.
 
+### Offline exhibition build
+
+The checked-in Debug configuration sets `SOMEWHERE_EXHIBITION_DEMO=YES`.
+Launching that build normally from an iPhone or iPad Home Screen uses a
+Debug-only in-process journey service and a deterministic route replay. The
+complete native start, compass, distance, Stop/Continue, arrival, and reveal
+surfaces therefore remain operable when the venue API, internet, or usable
+indoor GPS is unavailable.
+
+This does not replace the product path. Release always sets the flag to `NO`
+and continues to use Core Location plus `SOMEWHERE_API_ORIGIN`. To exercise a
+real local Worker from a manually launched Debug app, also pass
+`SOMEWHERE_EXHIBITION_DEMO=NO` at build time. UI tests keep their existing
+network and launch-state behavior unless they explicitly pass
+`--exhibition-demo`.
+
 ### Physical compass companion
 
 The native app can connect to the Waveshare ESP32-S3-Touch-LCD-2.1 companion

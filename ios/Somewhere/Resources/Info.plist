@@ -14,6 +14,7 @@
     <key>NSLocationWhenInUseUsageDescription</key><string>걷는 동안 경로 위의 현재 위치와 방향을 계산하기 위해 사용합니다.</string>
     <key>NSBluetoothAlwaysUsageDescription</key><string>물리 컴퍼스에 안내 상태를 표시하고 터치 입력을 받기 위해 Bluetooth를 사용합니다.</string>
     <key>SomewhereAPIOrigin</key><string>$(SOMEWHERE_API_ORIGIN)</string>
+    <key>SomewhereExhibitionDemo</key><string>$(SOMEWHERE_EXHIBITION_DEMO)</string>
     <key>UILaunchScreen</key><dict/>
     <key>UIAppFonts</key>
     <array>

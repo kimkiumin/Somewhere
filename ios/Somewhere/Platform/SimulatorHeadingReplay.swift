@@ -36,7 +36,8 @@ enum SimulatorHeadingReplay {
 /// without pretending that production can synthesize GPS.
 enum PhysicalFieldRouteReplay {
     static var enabled: Bool {
-        ProcessInfo.processInfo.arguments.contains("--physical-field-route-replay")
+        ExhibitionDemoRuntime.enabled ||
+            ProcessInfo.processInfo.arguments.contains("--physical-field-route-replay")
     }
 
     static let origin = Coordinate(latitude: 37.54385, longitude: 127.03695)

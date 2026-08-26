@@ -17,6 +17,17 @@ struct SomewhereApp: App {
         }
         #endif
         let service: any JourneyServiceProtocol
+        #if DEBUG
+        if ExhibitionDemoRuntime.enabled {
+            service = ExhibitionJourneyService()
+        } else if let value = Bundle.main.object(forInfoDictionaryKey: "SomewhereAPIOrigin") as? String,
+                  let origin = URL(string: value),
+                  let api = try? APIClient(origin: origin) {
+            service = APIJourneyService(api: api)
+        } else {
+            service = UnconfiguredJourneyService()
+        }
+        #else
         if let value = Bundle.main.object(forInfoDictionaryKey: "SomewhereAPIOrigin") as? String,
            let origin = URL(string: value),
            let api = try? APIClient(origin: origin) {
@@ -24,6 +35,7 @@ struct SomewhereApp: App {
         } else {
             service = UnconfiguredJourneyService()
         }
+        #endif
         #if DEBUG
         let suppressNotifications = ProcessInfo.processInfo.arguments.contains("--ui-test-no-notifications")
         #else
