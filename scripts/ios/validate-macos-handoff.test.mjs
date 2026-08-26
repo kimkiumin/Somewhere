@@ -88,6 +88,7 @@ describe("GitHub to macOS handoff contract", () => {
 
     const preview = workflow.jobs.preview;
     expect(preview["runs-on"]).toBe("macos-15");
+    expect(preview["timeout-minutes"]).toBe(30);
 
     const checkout = preview.steps.find((step) => step.name === "Check out exact source");
     const setupBun = preview.steps.find((step) => step.name === "Set up pinned Bun");
