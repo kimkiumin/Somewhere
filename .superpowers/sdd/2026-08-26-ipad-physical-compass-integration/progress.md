@@ -76,16 +76,16 @@
   58 assertions passed; final compile evidence is 83% flash and 9% RAM. No
   physical board upload, erase, or runtime PASS was claimed. Full evidence and
   owned-file list are in `task-5-report.md` and `.omo/evidence/task-5/`.
-- Task 6 app-only verification: complete at implementation HEAD `7c026bc`.
-  iPad native units 65/65, exhibition scenarios 10/10 by combined retry
-  evidence, iPad journey flow 41/41, and iPhone 13 app matrix 7/7 passed. App
-  183, server 238, contracts 15, general browser E2E 34, and real Worker E2E
-  5/5 passed. The iOS source gate is 34/34 and the iOS Release simulator and
-  external production diagnostic builds passed. Full evidence, reproduction
-  commands, and external blocks are in `task-6-report.md`.
+- Task 6 app-only verification: complete at implementation HEAD `b609d02`.
+  iPad native units 68/68, exhibition scenarios 10/10 by combined
+  retry evidence, iPad journey flow 41/41, and iPhone 13 app matrix 8/8 passed.
+  App 183, server 238, contracts 15, general browser E2E 34, and pre-expiry real
+  Worker E2E 5/5 passed. The iOS source gate is 34/34; the iOS Release simulator
+  and external production diagnostic builds passed. Full evidence,
+  reproduction commands, and external blocks are in `task-6-report.md`.
 - Scope handoff: round-LCD firmware implementation and physical board work are
   owned by another session. This lane preserves only the tested app-side BLE
   dependency/settings contract and makes no new firmware or hardware claim.
-- Immediate live-demo block: the reviewed Seoul Forest route expires at
+- Immediate live-demo block: the reviewed Seoul Forest route expired at
   `2026-08-26T06:00:00Z`; authorized field revalidation is required instead of
   silently extending repository fixture authority.

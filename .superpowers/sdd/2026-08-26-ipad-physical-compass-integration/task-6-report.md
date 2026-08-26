@@ -4,7 +4,7 @@ Date: 2026-08-26
 
 Branch: `codex/ipad-board-integration`
 
-Verified implementation HEAD: `7c026bc06d249c748402cdb49a5b1aa47bccb805`
+Verified implementation HEAD: `b609d022f57636fb72f58dc17f28a5fa978b33d3`
 
 ## Scope boundary
 
@@ -52,11 +52,11 @@ project source.
 
 | Lane | Result | Evidence |
 | --- | ---: | --- |
-| iPad Pro 11-inch (2nd generation) native units | 65/65 pass | `.local-artifacts/task-6/final-native-units.xcresult` |
+| iPad Pro 11-inch (2nd generation) native units | 68/68 pass | `.local-artifacts/task-6-review-final/ipad-units-final.xcresult` |
 | iPad exhibition layouts | 10/10 scenarios pass | 9 pass in `final-ipad-exhibition-ui.xcresult`; the single missed-tap scenario passed in `ipad-final-polish/.local-artifacts/task-6/conditions-tap-retry.xcresult` |
 | iPad journey flow | 41/41 pass | `final-ipad-journey-a/b/c.xcresult` |
-| iPhone 13 app matrix | 7/7 pass | `.local-artifacts/task-6/final-iphone13-app-ui-retry.xcresult` |
-| iOS source/field gate | 34/34 pass | 32 unit and 42 UI scenarios declared |
+| iPhone 13 app matrix | 8/8 pass | `.local-artifacts/task-6-review-final/iphone13-app-ui.xcresult` |
+| iOS source/field gate | 34/34 pass | 35 unit and 42 UI scenarios declared |
 | iOS Release simulator build | PASS | XcodeBuildMCP Release build on `Somewhere iPhone 13` |
 
 The iPhone conditions test first recorded one intermittent XCUITest tap miss,
@@ -69,13 +69,21 @@ The app was also built, installed, and launched as a normal process on the
 and zero launch-surface scroll areas; the conditions link opened the budget
 surface and exposed its explicit back control.
 
+The final app review added regression coverage for three lifecycle/layout
+boundaries: automatic arrival retries after a failed request, a new journey ID
+receives an independent arrival gate, and backgrounding suppresses stale
+guidance while invalidating the previously delivered board authority. Safety
+reveal now uses a compact name/address card on iPhone and iPad, keeping the
+compass composition and Stop in one non-scrolling viewport.
+
 ## Web, backend, and release regression
 
 - App unit tests: 183/183 pass.
 - Server tests: 238/238 pass.
 - Contract tests: 15/15 pass.
 - General Playwright E2E: 34 pass, 3 intentional WebKit automation skips.
-- Real local Worker E2E: 5/5 pass across Chromium and WebKit handshake.
+- Real local Worker E2E: 5/5 pass across Chromium and WebKit handshake before
+  the reviewed route capability expired.
 - Blueprint executable gates: 31 study + 22 completion + 34 iOS + 14 native
   evidence tests pass.
 - TypeScript typecheck and Biome lint pass. Biome reports only nine existing
@@ -91,7 +99,7 @@ field route as expired and incorrectly fail with `no_fit`.
 
 ## Important operational block
 
-The checked-in Seoul Forest restaurant route capability expires at
+The checked-in Seoul Forest restaurant route capability expired at
 `2026-08-26T06:00:00Z` (`2026-08-26 15:00 KST`). The venue, evidence, and
 rights fixtures expire at `2026-08-27T06:00:00Z`. These dates were not extended
 because doing so would falsely claim a new field/rights review. After expiry,
@@ -107,9 +115,13 @@ git switch codex/ipad-board-integration
 bun install
 xcodegen generate --spec ios/project.yml
 bun run verify:ios-source
-bun run test:e2e:v2
+bun run test:e2e
 open ios/Somewhere.xcodeproj
 ```
+
+Run `bun run test:e2e:v2` only after an authorized reviewer renews the expired
+route capability; the real Worker correctly fails closed with `no_fit` in the
+current repository state.
 
 In Xcode, select the `Somewhere` scheme and either iPhone 13 or iPad Pro
 11-inch (2nd generation). A real installation still requires the collaborator's
