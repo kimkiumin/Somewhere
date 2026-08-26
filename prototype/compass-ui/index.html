@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Somewhere — Compass Display</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="prototype-shell">
+      <header class="masthead" aria-label="프로토타입 정보">
+        <p class="eyebrow">SOMEWHERE / FIELD DISPLAY</p>
+        <p class="connection-status"><span class="status-dot" aria-hidden="true"></span>WIRED PREVIEW</p>
+      </header>
+
+      <section class="compass-stage" aria-label="나침반 디스플레이">
+        <div id="svg-mount" class="svg-mount" aria-hidden="true"></div>
+
+        <div class="readouts" aria-live="polite">
+          <p class="readout readout-distance">
+            <span class="readout-label">REMAINING</span>
+            <strong id="distance-readout">320 m</strong>
+          </p>
+          <p class="readout readout-price">
+            <span class="readout-label">PRICE</span>
+            <strong id="price-readout">-</strong>
+          </p>
+          <p class="readout readout-menu">
+            <span class="readout-label">MENU</span>
+            <strong id="menu-readout">TONKATSU</strong>
+          </p>
+        </div>
+
+        <p id="load-status" class="load-status">LOADING DISPLAY</p>
+      </section>
+
+      <section class="control-strip" aria-label="디스플레이 테스트 값">
+        <div class="control-intro">
+          <p class="eyebrow">LIVE VALUES</p>
+          <p>값을 바꾸면 화면 문자와 바늘이 함께 갱신됩니다.</p>
+        </div>
+
+        <form id="display-controls" class="display-controls">
+          <label>
+            <span>거리 (m)</span>
+            <input name="distance" type="number" min="0" step="10" value="320" />
+          </label>
+          <label>
+            <span>금액대</span>
+            <input name="price" type="text" value="상관없음" maxlength="16" />
+          </label>
+          <label>
+            <span>대표 메뉴</span>
+            <input name="menu" type="text" value="TONKATSU" maxlength="16" />
+          </label>
+          <label>
+            <span>목적지 방위</span>
+            <input name="targetBearing" type="number" min="0" max="359" step="1" value="35" />
+          </label>
+          <label>
+            <span>현재 방향</span>
+            <input name="heading" type="number" min="0" max="359" step="1" value="0" />
+          </label>
+          <button type="submit">APPLY</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="./compass-ui.js"></script>
+    <script>
+      (() => {
+        const api = window.SomewhereCompassUi;
+        const mount = document.querySelector("#svg-mount");
+        const status = document.querySelector("#load-status");
+        const form = document.querySelector("#display-controls");
+        const distanceReadout = document.querySelector("#distance-readout");
+        const priceReadout = document.querySelector("#price-readout");
+        const menuReadout = document.querySelector("#menu-readout");
+
+        const state = {
+          distanceMeters: 320,
+          priceBand: "상관없음",
+          menu: "TONKATSU",
+          targetBearingDeg: 35,
+          headingDeg: 0,
+        };
+
+        let needle;
+
+        function render() {
+          const view = api.buildCompassViewModel(state);
+          distanceReadout.textContent = view.distanceText;
+          priceReadout.textContent = view.priceText;
+          menuReadout.textContent = view.menuText;
+          if (needle) api.applyNeedleRotation(needle, view.needleAngleDeg);
+        }
+
+        async function loadArtwork() {
+          const response = await fetch("./artboard-3-2.svg");
+          if (!response.ok) throw new Error(`SVG load failed: ${response.status}`);
+
+          const markup = await response.text();
+          const documentFragment = new DOMParser().parseFromString(markup, "image/svg+xml");
+          const svg = documentFragment.documentElement;
+          const textLayer = documentFragment.getElementById("_디스플레이_문자");
+          needle = documentFragment.getElementById("_핑크_바늘");
+
+          if (!svg || svg.nodeName.toLowerCase() !== "svg") {
+            throw new Error("The artwork is not a valid SVG document.");
+          }
+          if (!needle) throw new Error("The pink needle layer was not found.");
+
+          svg.setAttribute("id", "compass-artwork");
+          svg.setAttribute("role", "img");
+          svg.setAttribute("aria-label", "Somewhere compass face");
+          if (textLayer) textLayer.setAttribute("display", "none");
+          needle.classList.add("compass-needle");
+          mount.replaceChildren(svg);
+          status.textContent = "DISPLAY READY";
+          status.classList.add("is-ready");
+          render();
+        }
+
+        form.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const values = new FormData(form);
+          state.distanceMeters = values.get("distance");
+          state.priceBand = values.get("price");
+          state.menu = values.get("menu");
+          state.targetBearingDeg = values.get("targetBearing");
+          state.headingDeg = values.get("heading");
+          render();
+        });
+
+        loadArtwork().catch((error) => {
+          status.textContent = "DISPLAY LOAD ERROR";
+          status.title = error.message;
+          console.error(error);
+        });
+      })();
+    </script>
+  </body>
+</html>

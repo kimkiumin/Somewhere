@@ -1,0 +1,342 @@
+@font-face {
+  font-family: "Univers Next Pro Thin Condensed";
+  src: local("UniversNextPro-ThinCond"), local("Univers Next Pro Thin Condensed");
+  font-style: normal;
+  font-weight: 200;
+  font-stretch: condensed;
+  font-display: swap;
+}
+
+:root {
+  --face: #050706;
+  --surface: #0b0f0d;
+  --line: rgba(232, 236, 232, 0.18);
+  --text: #e8ece8;
+  --muted: rgba(232, 236, 232, 0.58);
+  --green: #4dff76;
+  --pink: #ff3850;
+  --font-display: "Univers Next Pro Thin Condensed", "Univers Next Pro", "Univers Next", "Helvetica Neue", Arial, sans-serif;
+  --font-ui: "Univers Next Pro Thin Condensed", "Univers Next Pro", "Univers Next", "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--face);
+  font-synthesis: none;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 50% 18%, rgba(35, 71, 44, 0.12), transparent 34rem),
+    var(--face);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  color: var(--face);
+  border: 1px solid var(--green);
+  border-radius: 999px;
+  padding: 0.76rem 1.15rem;
+  background: var(--green);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+button:hover {
+  color: var(--green);
+  background: transparent;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+
+.prototype-shell {
+  width: min(100%, 960px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 1.25rem clamp(1rem, 4vw, 3rem) 2.5rem;
+}
+
+.masthead,
+.control-strip {
+  border-bottom: 1px solid var(--line);
+}
+
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+}
+
+.eyebrow,
+.connection-status,
+.readout-label,
+.load-status,
+.control-intro p:last-child,
+.display-controls label span {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  color: var(--muted);
+}
+
+.connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--green);
+}
+
+.status-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0.8rem rgba(77, 255, 118, 0.7);
+}
+
+.compass-stage {
+  position: relative;
+  width: min(84vw, 660px);
+  aspect-ratio: 1;
+  margin: clamp(1.75rem, 5vw, 4rem) auto clamp(3.5rem, 8vw, 5.5rem);
+  isolation: isolate;
+}
+
+.compass-stage::after {
+  position: absolute;
+  z-index: -1;
+  inset: 5%;
+  border: 1px solid rgba(77, 255, 118, 0.08);
+  border-radius: 50%;
+  box-shadow: 0 0 5rem rgba(77, 255, 118, 0.04);
+  content: "";
+  pointer-events: none;
+}
+
+.svg-mount,
+.svg-mount svg,
+.readouts {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.svg-mount svg {
+  display: block;
+  overflow: visible;
+}
+
+.compass-needle {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transition: transform 440ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.readouts {
+  color: var(--green);
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  text-rendering: geometricPrecision;
+}
+
+.readout {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  margin: 0;
+  line-height: 1;
+  text-shadow: 0 0 1.2rem rgba(77, 255, 118, 0.26);
+}
+
+.readout strong {
+  display: block;
+  max-width: 10rem;
+  overflow: hidden;
+  font-size: clamp(1rem, 3.3vw, 1.62rem);
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.readout-label {
+  color: rgba(77, 255, 118, 0.66);
+  font-size: clamp(0.46rem, 1.25vw, 0.62rem);
+}
+
+.readout-distance {
+  top: 23.5%;
+  left: 50%;
+  align-items: center;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.readout-distance strong {
+  font-size: clamp(1.8rem, 7vw, 3.25rem);
+  letter-spacing: -0.02em;
+}
+
+.readout-price {
+  bottom: 29%;
+  left: 26%;
+  align-items: flex-start;
+}
+
+.readout-menu {
+  right: 26%;
+  bottom: 29%;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.load-status {
+  position: absolute;
+  top: calc(100% + 0.8rem);
+  left: 50%;
+  color: var(--pink);
+  transform: translateX(-50%);
+  transition: color 180ms ease;
+  white-space: nowrap;
+}
+
+.load-status.is-ready {
+  color: rgba(77, 255, 118, 0.72);
+}
+
+.control-strip {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(0, 1.5fr);
+  gap: 2rem;
+  padding: 1.25rem 0 1.5rem;
+}
+
+.control-intro {
+  display: grid;
+  align-content: start;
+  gap: 0.62rem;
+}
+
+.control-intro p:last-child {
+  max-width: 20rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.55;
+  text-transform: none;
+}
+
+.display-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
+
+.display-controls label {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.display-controls label span {
+  color: var(--muted);
+  font-size: 0.56rem;
+}
+
+.display-controls input {
+  width: 100%;
+  min-width: 0;
+  color: var(--text);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0.45rem 0;
+  outline: 0;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+}
+
+.display-controls input:focus {
+  border-color: var(--green);
+}
+
+.display-controls button {
+  justify-self: start;
+}
+
+@media (max-width: 680px) {
+  .masthead {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .compass-stage {
+    width: min(92vw, 520px);
+    margin-top: 1.5rem;
+  }
+
+  .readout-price {
+    left: 23%;
+  }
+
+  .readout-menu {
+    right: 23%;
+  }
+
+  .control-strip {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

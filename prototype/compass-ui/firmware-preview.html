@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Somewhere — ROM Display Preview</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        background: #050706;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-width: 320px;
+        min-height: 100%;
+        margin: 0;
+        background: #050706;
+      }
+
+      body {
+        display: grid;
+        min-height: 100vh;
+        place-items: center;
+      }
+
+      .rom-preview {
+        width: min(100vw, 480px);
+        aspect-ratio: 1;
+      }
+
+      .rom-preview img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="rom-preview" aria-label="Somewhere ROM display preview">
+      <img
+        src="./firmware-preview.png"
+        width="480"
+        height="480"
+        alt="480 by 480 Somewhere compass display with remaining distance, price, and menu"
+      />
+    </main>
+  </body>
+</html>

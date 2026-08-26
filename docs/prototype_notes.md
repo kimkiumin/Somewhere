@@ -130,3 +130,39 @@ Do not implement these until v0.1 is reviewed.
 ## 9. vNext Source Hierarchy Update
 
 - 2026-07-21: v0.1 remains runnable as historical evidence. Its immediate Reroll and mock-only selection requirements are superseded for vNext by the approved blueprint's guarded recovery flow and evidence-qualified destination selection.
+
+## 10. vNext Hardware Smoke Test
+
+| Date | Change | Hypothesis / limitation |
+|---|---|---|
+| 2026-08-23 | Added `hardware/esp32-s3-touch-lcd-2.1/SomewhereDisplaySmokeTest`. | Hypothesis: the purchased ESP32-S3 round display can show the physical-product information hierarchy with a low-dependency Arduino smoke test before BLE integration. |
+
+The initial version used USB power, initialized the ST7701 RGB panel and CST820 touch controller, showed a short RGB color test, and rendered a rotating compass with temporary color themes and a small built-in ASCII font. That temporary renderer is superseded by the ROM display port in section 12. The repository has no Arduino toolchain or physical board connection, so upload, panel initialization, brightness, touch, and electrical behavior remain to be verified on the purchased unit.
+
+## 11. SVG Compass Display Demo
+
+| Date | Change | Hypothesis / limitation |
+|---|---|---|
+| 2026-08-27 | Added `prototype/compass-ui/`, using the supplied layered SVG as a standalone display UI. | Hypothesis: a fixed three-part readout can remain legible while preserving the analog instrument face. This is a browser demo, not evidence of physical-display readability or sensor accuracy. |
+
+The demo keeps the original artwork unchanged, inlines a copied SVG over HTTP, hides the artwork's static path-based display lettering, and overlays live values in the requested positions: remaining distance at the top, price band at lower left, and representative English menu under the `MENU` label at lower right. The pink needle rotates around the artwork center from the relative destination bearing. CSS defines `Univers Next Pro Thin Condensed` through a local-face declaration that resolves the installed `UniversNextPro-ThinCond` font in the current environment; the font file is not copied into the repository.
+
+Implemented controls: distance, price band, representative English menu, destination bearing, and current heading. Price values normalize `상관없음` to `-` and numeric won values such as `10000원` to `10000`, without a won symbol. Known limitations: the direction values are manual demo inputs, the original display lettering is vector paths rather than editable text, and no real iOS heading, BLE, outdoor contrast, power, or hardware safety behavior is connected yet.
+
+## 12. ROM Firmware Display Port
+
+| Date | Change | Hypothesis / limitation |
+|---|---|---|
+| 2026-08-27 | Ported the SVG compass face to the ESP32-S3 480×480 firmware and generated a bundled `Univers Next Pro Thin Condensed` bitmap font from the user-supplied TTF. | Hypothesis: the browser layout can be evaluated on the purchased display without a runtime browser or font dependency. The local repository has no Arduino toolchain or board connection, so compile, upload, electrical, outdoor-legibility, and power evidence remain open. |
+
+The firmware now draws the supplied SVG's 80 tick segments from `compass_artwork.h`, rotates a 480×480 pink needle around the original center, and renders the fixed display hierarchy: large remaining distance at the top center, price at lower left, and English representative menu at lower right. The distance is the only large value; `PRICE` and `MENU` retain the compact size. `상관없음`/non-numeric price input resolves to `-`, while values such as `10000원` resolve to `10000` with no currency symbol.
+
+The commercial TTF itself is not checked in. `tools/generate_display_assets.py` records the source SHA-256 in the generated header and emits antialiased ASCII glyphs at the four display sizes, including a `?` fallback. This avoids broken runtime font loading while keeping the repository free of the raw font file. `setDisplayState(...)` is the firmware integration seam for the later phone/BLE message path; the current sketch supplies bench defaults only.
+
+## 13. ROM-only Browser Preview
+
+| Date | Change | Hypothesis / limitation |
+|---|---|---|
+| 2026-08-27 | Added `prototype/compass-ui/firmware-preview.html` and its 480×480 snapshot asset. | Hypothesis: reviewers can inspect the ROM-only composition without confusing it with the browser control prototype. The image is a generated visual snapshot, not proof of the physical panel's actual color, brightness, or timing. |
+
+Open `http://127.0.0.1:4173/prototype/compass-ui/firmware-preview.html` after starting the local server. The page intentionally contains only the display image: SVG-derived tick geometry, Thin Condensed text, the enlarged distance, compact price/menu values, and the default 35° needle direction.
