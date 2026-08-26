@@ -61,20 +61,11 @@ struct ConstraintView: View {
                 withAnimation(.snappy(duration: 0.32)) { isShowingConditions = false }
             }
             if layout.isExhibition {
-                HStack(alignment: .top, spacing: layout.columnSpacing) {
-                    VStack(spacing: 12) {
-                        categoryCard
-                        partyCard
-                        locationStatus
-                    }
-                    VStack(spacing: 12) {
-                        walkingCard
-                        budgetCard
-                        if showsAdvanced { advancedCard }
-                        startButton
-                    }
+                VStack(alignment: .leading, spacing: 15) {
+                    conditions
+                    locationStatus
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             } else {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 15) {

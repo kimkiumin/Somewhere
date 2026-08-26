@@ -27,10 +27,15 @@ struct ArrivalView: View {
     @ViewBuilder
     private var adaptiveContent: some View {
         if layout.isExhibition {
-            HStack(alignment: .top, spacing: layout.columnSpacing) {
-                primaryPane.frame(maxWidth: .infinity)
-                secondaryPane.frame(maxWidth: .infinity)
+            VStack(spacing: 16) {
+                arrivalHeader
+                arrivalBody
+                if projection.revealed == true {
+                    completionNote
+                }
             }
+            .frame(maxWidth: layout.arrivalContentMaxWidth)
+            .frame(maxWidth: .infinity, alignment: .top)
         } else {
             VStack(spacing: 16) {
                 primaryPane
@@ -51,16 +56,21 @@ struct ArrivalView: View {
                 arrivalHeader
             }
 
-            if projection.revealed == true {
-                RevealView(projection: projection)
-            } else {
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(SomewherePalette.accent)
-                Text("도착지를 공개하는 중이에요")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(SomewherePalette.ink)
-            }
+            arrivalBody
+        }
+    }
+
+    @ViewBuilder
+    private var arrivalBody: some View {
+        if projection.revealed == true {
+            RevealView(projection: projection)
+        } else {
+            ProgressView()
+                .controlSize(.large)
+                .tint(SomewherePalette.accent)
+            Text("도착지를 공개하는 중이에요")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(SomewherePalette.ink)
         }
     }
 

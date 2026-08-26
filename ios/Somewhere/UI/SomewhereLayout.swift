@@ -10,6 +10,7 @@ struct SomewhereLayoutMetrics: Equatable, Sendable {
     let contentMaxWidth: CGFloat
     let horizontalPadding: CGFloat
     let compassDiameter: CGFloat
+    let arrivalContentMaxWidth: CGFloat
     let sheetMaxWidth: CGFloat
     let columnSpacing: CGFloat
 
@@ -24,6 +25,7 @@ struct SomewhereLayoutMetrics: Equatable, Sendable {
                 contentMaxWidth: contentWidth,
                 horizontalPadding: 20,
                 compassDiameter: min(360, contentWidth),
+                arrivalContentMaxWidth: contentWidth,
                 sheetMaxWidth: min(520, contentWidth),
                 columnSpacing: 16
             )
@@ -31,12 +33,13 @@ struct SomewhereLayoutMetrics: Equatable, Sendable {
 
         let padding: CGFloat = width >= 900 ? 52 : 36
         let contentWidth = min(1_080, width - padding * 2)
-        let widthBound = min(520, max(410, contentWidth * 0.64))
+        let compassDiameter = contentWidth * 0.62
         return SomewhereLayoutMetrics(
             mode: .exhibition,
             contentMaxWidth: contentWidth,
             horizontalPadding: padding,
-            compassDiameter: min(widthBound, max(410, height * 0.44)),
+            compassDiameter: compassDiameter,
+            arrivalContentMaxWidth: contentWidth * 0.80,
             sheetMaxWidth: 620,
             columnSpacing: 28
         )

@@ -51,16 +51,14 @@ struct CompassView: View {
             }
             .frame(maxHeight: .infinity)
         } else {
-            HStack(alignment: .center, spacing: layout.columnSpacing) {
-                VStack(spacing: 10) {
-                    if !usesCompactGuidanceLayout { phaseHeader }
-                    compassDial(size: layout.compassDiameter)
-                }
-                .frame(maxWidth: .infinity)
-                VStack(spacing: 14) { directionSummary; distanceCard; safetyNote }
-                    .frame(width: 300)
+            VStack(spacing: 14) {
+                if !usesCompactGuidanceLayout { phaseHeader }
+                directionSummary
+                compassDial(size: layout.compassDiameter)
+                distanceCard
+                safetyNote
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
     }
 
@@ -254,6 +252,7 @@ struct CompassView: View {
                 }
             }
         }
+        .accessibilityIdentifier("somewhere.guidance-distance")
     }
 
     private var directionSummary: some View {
