@@ -195,6 +195,7 @@ test("strong arrival retains one raw feedback capability across a context restar
   expect(JSON.stringify(await restarted.storageState({ indexedDB: true }))).not.toContain("fb_v1.");
   await page.reload();
   await expect(page.getByRole("heading", { name: "이 장소는 어땠나요?" })).toHaveCount(0);
+  expect(await control(page, 0, false)).toMatchObject({ status: 200 });
   await restarted.close();
 });
 
