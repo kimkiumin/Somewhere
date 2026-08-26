@@ -39,6 +39,10 @@ Apple Silicon and installs it into the CLI's local tool directory.
 
 ## Flashing over USB
 
+The commands below are the pinned macOS path. Windows collaborators should use
+the WSL-free PowerShell setup, explicit COM-port upload, and troubleshooting in
+the [Windows collaboration handoff](windows-collaboration-handoff.md).
+
 From the repository root:
 
 ```sh

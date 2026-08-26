@@ -61,6 +61,10 @@ For the current native implementation, use these two focused documents:
 - [Native iOS collaboration handoff](operations/native-ios-collaboration-handoff.md)
   gives a Mac/Xcode quickstart, source map, deterministic demo modes, real local
   Worker test path, physical-iPhone boundary, and an AI contributor checklist.
+- [Windows collaboration handoff](operations/windows-collaboration-handoff.md)
+  gives a PowerShell-only repository and ESP32 workflow, defines the Windows
+  smoke-test boundary, and explains when work must move to Mac, Ubuntu, or a
+  physical iPhone.
 
 ## Historical v0.2 application
 

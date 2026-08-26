@@ -23,12 +23,24 @@ required. The supported board FQBN is:
 esp32:esp32:waveshare_esp32_s3_touch_lcd_21
 ```
 
+On Windows, use the WSL-free PowerShell wrapper instead of these macOS-oriented
+shell commands. The one-time setup and explicit COM-port workflow are in the
+[Windows collaboration handoff](../../docs/operations/windows-collaboration-handoff.md).
+That wrapper restores the exact generated image and font sources from the
+checked-in integrity-verified `generated-assets-v1.br` bundle, so a clean
+Windows clone does not need Python or the font/image generation dependencies.
+
 `firmware:assets` regenerates the 520px cropped LVGL compass shell and needle
 from the shared iOS artwork. The board crop removes the transparent outer
 decoration so the circular body reaches the display edges; the image is
 intentionally clipped by the 480×480 face. The dial owns most of the display
 while status, distance, and touch actions sit on top as small rounded overlays
 rather than separate cards.
+
+After an intentional artwork or font change on the maintainer toolchain, run
+`bun run firmware:assets` and then
+`bun scripts/firmware/package-board-assets.mjs` so clean Windows clones receive
+the same generated inputs.
 
 ## USB flashing and diagnostics
 

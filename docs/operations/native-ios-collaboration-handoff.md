@@ -7,6 +7,11 @@ what to read, where the implementation lives, and how to reproduce the app on a
 Mac. It cannot override the product authority described in
 [`../README.md`](../README.md).
 
+For a collaborator on Windows, start with the
+[Windows collaboration handoff](windows-collaboration-handoff.md). It separates
+source work and ESP32 PowerShell tooling from the Xcode, Simulator, signing, and
+physical-iPhone checks that still need a Mac.
+
 ## Start here
 
 Read in this order:

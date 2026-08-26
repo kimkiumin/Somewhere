@@ -11,7 +11,10 @@ Roll the compass!는 사용자가 정한 최소 조건 안에서 검증된 목�
 [`docs/product/roll-the-compass-ios-requirements.md`](docs/product/roll-the-compass-ios-requirements.md),
 Mac/Xcode 개발과 AI 협업 절차는
 [`docs/operations/native-ios-collaboration-handoff.md`](docs/operations/native-ios-collaboration-handoff.md)를
-먼저 확인하세요.
+먼저 확인하세요. Windows에서 저장소·iOS 소스·ESP32 보드 작업을 나눠
+진행할 때는 WSL 없는 PowerShell 경로를 정리한
+[`docs/operations/windows-collaboration-handoff.md`](docs/operations/windows-collaboration-handoff.md)를
+사용하세요.
 
 ```text
 최소 조건 → 숨겨진 목적지 하나를 한 번에 확정 → 경로 기반 안내
@@ -92,6 +95,12 @@ bun run verify:release
 `bun run verify:blueprint-status`는 서비스 저장소, 승인된 청사진 전체,
 공개 출시를 서로 다른 게이트로 계산합니다. 현재 정상 출력은 각각
 `PASS`, `BLOCK`, `BLOCK`입니다.
+
+Windows 협업자는 먼저 `bun run verify:windows`로 플랫폼 안전 범위를
+확인할 수 있습니다. 이 명령은 전체 Linux 운영·릴리스 또는 Xcode/실기기
+검증을 대체하지 않습니다. 범위와 PowerShell 보드 플래시 방법은
+[Windows 협업 인수인계](docs/operations/windows-collaboration-handoff.md)에
+정리되어 있습니다.
 
 로컬 백엔드와 현장 QA 절차는
 [V2 파일럿 백엔드](docs/operations/v2-pilot-backend.md)와
