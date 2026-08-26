@@ -7,3 +7,4 @@ esp-lib-utils=0.2.0
 lvgl=8.4.0
 ArduinoJson=7.4.3
 XcodeGen=2.46.0
+Pillow=11.3.0 (scripts/firmware/requirements.txt)

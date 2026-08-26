@@ -11,13 +11,17 @@ From the repository root:
 ```sh
 bun run firmware:setup
 bun run firmware:assets
+bun run firmware:test
 bun run firmware:ios
 bun run firmware:compile
 ```
 
 The setup is pinned in `dependencies.lock` and installs Arduino CLI and XcodeGen
-under `.tools/`, with Arduino data under `.local-artifacts/`. Homebrew is not
-required. The supported board FQBN is:
+under `.tools/`, with Arduino data under `.local-artifacts/`. It also creates
+`.tools/firmware-python` and installs the exact `Pillow==11.3.0` from
+`scripts/firmware/requirements.txt`; `bun run firmware:assets` refuses to use a
+global Pillow installation. Homebrew is not required. The supported board FQBN
+is:
 
 ```text
 esp32:esp32:waveshare_esp32_s3_touch_lcd_21
@@ -54,15 +58,24 @@ The port can change after a reset. If more than one modem is connected, set
 State and event messages are newline-delimited compact JSON. The board rejects
 unknown versions/actions, invalid numbers, oversized frames, and any payload
 that does not contain the safe state fields. Destination identity is not part
-of the board contract.
+of the board contract. State sequences are strictly increasing and positive
+within one connection epoch. Disconnect clears the partial line, queued state,
+last accepted state, action authority, and visible direction; a reconnect
+therefore starts stale and accepts a low positive sequence again.
+
+The portable implementation in `physical_compass_protocol.*` is compiled by
+both the Arduino sketch and `bun run firmware:test`. It owns UTF-8 validation,
+40-byte display boundaries, newline reassembly/coalescing, state freshness,
+four-action guards, and event chunking. Notifications use `MTU - 3` bytes when
+the peer MTU is known and a conservative 20-byte payload fallback otherwise.
 
 ## Display behavior
 
 The official Espressif `ESP32_Display_Panel` preset initializes the 480×480
 RGB LCD and CST820 touch controller. The LVGL UI shows connection status,
 phone-computed direction only when confidence is `credible`, approximate
-distance, safe category/price cues, and only the actions advertised by the
-phone. A stale state hides the arrow and disables actions.
+distance, safe Korean category/price cues, and only the actions advertised by
+the phone. A stale or disconnected state hides the arrow and disables actions.
 
 Wi-Fi and the QMI8658 IMU are intentionally not used in the journey path.
 Wi-Fi is reserved for a later OTA/diagnostics milestone, and the IMU is not a

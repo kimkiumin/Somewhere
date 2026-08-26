@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_ROOT/../.." && pwd)"
 TOOL_ROOT="$PROJECT_ROOT/.tools"
+PYTHON_ROOT="$TOOL_ROOT/firmware-python"
+PYTHON_BIN="$PYTHON_ROOT/bin/python"
 ARDUINO_CLI_VERSION="1.5.1"
 ARDUINO_ESP32_VERSION="3.3.11"
 XCODEGEN_VERSION="2.46.0"
@@ -19,6 +21,11 @@ if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
     printf '%s\n' "This pinned setup currently targets Apple Silicon macOS (Darwin arm64)." >&2
     exit 1
 fi
+
+if [[ ! -x "$PYTHON_BIN" ]]; then
+    python3 -m venv "$PYTHON_ROOT"
+fi
+"$PYTHON_BIN" -m pip install --disable-pip-version-check --requirement "$SCRIPT_ROOT/requirements.txt"
 
 download_and_verify() {
     local download_url="$1"

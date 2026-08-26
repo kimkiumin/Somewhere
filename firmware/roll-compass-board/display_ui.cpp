@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "compass_assets.h"
+#include "display_copy.h"
 #include "lvgl_v8_port.h"
 
 namespace {
@@ -44,7 +45,7 @@ lv_obj_t *compassNeedle = nullptr;
 lv_obj_t *sparkles[4] = {nullptr, nullptr, nullptr, nullptr};
 lv_obj_t *distanceCaption = nullptr;
 lv_obj_t *distanceValue = nullptr;
-lv_obj_t *clueValue = nullptr;
+lv_obj_t *categoryValue = nullptr;
 lv_obj_t *priceLabel = nullptr;
 lv_obj_t *buttons[4] = {nullptr, nullptr, nullptr, nullptr};
 lv_obj_t *buttonLabels[4] = {nullptr, nullptr, nullptr, nullptr};
@@ -52,12 +53,13 @@ lv_obj_t *buttonLabels[4] = {nullptr, nullptr, nullptr, nullptr};
 physical_compass::BoardState currentState;
 PhysicalCompassEventCallback eventCallback = nullptr;
 bool connected = false;
+bool hasState = false;
 uint32_t lastStateMs = 0;
 float currentNeedleAngle = 0.0f;
 float targetNeedleAngle = 0.0f;
 
 const char *const actionNames[] = {"stop", "continue", "confirm-stop", "reveal"};
-const char *const actionLabels[] = {"STOP", "CONTINUE", "CONFIRM", "REVEAL"};
+const char *const actionLabels[] = {"정지", "계속", "정지 확인", "공개"};
 
 lv_obj_t *makeCard(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coord_t width, lv_coord_t height) {
     lv_obj_t *card = lv_obj_create(parent);
@@ -124,32 +126,7 @@ float shortestDelta(float from, float to) {
 }
 
 bool stateFresh(uint32_t nowMs) {
-    return connected && lastStateMs != 0 && nowMs - lastStateMs < 6000;
-}
-
-String printableMenu(const String &value, uint8_t index) {
-    for (size_t position = 0; position < value.length(); ++position) {
-        if (static_cast<uint8_t>(value[position]) >= 0x80) {
-            return String("CLUE ") + String(index + 1);
-        }
-    }
-    return value;
-}
-
-String priceText(const String &value) {
-    if (value == "low") return "LIGHT SPOILS";
-    if (value == "medium") return "MID SPOILS";
-    if (value == "high") return "RICH SPOILS";
-    return value.isEmpty() ? "PRICE UNKNOWN" : String("PRICE ") + value;
-}
-
-const char *phaseStatus(bool fresh, bool credible) {
-    if (!connected) return "CONNECT THE COMPASS";
-    if (!fresh) return "WAITING FOR YOUR CLUE";
-    if (currentState.revealed) return "TREASURE FOUND";
-    if (currentState.phase == "near") return "THE TREASURE IS NEAR";
-    if (credible) return "FOLLOW THE RED NEEDLE";
-    return "KEEP THE MAP CLOSE";
+    return connected && hasState && nowMs - lastStateMs < physical_compass::kStaleAfterMs;
 }
 
 void setButtonVisible(uint8_t index, bool visible) {
@@ -180,7 +157,8 @@ void styleButton(uint8_t index, bool visible) {
 
 void updateConnectionPill() {
     if (connectionPill == nullptr || connectionLabel == nullptr) return;
-    lv_label_set_text(connectionLabel, connected ? "BLE CONNECTED" : "BLE WAITING");
+    const std::string text = physical_compass::display::connectionText(connected);
+    lv_label_set_text(connectionLabel, text.c_str());
     lv_obj_set_style_bg_color(connectionPill, connected ? kSageSoft : kOxbloodSoft, LV_PART_MAIN);
     lv_obj_set_style_border_width(connectionPill, 1, LV_PART_MAIN);
     lv_obj_set_style_border_color(connectionPill, connected ? kSage : kOxblood, LV_PART_MAIN);
@@ -194,7 +172,14 @@ void renderState() {
     const bool credible = fresh && currentState.confidence == "credible" && currentState.hasBearing;
 
     updateConnectionPill();
-    lv_label_set_text(heroStatus, phaseStatus(fresh, credible));
+    const std::string status = physical_compass::display::phaseStatus(
+        fresh,
+        credible,
+        currentState.revealed,
+        currentState.phase == "near",
+        connected
+    );
+    lv_label_set_text(heroStatus, status.c_str());
     lv_obj_set_style_text_color(heroStatus, currentState.revealed ? kSage : credible ? kOxblood : kMutedInk, LV_PART_MAIN);
 
     if (fresh && currentState.hasBearing) {
@@ -210,10 +195,10 @@ void renderState() {
 
     if (!fresh) {
         lv_label_set_text(distanceValue, "-- m");
-        lv_label_set_text(distanceCaption, "TREASURE DISTANCE");
+        lv_label_set_text(distanceCaption, "남은 거리");
     } else if (currentState.revealed && !currentState.hasDistance) {
-        lv_label_set_text(distanceValue, "FOUND");
-        lv_label_set_text(distanceCaption, "JOURNEY COMPLETE");
+        lv_label_set_text(distanceValue, "도착");
+        lv_label_set_text(distanceCaption, "여정 완료");
     } else if (currentState.hasDistance) {
         char distance[32];
         if (currentState.distanceM >= 1000.0f) {
@@ -222,21 +207,20 @@ void renderState() {
             snprintf(distance, sizeof(distance), "%.0f m", currentState.distanceM);
         }
         lv_label_set_text(distanceValue, distance);
-        lv_label_set_text(distanceCaption, "REMAINING DISTANCE");
+        lv_label_set_text(distanceCaption, "남은 거리");
     } else {
         lv_label_set_text(distanceValue, "-- m");
-        lv_label_set_text(distanceCaption, "REMAINING DISTANCE");
+        lv_label_set_text(distanceCaption, "남은 거리");
     }
 
     if (fresh && currentState.menuCount > 0) {
-        String clue = printableMenu(currentState.menus[0], 0);
-        if (currentState.menuCount > 1) clue += String(" / ") + printableMenu(currentState.menus[1], 1);
-        lv_label_set_text(clueValue, clue.c_str());
-        String price = priceText(currentState.priceBand);
+        const std::string menu = physical_compass::display::menuText(currentState);
+        lv_label_set_text(categoryValue, menu.c_str());
+        const std::string price = physical_compass::display::priceText(currentState.priceBand);
         lv_label_set_text(priceLabel, price.c_str());
     } else {
-        lv_label_set_text(clueValue, "HIDDEN CLUE");
-        lv_label_set_text(priceLabel, "SPOILS UNKNOWN");
+        lv_label_set_text(categoryValue, "분류 대기");
+        lv_label_set_text(priceLabel, "가격 미정");
     }
 
     for (uint8_t index = 0; index < 4; ++index) {
@@ -366,13 +350,13 @@ void displayUiBegin() {
     lv_obj_set_style_shadow_opa(infoPill, LV_OPA_20, LV_PART_MAIN);
 
     distanceCaption = makeLabel(infoPill, 14, 5, 136, 14, &lv_font_montserrat_10, kMutedInk);
-    lv_label_set_text(distanceCaption, "REMAINING");
+    lv_label_set_text(distanceCaption, "남은 거리");
     distanceValue = makeLabel(infoPill, 14, 18, 136, 30, &lv_font_montserrat_22, kInk);
     lv_label_set_text(distanceValue, "-- m");
-    clueValue = makeLabel(infoPill, 154, 8, 196, 18, &lv_font_montserrat_12, kInk);
-    lv_label_set_text(clueValue, "HIDDEN CLUE");
+    categoryValue = makeLabel(infoPill, 154, 8, 196, 18, &lv_font_montserrat_12, kInk);
+    lv_label_set_text(categoryValue, "분류 대기");
     priceLabel = makeLabel(infoPill, 154, 28, 196, 14, &lv_font_montserrat_10, kBrass);
-    lv_label_set_text(priceLabel, "SPOILS UNKNOWN");
+    lv_label_set_text(priceLabel, "가격 미정");
 
     for (uint8_t index = 0; index < 4; ++index) {
         buttons[index] = lv_btn_create(screen);
@@ -406,6 +390,7 @@ void displayUiBegin() {
 
 void displayUiSetState(const physical_compass::BoardState &state) {
     currentState = state;
+    hasState = true;
     lastStateMs = millis();
     if (currentState.hasBearing) targetNeedleAngle = normalizeDegrees(currentState.bearingDegrees);
     if (lvgl_port_lock(-1)) {
@@ -417,6 +402,13 @@ void displayUiSetState(const physical_compass::BoardState &state) {
 void displayUiSetConnection(bool value) {
     if (connected == value) return;
     connected = value;
+    if (!connected) {
+        currentState = physical_compass::BoardState();
+        hasState = false;
+        lastStateMs = 0;
+        currentNeedleAngle = 0.0f;
+        targetNeedleAngle = 0.0f;
+    }
     if (lvgl_port_lock(-1)) {
         renderState();
         lvgl_port_unlock();
@@ -425,7 +417,7 @@ void displayUiSetConnection(bool value) {
 
 void displayUiTick(uint32_t nowMs) {
     if (lvgl_port_lock(-1)) {
-        if (lastStateMs != 0 && nowMs - lastStateMs > 6000 && compassNeedle != nullptr &&
+        if (hasState && nowMs - lastStateMs >= physical_compass::kStaleAfterMs && compassNeedle != nullptr &&
             !lv_obj_has_flag(compassNeedle, LV_OBJ_FLAG_HIDDEN)) {
             renderState();
         }

@@ -19,44 +19,24 @@ BLEServer *bleServer = nullptr;
 BLECharacteristic *stateCharacteristic = nullptr;
 BLECharacteristic *eventCharacteristic = nullptr;
 SemaphoreHandle_t pendingStateMutex = nullptr;
-String pendingStateFrame;
-String stateReassemblyBuffer;
-bool pendingStateReady = false;
 volatile bool bleConnected = false;
-physical_compass::BoardState currentState;
-
-void queueStateChunk(const uint8_t *data, size_t length) {
-    if (pendingStateMutex == nullptr || data == nullptr || length == 0 || length > physical_compass::kMaxFrameBytes) return;
-    if (xSemaphoreTake(pendingStateMutex, pdMS_TO_TICKS(10)) != pdTRUE) return;
-    if (stateReassemblyBuffer.length() + length > physical_compass::kMaxFrameBytes) {
-        stateReassemblyBuffer = "";
-    }
-    stateReassemblyBuffer.reserve(physical_compass::kMaxFrameBytes);
-    for (size_t index = 0; index < length; ++index) {
-        stateReassemblyBuffer += static_cast<char>(data[index]);
-    }
-
-    int newlineIndex = stateReassemblyBuffer.indexOf('\n');
-    while (newlineIndex >= 0) {
-        const String completeFrame = stateReassemblyBuffer.substring(0, newlineIndex);
-        stateReassemblyBuffer.remove(0, newlineIndex + 1);
-        newlineIndex = stateReassemblyBuffer.indexOf('\n');
-        if (completeFrame.isEmpty()) continue;
-
-        pendingStateFrame = completeFrame;
-        pendingStateFrame.reserve(physical_compass::kMaxFrameBytes);
-        pendingStateReady = true;
-    }
-    xSemaphoreGive(pendingStateMutex);
-}
+physical_compass::BoardSession boardSession;
 
 class ServerCallbacks final : public BLEServerCallbacks {
     void onConnect(BLEServer *) override {
+        if (pendingStateMutex != nullptr && xSemaphoreTake(pendingStateMutex, portMAX_DELAY) != pdTRUE) return;
+        boardSession.beginConnection();
         bleConnected = true;
+        if (pendingStateMutex != nullptr) xSemaphoreGive(pendingStateMutex);
+        displayUiSetConnection(true);
     }
 
     void onDisconnect(BLEServer *) override {
+        if (pendingStateMutex != nullptr && xSemaphoreTake(pendingStateMutex, portMAX_DELAY) != pdTRUE) return;
+        boardSession.disconnect();
         bleConnected = false;
+        if (pendingStateMutex != nullptr) xSemaphoreGive(pendingStateMutex);
+        displayUiSetConnection(false);
         BLEDevice::startAdvertising();
     }
 };
@@ -64,21 +44,34 @@ class ServerCallbacks final : public BLEServerCallbacks {
 class StateCallbacks final : public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *characteristic) override {
         const String value = characteristic->getValue();
-        queueStateChunk(reinterpret_cast<const uint8_t *>(value.c_str()), value.length());
+        if (pendingStateMutex == nullptr || value.isEmpty()) return;
+        if (xSemaphoreTake(pendingStateMutex, pdMS_TO_TICKS(10)) != pdTRUE) return;
+        boardSession.appendStateChunk(reinterpret_cast<const uint8_t *>(value.c_str()), value.length());
+        xSemaphoreGive(pendingStateMutex);
     }
 };
 
 void sendPhysicalCompassEvent(const char *action, uint32_t sequence) {
     if (!bleConnected || eventCharacteristic == nullptr) return;
-    const String frame = physical_compass::encodeEvent(action, sequence);
-    if (frame.isEmpty()) return;
-    eventCharacteristic->setValue(reinterpret_cast<const uint8_t *>(frame.c_str()), frame.length());
-    eventCharacteristic->notify();
+    const std::string frame = physical_compass::encodeEvent(action, sequence);
+    if (frame.empty()) return;
+    const uint16_t connectionId = bleServer == nullptr ? 0 : bleServer->getConnId();
+    const uint16_t negotiatedMtu = bleServer == nullptr ? 0 : bleServer->getPeerMTU(connectionId);
+    const std::vector<std::string> chunks = physical_compass::chunkEventFrame(frame, negotiatedMtu);
+    for (const std::string &chunk : chunks) {
+        eventCharacteristic->setValue(reinterpret_cast<const uint8_t *>(chunk.data()), chunk.size());
+        eventCharacteristic->notify();
+    }
     Serial.printf("BLE event: %s\n", action);
 }
 
 void onTouchAction(const char *action, uint32_t sequence) {
-    if (physical_compass::hasAction(currentState, action)) {
+    bool allowed = false;
+    if (pendingStateMutex != nullptr && xSemaphoreTake(pendingStateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        allowed = boardSession.canEmitAction(action, sequence, millis());
+        xSemaphoreGive(pendingStateMutex);
+    }
+    if (allowed) {
         sendPhysicalCompassEvent(action, sequence);
     }
 }
@@ -112,25 +105,16 @@ void initializeBle() {
 
 void applyPendingState() {
     if (pendingStateMutex == nullptr) return;
-    String frame;
+    physical_compass::BoardState next;
+    bool accepted = false;
     if (xSemaphoreTake(pendingStateMutex, 0) == pdTRUE) {
-        if (pendingStateReady) {
-            frame = pendingStateFrame;
-            pendingStateFrame = "";
-            pendingStateReady = false;
-        }
+        accepted = boardSession.takePendingState(millis(), next);
         xSemaphoreGive(pendingStateMutex);
     }
-    if (frame.isEmpty()) return;
+    if (!accepted) return;
 
-    physical_compass::BoardState next;
-    if (!physical_compass::parseStateFrame(reinterpret_cast<const uint8_t *>(frame.c_str()), frame.length(), next)) {
-        Serial.println("BLE state rejected");
-        return;
-    }
-    currentState = next;
-    displayUiSetState(currentState);
-    Serial.printf("BLE state: seq=%lu phase=%s confidence=%s\n", static_cast<unsigned long>(currentState.sequence), currentState.phase.c_str(), currentState.confidence.c_str());
+    displayUiSetState(next);
+    Serial.printf("BLE state: seq=%lu phase=%s confidence=%s\n", static_cast<unsigned long>(next.sequence), next.phase.c_str(), next.confidence.c_str());
 }
 
 }  // namespace
@@ -141,8 +125,6 @@ void setup() {
     Serial.println("Roll Compass board boot");
 
     pendingStateMutex = xSemaphoreCreateMutex();
-    pendingStateFrame.reserve(physical_compass::kMaxFrameBytes);
-    stateReassemblyBuffer.reserve(physical_compass::kMaxFrameBytes);
     displayUiSetEventCallback(onTouchAction);
 
     Serial.println("Initializing display panel");
