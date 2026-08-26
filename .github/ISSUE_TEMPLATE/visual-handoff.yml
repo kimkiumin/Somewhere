@@ -1,0 +1,147 @@
+name: Visual handoff
+description: Hand off one reviewable visual or interaction decision for the iPhone app, iPad app, or circular LCD.
+title: "[Visual handoff] "
+labels:
+  - design-handoff
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Submit one coherent decision per issue. Link the exact source commit and preview evidence; do not replace the hidden-destination V2 product boundary.
+
+  - type: input
+    id: source_sha
+    attributes:
+      label: Source commit SHA
+      description: Full 40-character Git commit used for the screenshot, artifact, or design.
+      placeholder: 0123456789abcdef0123456789abcdef01234567
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      description: Select the implementation surface affected by this decision.
+      options:
+        - iPhone app
+        - iPad app
+        - 480x480 circular LCD
+        - Cross-surface behavior
+    validations:
+      required: true
+
+  - type: input
+    id: state
+    attributes:
+      label: Product state
+      description: Name the exact state, such as Home, Guiding, Near, Paused, Arrived, or Revealed.
+      placeholder: Guiding
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and viewport
+      description: Include model and logical or pixel dimensions.
+      placeholder: iPad Pro 11-inch 2nd generation, portrait
+    validations:
+      required: true
+
+  - type: dropdown
+    id: orientation
+    attributes:
+      label: Orientation
+      options:
+        - Portrait
+        - Portrait upside down
+        - Circular display
+        - Not applicable
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot, preview, or asset reference
+      description: Drag files here or link the GitHub artifact, Appetize build, Figma frame, or Drive file. Include a before and after reference when possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: interaction
+    attributes:
+      label: User interaction
+      description: State what the user taps, drags, rotates, or waits for.
+      placeholder: Tap the compass hub once from Home.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_result
+    attributes:
+      label: Expected result
+      description: Describe the visible state change and any backend, BLE, haptic, or animation consequence.
+    validations:
+      required: true
+
+  - type: textarea
+    id: geometry
+    attributes:
+      label: Geometry and spacing
+      description: Give frames, safe areas, alignment, padding, radius, and responsive behavior rather than only saying “make it bigger.”
+    validations:
+      required: true
+
+  - type: textarea
+    id: typography
+    attributes:
+      label: Typography and copy
+      description: Include the exact text, language, font role, size, weight, line count, and truncation rule.
+    validations:
+      required: true
+
+  - type: textarea
+    id: color
+    attributes:
+      label: Color and finish
+      description: Include tokens or color values, contrast intent, texture, opacity, and state changes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: asset
+    attributes:
+      label: Asset source and rights
+      description: Link the editable source and export, identify the owner, and state whether replacement of the existing antique shell or red needle is intended.
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Product and implementation constraints
+      description: Confirm the hidden-destination boundary, V2 backend, Release GPS/BLE path, no-scroll guiding screen, and any circular safe-area constraints that must remain.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0 — blocks exhibition
+        - P1 — required before handoff
+        - P2 — polish
+        - P3 — later exploration
+    validations:
+      required: true
+
+  - type: textarea
+    id: mac_verification
+    attributes:
+      label: Mac and physical-device verification request
+      description: List the exact Xcode Simulator, iPhone/iPad, Core Location, CoreBluetooth, or performance checks the Mac owner must run.
+    validations:
+      required: true

@@ -1,0 +1,137 @@
+name: Roll the compass iOS browser preview
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - codex/ipad-board-integration
+    paths:
+      - ios/**
+      - scripts/ios/**
+      - docs/assets/**
+      - .github/workflows/ios-preview.yml
+  pull_request:
+    paths:
+      - ios/**
+      - scripts/ios/**
+      - docs/assets/**
+      - .github/workflows/ios-preview.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: somewhere-ios-preview-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    name: Build unsigned exhibition Simulator artifact
+    runs-on: macos-15
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pinned Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install frozen dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate native source and preview contract
+        run: bun run verify:ios-source
+
+      - name: Build pinned XcodeGen
+        env:
+          XCODEGEN_SHA: 82c6ab9bbd5b6075fc0887d897733fc0c4ffc9ab
+        run: |
+          git init "$RUNNER_TEMP/XcodeGen"
+          git -C "$RUNNER_TEMP/XcodeGen" remote add origin https://github.com/yonaskolb/XcodeGen.git
+          git -C "$RUNNER_TEMP/XcodeGen" fetch --depth 1 origin "$XCODEGEN_SHA"
+          git -C "$RUNNER_TEMP/XcodeGen" checkout --detach FETCH_HEAD
+          swift build --package-path "$RUNNER_TEMP/XcodeGen" -c release
+          "$RUNNER_TEMP/XcodeGen/.build/release/xcodegen" --version | grep '2.42.0'
+
+      - name: Generate exact Xcode project
+        run: |
+          "$RUNNER_TEMP/XcodeGen/.build/release/xcodegen" generate --spec ios/project.yml
+          xcodebuild -list -project ios/Somewhere.xcodeproj
+
+      - name: Build unsigned exhibition preview
+        id: build-preview
+        env:
+          SOMEWHERE_API_ORIGIN: https://example.invalid
+          SOMEWHERE_EXHIBITION_DEMO: "YES"
+        run: |
+          xcodebuild build \
+            -project ios/Somewhere.xcodeproj \
+            -scheme Somewhere \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/SomewherePreviewDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            SOMEWHERE_API_ORIGIN="$SOMEWHERE_API_ORIGIN" \
+            SOMEWHERE_EXHIBITION_DEMO="$SOMEWHERE_EXHIBITION_DEMO" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES
+
+      - name: Verify and package preview
+        id: package-preview
+        env:
+          SOMEWHERE_API_ORIGIN: https://example.invalid
+          SOMEWHERE_EXHIBITION_DEMO: "YES"
+        run: |
+          app_path="$RUNNER_TEMP/SomewherePreviewDerivedData/Build/Products/Debug-iphonesimulator/Somewhere.app"
+          output_dir="$RUNNER_TEMP/somewhere-ios-preview"
+          archive_path="$output_dir/Somewhere-iOS-Simulator.zip"
+          manifest_path="$output_dir/preview-manifest.json"
+          executable_path="$app_path/Somewhere"
+
+          test -d "$app_path"
+          test -f "$executable_path"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :SomewhereAPIOrigin' "$app_path/Info.plist")" = "$SOMEWHERE_API_ORIGIN"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :SomewhereExhibitionDemo' "$app_path/Info.plist")" = "$SOMEWHERE_EXHIBITION_DEMO"
+
+          architecture="$(lipo -archs "$executable_path")"
+          test "$architecture" = "arm64"
+          bundle_identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Info.plist")"
+          sdk_version="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+
+          mkdir -p "$output_dir"
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive_path"
+          archive_sha="$(shasum -a 256 "$archive_path" | awk '{print $1}')"
+
+          jq -n \
+            --arg finalSha "$GITHUB_SHA" \
+            --arg sourceTree "$(git rev-parse HEAD^{tree})" \
+            --arg configuration "Debug" \
+            --arg sdk "iphonesimulator-$sdk_version" \
+            --arg architecture "$architecture" \
+            --arg bundleIdentifier "$bundle_identifier" \
+            --arg exhibitionFlag "$SOMEWHERE_EXHIBITION_DEMO" \
+            --arg apiOrigin "$SOMEWHERE_API_ORIGIN" \
+            --arg archiveSha256 "sha256:$archive_sha" \
+            '{schemaVersion:1,kind:"ios-simulator-browser-preview",finalSha:$finalSha,sourceTree:$sourceTree,configuration:$configuration,sdk:$sdk,architecture:$architecture,bundleIdentifier:$bundleIdentifier,exhibitionFlag:$exhibitionFlag,apiOrigin:$apiOrigin,archiveSha256:$archiveSha256,signing:"unsigned",distribution:"manual-browser-preview",physicalDeviceEvidence:false}' \
+            > "$manifest_path"
+
+          jq -e '
+            .configuration == "Debug" and
+            .architecture == "arm64" and
+            .exhibitionFlag == "YES" and
+            .apiOrigin == "https://example.invalid" and
+            .signing == "unsigned" and
+            .physicalDeviceEvidence == false
+          ' "$manifest_path" >/dev/null
+
+      - name: Upload Simulator preview
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: roll-compass-ios-preview-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/somewhere-ios-preview/Somewhere-iOS-Simulator.zip
+            ${{ runner.temp }}/somewhere-ios-preview/preview-manifest.json

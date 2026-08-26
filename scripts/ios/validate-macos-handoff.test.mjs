@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { parse } from "yaml";
 
 const repositoryRoot = resolve(import.meta.dir, "../..");
 const read = (path) => readFile(resolve(repositoryRoot, path), "utf8");
@@ -73,5 +74,102 @@ describe("GitHub to macOS handoff contract", () => {
     expect(workflow).toContain("if-no-files-found: ignore");
     expect(workflow).toContain("app/src/data/curated-destinations.json");
     expect(workflow).toContain("participant(Name|Email)|contactEmail");
+  });
+
+  test("publishes one unsigned exhibition Simulator build for Windows review", async () => {
+    const source = await read(".github/workflows/ios-preview.yml");
+    const workflow = parse(source);
+
+    expect(workflow.permissions).toEqual({ contents: "read" });
+    expect(workflow.on.workflow_dispatch).toEqual({});
+    expect(workflow.on.pull_request.paths).toContain("ios/**");
+    expect(workflow.on.push.branches).toContain("codex/ipad-board-integration");
+    expect(workflow.on.push.paths).toContain("ios/**");
+
+    const preview = workflow.jobs.preview;
+    expect(preview["runs-on"]).toBe("macos-15");
+
+    const checkout = preview.steps.find((step) => step.name === "Check out exact source");
+    const setupBun = preview.steps.find((step) => step.name === "Set up pinned Bun");
+    expect(checkout.uses).toBe("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1");
+    expect(setupBun.uses).toBe("oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6");
+
+    const build = preview.steps.find((step) => step.id === "build-preview");
+    expect(build.env).toEqual({
+      SOMEWHERE_API_ORIGIN: "https://example.invalid",
+      SOMEWHERE_EXHIBITION_DEMO: "YES",
+    });
+    for (const fragment of [
+      "-sdk iphonesimulator",
+      "-configuration Debug",
+      "CODE_SIGNING_ALLOWED=NO",
+      'SOMEWHERE_API_ORIGIN="$SOMEWHERE_API_ORIGIN"',
+      'SOMEWHERE_EXHIBITION_DEMO="$SOMEWHERE_EXHIBITION_DEMO"',
+      "ARCHS=arm64",
+    ]) {
+      expect(build.run).toContain(fragment);
+    }
+
+    const packageStep = preview.steps.find((step) => step.id === "package-preview");
+    for (const fragment of [
+      "SomewhereAPIOrigin",
+      "SomewhereExhibitionDemo",
+      "finalSha",
+      "sourceTree",
+      "configuration",
+      "architecture",
+      "bundleIdentifier",
+      "archiveSha256",
+    ]) {
+      expect(packageStep.run).toContain(fragment);
+    }
+
+    const upload = preview.steps.find((step) => step.name === "Upload Simulator preview");
+    expect(upload.uses).toBe("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a");
+    expect(upload.with["retention-days"]).toBe(7);
+    expect(upload.with["if-no-files-found"]).toBe("error");
+    expect(upload.with.path.trim().split(/\s*\n\s*/)).toEqual([
+      "${{ runner.temp }}/somewhere-ios-preview/Somewhere-iOS-Simulator.zip",
+      "${{ runner.temp }}/somewhere-ios-preview/preview-manifest.json",
+    ]);
+
+    const executableSteps = preview.steps.map((step) => `${step.uses ?? ""}\n${step.run ?? ""}`).join("\n");
+    expect(executableSteps).not.toMatch(/appetize|browserstack/i);
+  });
+
+  test("collects complete cross-surface visual decisions in one issue form", async () => {
+    const source = await read(".github/ISSUE_TEMPLATE/visual-handoff.yml");
+    const form = parse(source);
+    const fields = new Map(form.body.filter((item) => item.id).map((item) => [item.id, item]));
+    const requiredIds = [
+      "source_sha",
+      "surface",
+      "state",
+      "device",
+      "orientation",
+      "screenshot",
+      "interaction",
+      "expected_result",
+      "geometry",
+      "typography",
+      "color",
+      "asset",
+      "constraints",
+      "priority",
+      "mac_verification",
+    ];
+
+    expect([...fields.keys()]).toEqual(requiredIds);
+    for (const id of requiredIds) expect(fields.get(id).validations.required).toBe(true);
+
+    expect(fields.get("surface").attributes.options).toEqual([
+      "iPhone app",
+      "iPad app",
+      "480x480 circular LCD",
+      "Cross-surface behavior",
+    ]);
+    expect(fields.get("orientation").attributes.options).toContain("Portrait");
+    expect(fields.get("constraints").attributes.description).toContain("V2 backend");
+    expect(fields.get("mac_verification").attributes.description).toContain("Xcode");
   });
 });
