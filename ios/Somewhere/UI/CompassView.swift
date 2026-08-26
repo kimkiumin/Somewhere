@@ -32,24 +32,18 @@ struct CompassView: View {
     @ViewBuilder
     private var exhibitionJourneyContent: some View {
         if projection.phase == .routeRecovery {
-            HStack(spacing: layout.columnSpacing) {
-                compassDial(size: min(360, layout.compassDiameter))
-                    .frame(maxWidth: .infinity)
-                RouteRecoveryView(store: store).frame(width: 300)
-            }
-            .frame(maxHeight: .infinity)
+            routeRecoveryStack(compassSize: layout.compassDiameter, compact: false)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else if projection.revealed == true {
-            HStack(alignment: .center, spacing: layout.columnSpacing) {
-                RevealView(projection: projection).frame(maxWidth: .infinity)
-                VStack(spacing: 14) {
-                    phaseHeader
-                    compassDial(size: min(320, layout.compassDiameter))
-                    directionSummary
-                    distanceCard
-                }
-                .frame(width: 310)
+            VStack(spacing: 14) {
+                phaseHeader
+                directionSummary
+                compassDial(size: layout.compassDiameter)
+                distanceCard
+                RevealView(projection: projection)
+                    .frame(maxWidth: layout.arrivalContentMaxWidth)
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else {
             VStack(spacing: 14) {
                 if !usesCompactGuidanceLayout { phaseHeader }

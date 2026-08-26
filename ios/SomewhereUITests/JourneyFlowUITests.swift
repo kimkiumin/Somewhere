@@ -201,6 +201,58 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["목적지 숨김"].exists)
     }
 
+    func testIPadRouteRecoveryUsesVerticalCompassBeforeRecoveryActions() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("The proportional route recovery composition is iPad-specific")
+        }
+
+        let app = launchHarness("route-recovery")
+        let compass = app.otherElements["somewhere.guidance-compass"]
+        let recalibrate = app.buttons["somewhere.route-recovery.recalibrate"]
+        let stop = app.buttons["somewhere.stop"]
+        let window = app.windows.firstMatch
+
+        XCTAssertTrue(recalibrate.waitForExistence(timeout: 3))
+        XCTAssertTrue(compass.exists)
+        XCTAssertLessThan(compass.frame.maxY, recalibrate.frame.minY)
+        XCTAssertTrue(stop.isHittable)
+        XCTAssertEqual(app.scrollViews.count, 0)
+
+        let availableWidth = window.frame.width - (36 * 2)
+        let compassWidthRatio = compass.frame.width / availableWidth
+        XCTAssertGreaterThanOrEqual(compassWidthRatio, 0.58)
+        XCTAssertLessThanOrEqual(compassWidthRatio, 0.64)
+    }
+
+    func testIPadEarlyRevealedGuidanceUsesVerticalDirectionCompassAndRemainingInformationOrder() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("The proportional revealed guidance composition is iPad-specific")
+        }
+
+        let app = launchHarness("following-revealed")
+        let direction = app.descendants(matching: .any)["somewhere.direction-summary"]
+        let compass = app.otherElements["somewhere.guidance-compass"]
+        let distance = app.staticTexts["약 700m · 10분"]
+        let reveal = app.otherElements["공개된 목적지 소문난성수감자탕"]
+        let stop = app.buttons["somewhere.stop"]
+        let window = app.windows.firstMatch
+
+        XCTAssertTrue(direction.waitForExistence(timeout: 3))
+        XCTAssertTrue(compass.exists)
+        XCTAssertTrue(distance.exists)
+        XCTAssertTrue(reveal.exists)
+        XCTAssertLessThan(direction.frame.maxY, compass.frame.minY)
+        XCTAssertLessThan(compass.frame.maxY, distance.frame.minY)
+        XCTAssertLessThan(distance.frame.maxY, reveal.frame.minY)
+        XCTAssertTrue(stop.exists)
+        XCTAssertEqual(app.scrollViews.count, 0)
+
+        let availableWidth = window.frame.width - (36 * 2)
+        let compassWidthRatio = compass.frame.width / availableWidth
+        XCTAssertGreaterThanOrEqual(compassWidthRatio, 0.58)
+        XCTAssertLessThanOrEqual(compassWidthRatio, 0.64)
+    }
+
     func testBackControlIsVisibleDuringGuidance() {
         let app = launchHarness("following")
         XCTAssertTrue(app.buttons["somewhere.back"].waitForExistence(timeout: 2))
