@@ -14,6 +14,10 @@ Mac/Xcode 개발과 AI 협업 절차는
 확인하세요. Mac이나 Ubuntu가 없는 협업자는
 [`docs/operations/non-mac-ios-collaboration-handoff.md`](docs/operations/non-mac-ios-collaboration-handoff.md)에서
 현재 브랜치, 전시/제품 실행 경계, GitHub PR 검증 절차를 먼저 확인하세요.
+Windows에서 실제 SwiftUI 전시 빌드를 브라우저로 누르고 iPhone·iPad·원형
+LCD 시안을 같은 양식으로 넘길 때는
+[`docs/operations/cross-platform-visual-collaboration.md`](docs/operations/cross-platform-visual-collaboration.md)를
+사용하세요.
 
 ```text
 최소 조건 → 숨겨진 목적지 하나를 한 번에 확정 → 경로 기반 안내

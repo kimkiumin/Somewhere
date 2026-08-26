@@ -203,9 +203,19 @@ Windows 로컬만으로 완료했다고 말할 수 없는 범위:
 즉, 협업자 컴퓨터가 Mac이나 Ubuntu일 필요는 없다. 단, GitHub Actions의
 통과는 Apple 서명이나 실제 기기 전시 확인을 대신하지 않는다.
 
+화면을 직접 눌러 보려면
+[`cross-platform-visual-collaboration.md`](cross-platform-visual-collaboration.md)의
+절차를 사용한다. macOS Actions가 실제 Debug 전시 앱을 unsigned ARM64 iOS
+Simulator ZIP으로 만들고, Windows 협업자가 Appetize에 수동 업로드해 Home,
+Guiding, Stop/Continue, Arrived/Reveal을 브라우저에서 실행할 수 있다. ZIP의
+`preview-manifest.json`과 정확한 source SHA를 먼저 확인해야 하며, 이 결과를
+Apple 서명·GPS·BLE·실기기 통과로 기록하면 안 된다.
+
 ## 비-Mac 협업자의 변경 전달 형식
 
-PR 또는 커밋 설명에 아래 항목을 남긴다. AI가 만든 변경도 동일하다.
+PR 또는 커밋 설명에 아래 항목을 남긴다. AI가 만든 변경도 동일하다. 시각
+변경은 [표준 visual handoff packet](../templates/visual-handoff.md) 또는 GitHub
+`Visual handoff` Issue Form을 우선 사용한다.
 
 ```text
 목적:

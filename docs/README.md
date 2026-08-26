@@ -65,6 +65,10 @@ For the current native implementation, use these focused documents:
   is the current entry point for Windows/GitHub-only collaborators. It separates
   the Debug exhibition path from the Release product path, identifies what can
   be reviewed without Xcode, and defines the exact Mac/CI verification handoff.
+- [Cross-platform visual collaboration](operations/cross-platform-visual-collaboration.md)
+  gives Windows collaborators a browser-executable iOS Simulator artifact,
+  Appetize handoff, iPhone/iPad/LCD state matrix, and the matching
+  [visual decision packet](templates/visual-handoff.md).
 
 ## Historical v0.2 application
 

@@ -21,6 +21,9 @@ Collaborators without macOS or Ubuntu should start with the
 [non-Mac iOS handoff](../docs/operations/non-mac-ios-collaboration-handoff.md),
 which explains the current branch, the Debug exhibition/Release boundary, and
 how GitHub-hosted macOS and Ubuntu checks replace unavailable local toolchains.
+To run the unsigned exhibition Simulator build in a Windows browser and hand
+back complete visual decisions, use the
+[cross-platform visual collaboration runbook](../docs/operations/cross-platform-visual-collaboration.md).
 
 The checked-in bundle identifiers are intentionally non-production examples. Linux verification proves source/contract consistency only. It does **not** prove Xcode compilation, signing, simulator behavior, TestFlight distribution, or physical iPhone behavior.
 
@@ -41,6 +44,12 @@ real local Worker from a manually launched Debug app, also pass
 `SOMEWHERE_EXHIBITION_DEMO=NO` at build time. UI tests keep their existing
 network and launch-state behavior unless they explicitly pass
 `--exhibition-demo`.
+
+The manual `Roll the compass iOS browser preview` GitHub Actions workflow builds
+this Debug path as an unsigned ARM64 Simulator `.app`, verifies the injected
+Info.plist values, and publishes a seven-day ZIP plus manifest. It does not sign
+for a device or upload to an external preview service. See the cross-platform
+runbook before sharing that artifact.
 
 ### Physical compass companion
 
