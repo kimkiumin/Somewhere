@@ -351,6 +351,70 @@ final class JourneyStoreTests: XCTestCase {
         XCTAssertEqual(commandsAfterDeliveredEvent, [.requestStop])
     }
 
+    func testBLEBackpressurePreservesTheInFlightAuthorityRecordWhileCoalescingUpdates() async throws {
+        let following = try projection(phase: "following", revealed: false)
+        let paused = try projection(phase: "paused", revealed: false)
+        let service = FakeJourneyService(response: paused)
+        let compass = RecordingPhysicalCompassClient()
+        compass.automaticallyConfirmSnapshots = false
+        let store = JourneyStore(
+            service: service,
+            physicalCompass: compass,
+            physicalCompassHostEnabled: true
+        )
+        compass.emitConnection(.connected)
+        store.applyServerProjection(following)
+        let inFlight = try XCTUnwrap(compass.sentSnapshots.first)
+
+        for update in 1...10 {
+            store.presentGuidanceForTesting(
+                bearing: Double(update * 10),
+                remainingM: 420 - Double(update)
+            )
+        }
+
+        XCTAssertGreaterThanOrEqual(compass.sentSnapshots.count, 9)
+        compass.confirmDelivery(of: inFlight.sequence)
+        compass.emit(.action(.stop, sequence: inFlight.sequence))
+        try await Task.sleep(for: .milliseconds(50))
+
+        let commands = await service.capturedCommands()
+        XCTAssertEqual(commands, [.requestStop])
+    }
+
+    func testDisconnectAndDisableClearPreviouslyDeliveredBoardAuthority() async throws {
+        let following = try projection(phase: "following", revealed: false)
+        let paused = try projection(phase: "paused", revealed: false)
+        let service = FakeJourneyService(response: paused)
+        let compass = RecordingPhysicalCompassClient()
+        compass.automaticallyConfirmSnapshots = false
+        let store = JourneyStore(
+            service: service,
+            physicalCompass: compass,
+            physicalCompassHostEnabled: true
+        )
+        compass.emitConnection(.connected)
+        store.applyServerProjection(following)
+        let delivered = try XCTUnwrap(compass.sentSnapshots.last)
+        compass.confirmDelivery(of: delivered.sequence)
+
+        compass.emitConnection(.disconnected)
+        compass.emit(.action(.stop, sequence: delivered.sequence))
+        try await Task.sleep(for: .milliseconds(50))
+        let commandsAfterDisconnect = await service.capturedCommands()
+        XCTAssertEqual(commandsAfterDisconnect, [])
+
+        compass.emitConnection(.stale)
+        let reconnected = try XCTUnwrap(compass.sentSnapshots.last)
+        compass.confirmDelivery(of: reconnected.sequence)
+        compass.emitConnection(.connected)
+        compass.emitConnection(.disabled)
+        compass.emit(.action(.stop, sequence: reconnected.sequence))
+        try await Task.sleep(for: .milliseconds(50))
+        let commandsAfterDisable = await service.capturedCommands()
+        XCTAssertEqual(commandsAfterDisable, [])
+    }
+
     func testPhysicalCompassHostIsOptInAndPersistsExplicitOwnership() throws {
         let following = try projection(phase: "following", revealed: false)
         let compass = RecordingPhysicalCompassClient()

@@ -73,25 +73,34 @@ final class ExhibitionLayoutUITests: XCTestCase {
 
         let stopped = launchHarness("stopped")
         let stoppedWindow = stopped.windows.firstMatch
-        let reasonList = stopped.scrollViews.firstMatch
         let skip = stopped.buttons["somewhere.skip-stop-reason"]
-        XCTAssertTrue(reasonList.waitForExistence(timeout: 3))
         let safetyReason = stopped.buttons["somewhere.stop-reason.safety-concern"]
         XCTAssertTrue(safetyReason.waitForExistence(timeout: 3))
         XCTAssertTrue(safetyReason.isHittable)
         XCTAssertTrue(skip.waitForExistence(timeout: 3))
         if UIDevice.current.userInterfaceIdiom == .phone {
+            let reasonList = stopped.scrollViews.firstMatch
+            XCTAssertTrue(reasonList.waitForExistence(timeout: 3))
             for _ in 0..<6 where !skip.isHittable {
                 reasonList.swipeUp()
             }
         }
         XCTAssertTrue(skip.isHittable)
         if UIDevice.current.userInterfaceIdiom == .pad {
-            XCTAssertEqual(stopped.scrollViews.count, 1)
-            XCTAssertLessThanOrEqual(reasonList.frame.height, 400)
-            XCTAssertTrue(stoppedWindow.frame.contains(reasonList.frame))
+            XCTAssertEqual(stopped.scrollViews.count, 0)
+            for identifier in [
+                "safety-concern",
+                "route-or-sensor",
+                "hard-condition",
+                "venue-situation",
+                "changed-mind",
+                "schedule-changed",
+            ] {
+                let reason = stopped.buttons["somewhere.stop-reason.\(identifier)"]
+                XCTAssertTrue(reason.isHittable, identifier)
+                XCTAssertTrue(stoppedWindow.frame.contains(reason.frame), identifier)
+            }
             XCTAssertTrue(stoppedWindow.frame.contains(skip.frame))
-            XCTAssertFalse(reasonList.frame.contains(skip.frame))
         }
     }
 

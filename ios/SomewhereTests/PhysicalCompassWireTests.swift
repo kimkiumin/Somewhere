@@ -131,9 +131,6 @@ final class PhysicalCompassWireTests: XCTestCase {
             (true, true, false, false, false),
             (true, true, true, true, false),
             (true, true, true, false, true),
-            // A late discovery delivered during a power cycle must remain rejected even if
-            // CoreBluetooth has already flipped the central back to powered-on.
-            (true, true, true, true, false),
         ]
 
         for lifecycle in rejected {

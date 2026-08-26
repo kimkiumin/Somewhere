@@ -654,11 +654,16 @@ final class JourneyStore: ObservableObject {
             timestampMs: Int64(Date().timeIntervalSince1970 * 1000)
         ) else { return }
         physicalCompassSequence = nextSequence
-        pendingPhysicalCompassSnapshots[nextSequence] = snapshot
-        if pendingPhysicalCompassSnapshots.count > 8,
-           let oldest = pendingPhysicalCompassSnapshots.keys.min() {
-            pendingPhysicalCompassSnapshots.removeValue(forKey: oldest)
+        if let inFlightSequence = pendingPhysicalCompassSnapshots.keys.min(),
+           let inFlightSnapshot = pendingPhysicalCompassSnapshots[inFlightSequence] {
+            // PhysicalCompassFrameQueue preserves its in-flight frame and coalesces every
+            // waiting frame into one latest value. Mirror that exact ownership here so a
+            // completion callback can always resolve the frame that actually reached BLE.
+            pendingPhysicalCompassSnapshots = [inFlightSequence: inFlightSnapshot]
+        } else {
+            pendingPhysicalCompassSnapshots.removeAll(keepingCapacity: true)
         }
+        pendingPhysicalCompassSnapshots[nextSequence] = snapshot
         physicalCompass.send(snapshot)
     }
 }
