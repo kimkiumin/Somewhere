@@ -5,6 +5,7 @@
 #include <string>
 
 #include "compass_math.h"
+#include "compass_diagnostics.h"
 #include "compass_runtime.h"
 #include "needle_spring.h"
 #include "physical_compass_wire.h"
@@ -269,6 +270,217 @@ static void assertStrictBleV2Parsing() {
     ) == 0);
 }
 
+static void assertRuntimeInputEquals(
+    const roll_compass::RuntimeInput &actual,
+    const roll_compass::RuntimeInput &expected
+) {
+    assert(actual.bootComplete == expected.bootComplete);
+    assert(actual.bleConnected == expected.bleConnected);
+    assert(actual.protocolMismatch == expected.protocolMismatch);
+    assert(actual.snapshotFresh == expected.snapshotFresh);
+    assert(actual.sensorHealth == expected.sensorHealth);
+    assert(actual.calibrationHealth == expected.calibrationHealth);
+    assert(actual.phase == expected.phase);
+    assert(actual.hasCredibleTarget == expected.hasCredibleTarget);
+    assertNear(actual.targetTrueBearingDegrees, expected.targetTrueBearingDegrees);
+    assertNear(actual.magneticDeclinationDegreesEast, expected.magneticDeclinationDegreesEast);
+    assertNear(actual.boardMagneticHeadingDegrees, expected.boardMagneticHeadingDegrees);
+    assert(actual.hasDistance == expected.hasDistance);
+    assertNear(actual.distanceM, expected.distanceM);
+    assert(actual.actionMask == expected.actionMask);
+}
+
+static void assertDiagnosticParsing() {
+    using roll_compass::DiagnosticCommandType;
+    assert(roll_compass::parseDiagnosticCommand("sim on").type == DiagnosticCommandType::SimOn);
+    assert(roll_compass::parseDiagnosticCommand("sim off").type == DiagnosticCommandType::SimOff);
+    assert(roll_compass::parseDiagnosticCommand("state guiding").type == DiagnosticCommandType::StateGuiding);
+    assert(roll_compass::parseDiagnosticCommand("state near").type == DiagnosticCommandType::StateNear);
+    assert(roll_compass::parseDiagnosticCommand("state paused").type == DiagnosticCommandType::StatePaused);
+    assert(roll_compass::parseDiagnosticCommand("state arrived").type == DiagnosticCommandType::StateArrived);
+    assert(roll_compass::parseDiagnosticCommand("state calibrating").type == DiagnosticCommandType::StateCalibrating);
+    assert(roll_compass::parseDiagnosticCommand("state sensor-missing").type == DiagnosticCommandType::StateSensorMissing);
+    assert(roll_compass::parseDiagnosticCommand("state anomaly").type == DiagnosticCommandType::StateAnomaly);
+
+    const auto heading = roll_compass::parseDiagnosticCommand("heading 90");
+    assert(heading.type == DiagnosticCommandType::Heading);
+    assertNear(heading.valueDegrees, 90.0f);
+    assert(roll_compass::parseDiagnosticCommand("heading 0").type == DiagnosticCommandType::Heading);
+    assert(roll_compass::parseDiagnosticCommand("heading 359.999").type == DiagnosticCommandType::Heading);
+    assert(roll_compass::parseDiagnosticCommand("target 315").type == DiagnosticCommandType::Target);
+    assert(roll_compass::parseDiagnosticCommand("target 359.999").type == DiagnosticCommandType::Target);
+    assert(roll_compass::parseDiagnosticCommand("declination -180").type == DiagnosticCommandType::Declination);
+    assert(roll_compass::parseDiagnosticCommand("declination 180").type == DiagnosticCommandType::Declination);
+    assert(roll_compass::parseDiagnosticCommand("sweep cw").type == DiagnosticCommandType::SweepClockwise);
+    assert(roll_compass::parseDiagnosticCommand("sweep ccw").type == DiagnosticCommandType::SweepCounterClockwise);
+    assert(roll_compass::parseDiagnosticCommand("sweep stop").type == DiagnosticCommandType::SweepStop);
+
+    const char *const invalidCommands[] = {
+        nullptr,
+        "",
+        "sim  on",
+        " sim on",
+        "sim on ",
+        "sim\ton",
+        "sim on now",
+        "heading",
+        "heading 90 extra",
+        "heading nan",
+        "heading inf",
+        "heading -0.001",
+        "heading 360",
+        "target -1",
+        "target 360",
+        "declination -180.001",
+        "declination 180.001",
+        "declination NaN",
+        "sweep clockwise",
+        "state Guiding",
+        "state unknown",
+        "sim on\n",
+    };
+    for (const char *command : invalidCommands) {
+        assert(roll_compass::parseDiagnosticCommand(command).type == DiagnosticCommandType::Invalid);
+    }
+}
+
+static void assertDiagnosticStateInjection() {
+    using roll_compass::DiagnosticCommandType;
+    roll_compass::DiagnosticState diagnostic;
+    auto realInput = credibleGuidanceInput();
+    realInput.protocolMismatch = true;
+    const auto untouched = realInput;
+    diagnostic.applyTo(realInput, 1000);
+    assertRuntimeInputEquals(realInput, untouched);
+
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("target 315"),
+        diagnostic
+    ));
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("declination -8.2"),
+        diagnostic
+    ));
+    assert(!diagnostic.enabled());
+    realInput = untouched;
+    diagnostic.applyTo(realInput, 2000);
+    assertRuntimeInputEquals(realInput, untouched);
+
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("heading 90"),
+        diagnostic
+    ));
+    assert(diagnostic.enabled());
+    roll_compass::RuntimeInput simulated{};
+    diagnostic.applyTo(simulated, 3000);
+    assert(simulated.bootComplete);
+    assert(simulated.bleConnected);
+    assert(!simulated.protocolMismatch);
+    assert(simulated.snapshotFresh);
+    assert(simulated.sensorHealth == roll_compass::SensorHealth::Ready);
+    assert(simulated.calibrationHealth == roll_compass::CalibrationHealth::Valid);
+    assert(simulated.phase == roll_compass::JourneyPhase::Following);
+    assert(simulated.hasCredibleTarget);
+    assertNear(simulated.targetTrueBearingDegrees, 315.0f);
+    assertNear(simulated.magneticDeclinationDegreesEast, -8.2f);
+    assertNear(simulated.boardMagneticHeadingDegrees, 90.0f);
+    assert(!simulated.hasDistance);
+    assert(simulated.actionMask == (1U << 0));
+
+    const struct {
+        const char *command;
+        roll_compass::JourneyPhase phase;
+        roll_compass::SensorHealth sensor;
+        roll_compass::CalibrationHealth calibration;
+        uint8_t actionMask;
+    } stateCases[] = {
+        {"state guiding", roll_compass::JourneyPhase::Following, roll_compass::SensorHealth::Ready, roll_compass::CalibrationHealth::Valid, 1U << 0},
+        {"state near", roll_compass::JourneyPhase::Near, roll_compass::SensorHealth::Ready, roll_compass::CalibrationHealth::Valid, 1U << 0},
+        {"state paused", roll_compass::JourneyPhase::Paused, roll_compass::SensorHealth::Ready, roll_compass::CalibrationHealth::Valid, static_cast<uint8_t>((1U << 1) | (1U << 2))},
+        {"state arrived", roll_compass::JourneyPhase::Arrived, roll_compass::SensorHealth::Ready, roll_compass::CalibrationHealth::Valid, 1U << 3},
+        {"state calibrating", roll_compass::JourneyPhase::Following, roll_compass::SensorHealth::Ready, roll_compass::CalibrationHealth::Collecting, 1U << 0},
+        {"state sensor-missing", roll_compass::JourneyPhase::Following, roll_compass::SensorHealth::Missing, roll_compass::CalibrationHealth::Missing, 1U << 0},
+        {"state anomaly", roll_compass::JourneyPhase::Following, roll_compass::SensorHealth::Anomaly, roll_compass::CalibrationHealth::Valid, 1U << 0},
+    };
+    for (const auto &stateCase : stateCases) {
+        assert(roll_compass::applyDiagnosticCommand(
+            roll_compass::parseDiagnosticCommand(stateCase.command),
+            diagnostic
+        ));
+        diagnostic.applyTo(simulated, 4000);
+        assert(simulated.phase == stateCase.phase);
+        assert(simulated.sensorHealth == stateCase.sensor);
+        assert(simulated.calibrationHealth == stateCase.calibration);
+        assert(simulated.actionMask == stateCase.actionMask);
+    }
+
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("sim off"),
+        diagnostic
+    ));
+    assert(!diagnostic.enabled());
+    realInput = untouched;
+    diagnostic.applyTo(realInput, 5000);
+    assertRuntimeInputEquals(realInput, untouched);
+    assert(!roll_compass::applyDiagnosticCommand(
+        roll_compass::DiagnosticCommand{DiagnosticCommandType::Invalid, 0.0f},
+        diagnostic
+    ));
+}
+
+static void assertDiagnosticSweep() {
+    roll_compass::DiagnosticState diagnostic;
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("sim on"),
+        diagnostic
+    ));
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("sweep cw"),
+        diagnostic
+    ));
+    roll_compass::RuntimeInput input{};
+    diagnostic.applyTo(input, 1000);
+    assertNear(input.boardMagneticHeadingDegrees, 0.0f);
+    diagnostic.applyTo(input, 2000);
+    assertNear(input.boardMagneticHeadingDegrees, 45.0f);
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("sweep stop"),
+        diagnostic
+    ));
+    diagnostic.applyTo(input, 8000);
+    assertNear(input.boardMagneticHeadingDegrees, 45.0f);
+
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("sweep ccw"),
+        diagnostic
+    ));
+    diagnostic.applyTo(input, 9000);
+    assertNear(input.boardMagneticHeadingDegrees, 45.0f);
+    diagnostic.applyTo(input, 10000);
+    assertNear(input.boardMagneticHeadingDegrees, 0.0f);
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("heading 120"),
+        diagnostic
+    ));
+    diagnostic.applyTo(input, 11000);
+    assertNear(input.boardMagneticHeadingDegrees, 120.0f);
+    diagnostic.applyTo(input, 12000);
+    assertNear(input.boardMagneticHeadingDegrees, 120.0f);
+
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("sim on"),
+        diagnostic
+    ));
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("sweep cw"),
+        diagnostic
+    ));
+    diagnostic.applyTo(input, UINT32_MAX - 500U);
+    assertNear(input.boardMagneticHeadingDegrees, 0.0f);
+    diagnostic.applyTo(input, 499U);
+    assertNear(input.boardMagneticHeadingDegrees, 45.0f);
+}
+
 int main() {
     assertNear(roll_compass::normalizeDegrees(-1.0f), 359.0f);
     assertNear(roll_compass::shortestDeltaDegrees(359.0f, 1.0f), 2.0f);
@@ -307,5 +519,8 @@ int main() {
     assertRuntimePhaseMappingAndSuppression();
     assertWirePhaseMapping();
     assertStrictBleV2Parsing();
+    assertDiagnosticParsing();
+    assertDiagnosticStateInjection();
+    assertDiagnosticSweep();
     return 0;
 }

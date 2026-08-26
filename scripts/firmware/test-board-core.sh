@@ -15,6 +15,7 @@ mkdir -p "$test_output_root"
   -I "$project_root/firmware/roll-compass-board" \
   -I "$arduino_json_include" \
   "$project_root/firmware/roll-compass-board/tests/compass_core_test.cpp" \
+  "$project_root/firmware/roll-compass-board/compass_diagnostics.cpp" \
   "$project_root/firmware/roll-compass-board/compass_math.cpp" \
   "$project_root/firmware/roll-compass-board/compass_runtime.cpp" \
   "$project_root/firmware/roll-compass-board/needle_spring.cpp" \
