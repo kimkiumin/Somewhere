@@ -14,8 +14,10 @@ if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
     throw "Bun is not on PATH. Install Bun 1.3.14, then reopen PowerShell."
 }
 $ExpectedBunVersion = "1.3.14"
-$InstalledBunVersion = (& bun --version | Select-Object -First 1).Trim()
-if ($LASTEXITCODE -ne 0 -or $InstalledBunVersion -ne $ExpectedBunVersion) {
+$BunVersionOutput = & bun --version
+$BunVersionCommandSucceeded = $?
+$InstalledBunVersion = ($BunVersionOutput | Select-Object -First 1).Trim()
+if (-not $BunVersionCommandSucceeded -or $InstalledBunVersion -ne $ExpectedBunVersion) {
     throw "Bun $ExpectedBunVersion is required; found $InstalledBunVersion."
 }
 
