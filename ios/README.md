@@ -22,6 +22,24 @@ The checked-in bundle identifiers are intentionally non-production examples. Lin
 
 `SOMEWHERE_API_ORIGIN` is deliberately `https://example.invalid` in the checked-in project. An authorized field build must override it with the canonical HTTPS service origin; source code rejects credentials, paths, query strings, fragments, non-HTTPS origins, and non-loopback HTTP.
 
+### Physical compass companion
+
+The native app can connect to the Waveshare ESP32-S3-Touch-LCD-2.1 companion
+over CoreBluetooth. The iPhone remains authoritative for location, heading,
+route guidance, destination disclosure, and guarded journey actions. USB is
+only for board flashing and serial logs; Wi-Fi is reserved for a later
+OTA/diagnostics milestone.
+
+The app requests `NSBluetoothAlwaysUsageDescription` at runtime and scans for
+the fixed `Roll Compass` BLE service. It intentionally does not declare
+`bluetooth-central`, so this milestone makes no background or locked-screen
+navigation promise. The Simulator can exercise the contract and tests but
+cannot prove physical BLE hardware interaction.
+
+See the [physical BLE operations runbook](../docs/operations/physical-compass-ble.md)
+for pinned dependencies, USB commands, UUIDs, first connection, stale-state
+behavior, and board limitations.
+
 ## Verification
 
 On Ubuntu:
