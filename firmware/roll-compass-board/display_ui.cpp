@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "compass_assets.h"
+#include "compass_math.h"
 #include "lvgl_v8_port.h"
 
 namespace {
@@ -50,9 +51,8 @@ lv_obj_t *buttons[4] = {nullptr, nullptr, nullptr, nullptr};
 lv_obj_t *buttonLabels[4] = {nullptr, nullptr, nullptr, nullptr};
 
 physical_compass::BoardState currentState;
+roll_compass::CompassRenderModel currentModel;
 PhysicalCompassEventCallback eventCallback = nullptr;
-bool connected = false;
-uint32_t lastStateMs = 0;
 float currentNeedleAngle = 0.0f;
 float targetNeedleAngle = 0.0f;
 
@@ -110,24 +110,8 @@ lv_obj_t *makePill(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coord_t widt
     return pill;
 }
 
-float normalizeDegrees(float value) {
-    while (value < 0.0f) value += 360.0f;
-    while (value >= 360.0f) value -= 360.0f;
-    return value;
-}
-
-float shortestDelta(float from, float to) {
-    float delta = normalizeDegrees(to) - normalizeDegrees(from);
-    if (delta > 180.0f) delta -= 360.0f;
-    if (delta < -180.0f) delta += 360.0f;
-    return delta;
-}
-
-bool stateFresh(uint32_t nowMs) {
-    return connected && lastStateMs != 0 && nowMs - lastStateMs < 6000;
-}
-
-String printableMenu(const String &value, uint8_t index) {
+String printableMenu(const char *rawValue, uint8_t index) {
+    const String value = rawValue == nullptr ? "" : rawValue;
     for (size_t position = 0; position < value.length(); ++position) {
         if (static_cast<uint8_t>(value[position]) >= 0x80) {
             return String("CLUE ") + String(index + 1);
@@ -136,20 +120,40 @@ String printableMenu(const String &value, uint8_t index) {
     return value;
 }
 
-String priceText(const String &value) {
+String priceText(const char *rawValue) {
+    const String value = rawValue == nullptr ? "" : rawValue;
     if (value == "low") return "LIGHT SPOILS";
     if (value == "medium") return "MID SPOILS";
     if (value == "high") return "RICH SPOILS";
     return value.isEmpty() ? "PRICE UNKNOWN" : String("PRICE ") + value;
 }
 
-const char *phaseStatus(bool fresh, bool credible) {
-    if (!connected) return "CONNECT THE COMPASS";
-    if (!fresh) return "WAITING FOR YOUR CLUE";
-    if (currentState.revealed) return "TREASURE FOUND";
-    if (currentState.phase == "near") return "THE TREASURE IS NEAR";
-    if (credible) return "FOLLOW THE RED NEEDLE";
-    return "KEEP THE MAP CLOSE";
+const char *stateStatus(roll_compass::CompassOsState state) {
+    switch (state) {
+        case roll_compass::CompassOsState::Boot: return "WAKING THE COMPASS";
+        case roll_compass::CompassOsState::Pairing: return "CONNECT THE COMPASS";
+        case roll_compass::CompassOsState::SensorMissing: return "HEADING SENSOR REQUIRED";
+        case roll_compass::CompassOsState::Calibrating: return "CALIBRATING THE NEEDLE";
+        case roll_compass::CompassOsState::Ready: return "READY FOR THE UNKNOWN";
+        case roll_compass::CompassOsState::Guiding: return "FOLLOW THE RED NEEDLE";
+        case roll_compass::CompassOsState::Near: return "THE TREASURE IS NEAR";
+        case roll_compass::CompassOsState::Paused: return "JOURNEY PAUSED";
+        case roll_compass::CompassOsState::Arrived: return "TREASURE FOUND";
+        case roll_compass::CompassOsState::Stale: return "WAITING FOR YOUR CLUE";
+        case roll_compass::CompassOsState::MagneticAnomaly: return "MOVE AWAY FROM METAL";
+        case roll_compass::CompassOsState::UpdateRequired: return "UPDATE REQUIRED";
+    }
+    return "WAKING THE COMPASS";
+}
+
+bool modelEquals(
+    const roll_compass::CompassRenderModel &left,
+    const roll_compass::CompassRenderModel &right
+) {
+    return left.state == right.state && left.showNeedle == right.showNeedle &&
+        left.targetNeedleAngleDegrees == right.targetNeedleAngleDegrees &&
+        left.hasDistance == right.hasDistance && left.distanceM == right.distanceM &&
+        left.actionMask == right.actionMask;
 }
 
 void setButtonVisible(uint8_t index, bool visible) {
@@ -180,6 +184,8 @@ void styleButton(uint8_t index, bool visible) {
 
 void updateConnectionPill() {
     if (connectionPill == nullptr || connectionLabel == nullptr) return;
+    const bool connected = currentModel.state != roll_compass::CompassOsState::Boot &&
+        currentModel.state != roll_compass::CompassOsState::Pairing;
     lv_label_set_text(connectionLabel, connected ? "BLE CONNECTED" : "BLE WAITING");
     lv_obj_set_style_bg_color(connectionPill, connected ? kSageSoft : kOxbloodSoft, LV_PART_MAIN);
     lv_obj_set_style_border_width(connectionPill, 1, LV_PART_MAIN);
@@ -189,16 +195,17 @@ void updateConnectionPill() {
 
 void renderState() {
     if (heroStatus == nullptr) return;
-    const uint32_t nowMs = millis();
-    const bool fresh = stateFresh(nowMs);
-    const bool credible = fresh && currentState.confidence == "credible" && currentState.hasBearing;
+    const bool credible = currentModel.showNeedle;
+    const bool arrived = currentModel.state == roll_compass::CompassOsState::Arrived;
+    const bool hasSnapshot = currentState.sequence > 0 &&
+        currentModel.state != roll_compass::CompassOsState::UpdateRequired;
 
     updateConnectionPill();
-    lv_label_set_text(heroStatus, phaseStatus(fresh, credible));
-    lv_obj_set_style_text_color(heroStatus, currentState.revealed ? kSage : credible ? kOxblood : kMutedInk, LV_PART_MAIN);
+    lv_label_set_text(heroStatus, stateStatus(currentModel.state));
+    lv_obj_set_style_text_color(heroStatus, arrived ? kSage : credible ? kOxblood : kMutedInk, LV_PART_MAIN);
 
-    if (fresh && currentState.hasBearing) {
-        targetNeedleAngle = normalizeDegrees(currentState.bearingDegrees);
+    if (credible) {
+        targetNeedleAngle = roll_compass::normalizeDegrees(currentModel.targetNeedleAngleDegrees);
     }
     if (compassNeedle != nullptr) {
         if (credible) {
@@ -208,27 +215,21 @@ void renderState() {
         }
     }
 
-    if (!fresh) {
+    if (!currentModel.hasDistance) {
         lv_label_set_text(distanceValue, "-- m");
-        lv_label_set_text(distanceCaption, "TREASURE DISTANCE");
-    } else if (currentState.revealed && !currentState.hasDistance) {
-        lv_label_set_text(distanceValue, "FOUND");
-        lv_label_set_text(distanceCaption, "JOURNEY COMPLETE");
-    } else if (currentState.hasDistance) {
+        lv_label_set_text(distanceCaption, arrived ? "JOURNEY COMPLETE" : "REMAINING DISTANCE");
+    } else {
         char distance[32];
-        if (currentState.distanceM >= 1000.0f) {
-            snprintf(distance, sizeof(distance), "%.1f km", currentState.distanceM / 1000.0f);
+        if (currentModel.distanceM >= 1000.0f) {
+            snprintf(distance, sizeof(distance), "%.1f km", currentModel.distanceM / 1000.0f);
         } else {
-            snprintf(distance, sizeof(distance), "%.0f m", currentState.distanceM);
+            snprintf(distance, sizeof(distance), "%.0f m", currentModel.distanceM);
         }
         lv_label_set_text(distanceValue, distance);
         lv_label_set_text(distanceCaption, "REMAINING DISTANCE");
-    } else {
-        lv_label_set_text(distanceValue, "-- m");
-        lv_label_set_text(distanceCaption, "REMAINING DISTANCE");
     }
 
-    if (fresh && currentState.menuCount > 0) {
+    if (hasSnapshot && currentState.menuCount > 0) {
         String clue = printableMenu(currentState.menus[0], 0);
         if (currentState.menuCount > 1) clue += String(" / ") + printableMenu(currentState.menus[1], 1);
         lv_label_set_text(clueValue, clue.c_str());
@@ -240,7 +241,7 @@ void renderState() {
     }
 
     for (uint8_t index = 0; index < 4; ++index) {
-        const bool visible = fresh && physical_compass::hasAction(currentState, actionNames[index]);
+        const bool visible = (currentModel.actionMask & (1U << index)) != 0;
         setButtonVisible(index, visible);
         styleButton(index, visible);
     }
@@ -249,22 +250,23 @@ void renderState() {
 void buttonClicked(lv_event_t *event) {
     if (eventCallback == nullptr) return;
     const char *action = static_cast<const char *>(lv_event_get_user_data(event));
-    if (action != nullptr && physical_compass::hasAction(currentState, action)) {
+    const uint8_t actionIndex = physical_compass::actionIndex(action);
+    if (actionIndex < 5 && (currentModel.actionMask & (1U << actionIndex)) != 0) {
         eventCallback(action, currentState.sequence);
     }
 }
 
 void animateCompass(uint32_t nowMs) {
     if (compassNeedle != nullptr && !lv_obj_has_flag(compassNeedle, LV_OBJ_FLAG_HIDDEN)) {
-        const float delta = shortestDelta(currentNeedleAngle, targetNeedleAngle);
-        currentNeedleAngle = normalizeDegrees(currentNeedleAngle + delta * 0.18f);
+        const float delta = roll_compass::shortestDeltaDegrees(currentNeedleAngle, targetNeedleAngle);
+        currentNeedleAngle = roll_compass::normalizeDegrees(currentNeedleAngle + delta * 0.18f);
         if (fabsf(delta) < 0.08f) currentNeedleAngle = targetNeedleAngle;
         lv_img_set_angle(compassNeedle, static_cast<int16_t>(lroundf(currentNeedleAngle * 10.0f)));
     }
 
-    const bool fresh = stateFresh(nowMs);
-    const bool hunting = connected && !fresh;
-    const bool active = fresh && currentState.hasBearing && currentState.confidence == "credible";
+    const bool hunting = currentModel.state == roll_compass::CompassOsState::Pairing ||
+        currentModel.state == roll_compass::CompassOsState::Stale;
+    const bool active = currentModel.showNeedle;
     const float wave = (sinf(static_cast<float>(nowMs) / (active ? 430.0f : 620.0f)) + 1.0f) * 0.5f;
     if (glowRing != nullptr) {
         const uint8_t opacity = active ? static_cast<uint8_t>(80 + wave * 90) : hunting ? static_cast<uint8_t>(35 + wave * 55) : 18;
@@ -404,20 +406,17 @@ void displayUiBegin() {
     renderState();
 }
 
-void displayUiSetState(const physical_compass::BoardState &state) {
+void displayUiSetRuntime(
+    const physical_compass::BoardState &state,
+    const roll_compass::CompassRenderModel &model
+) {
+    const bool shouldRender = state.sequence != currentState.sequence || !modelEquals(model, currentModel);
     currentState = state;
-    lastStateMs = millis();
-    if (currentState.hasBearing) targetNeedleAngle = normalizeDegrees(currentState.bearingDegrees);
-    if (lvgl_port_lock(-1)) {
-        renderState();
-        lvgl_port_unlock();
+    currentModel = model;
+    if (currentModel.showNeedle) {
+        targetNeedleAngle = roll_compass::normalizeDegrees(currentModel.targetNeedleAngleDegrees);
     }
-}
-
-void displayUiSetConnection(bool value) {
-    if (connected == value) return;
-    connected = value;
-    if (lvgl_port_lock(-1)) {
+    if (shouldRender && lvgl_port_lock(-1)) {
         renderState();
         lvgl_port_unlock();
     }
@@ -425,10 +424,6 @@ void displayUiSetConnection(bool value) {
 
 void displayUiTick(uint32_t nowMs) {
     if (lvgl_port_lock(-1)) {
-        if (lastStateMs != 0 && nowMs - lastStateMs > 6000 && compassNeedle != nullptr &&
-            !lv_obj_has_flag(compassNeedle, LV_OBJ_FLAG_HIDDEN)) {
-            renderState();
-        }
         animateCompass(nowMs);
         lvgl_port_unlock();
     }

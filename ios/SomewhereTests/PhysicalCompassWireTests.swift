@@ -98,6 +98,18 @@ final class PhysicalCompassWireTests: XCTestCase {
         }
     }
 
+    func testDisplayTextUsesTheSameUnicodeScalarLimitAsTheBoard() throws {
+        let koreanAtLimit = String(repeating: "가", count: PhysicalCompassBLE.maxDisplayCharacters)
+        XCTAssertNoThrow(try makeSnapshot(menus: [koreanAtLimit]))
+
+        let combiningText = String(repeating: "e\u{301}", count: 21)
+        XCTAssertEqual(combiningText.count, 21)
+        XCTAssertEqual(combiningText.unicodeScalars.count, 42)
+        XCTAssertThrowsError(try makeSnapshot(menus: [combiningText])) { error in
+            XCTAssertEqual(error as? PhysicalCompassWireError, .invalidPayload)
+        }
+    }
+
     func testSnapshotNeverCarriesDestinationIdentity() throws {
         let snapshot = try makeSnapshot(menus: ["한식 국물 요리"])
         let frame = try PhysicalCompassWire.encodeState(snapshot)

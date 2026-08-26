@@ -4,6 +4,7 @@ enum PhysicalCompassBLE {
     static let contractVersion = 2
     static let maxFrameBytes = 512
     static let maxDisplayCharacters = 40
+    static let maxDisplayBytes = maxDisplayCharacters * 4
     static let serviceUUID = "C1F8A100-35D1-4C53-9A03-7A1B3E620001"
     static let stateCharacteristicUUID = "C1F8A101-35D1-4C53-9A03-7A1B3E620001"
     static let eventCharacteristicUUID = "C1F8A102-35D1-4C53-9A03-7A1B3E620001"
@@ -67,10 +68,10 @@ struct PhysicalCompassSnapshot: Equatable, Sendable {
         timestampMs: Int64
     ) throws {
         guard sequence > 0 else { throw PhysicalCompassWireError.invalidSequence }
-        guard !phase.isEmpty, phase.count <= PhysicalCompassBLE.maxDisplayCharacters else {
+        guard PhysicalCompassBLE.isValidDisplayText(phase) else {
             throw PhysicalCompassWireError.invalidPayload
         }
-        guard !confidence.isEmpty, confidence.count <= PhysicalCompassBLE.maxDisplayCharacters else {
+        guard PhysicalCompassBLE.isValidDisplayText(confidence) else {
             throw PhysicalCompassWireError.invalidPayload
         }
         if let remainingDistanceM,
@@ -89,14 +90,14 @@ struct PhysicalCompassSnapshot: Equatable, Sendable {
             throw PhysicalCompassWireError.invalidNumber
         }
         guard menus.count <= 2,
-              menus.allSatisfy({ !$0.isEmpty && $0.count <= PhysicalCompassBLE.maxDisplayCharacters }) else {
+              menus.allSatisfy(PhysicalCompassBLE.isValidDisplayText) else {
             throw PhysicalCompassWireError.invalidPayload
         }
         guard Set(actions).count == actions.count else {
             throw PhysicalCompassWireError.invalidPayload
         }
         if let priceBand,
-           priceBand.isEmpty || priceBand.count > PhysicalCompassBLE.maxDisplayCharacters {
+           !PhysicalCompassBLE.isValidDisplayText(priceBand) {
             throw PhysicalCompassWireError.invalidPayload
         }
         guard timestampMs >= 0 else { throw PhysicalCompassWireError.invalidNumber }
@@ -112,6 +113,14 @@ struct PhysicalCompassSnapshot: Equatable, Sendable {
         self.actions = actions
         self.revealed = revealed
         self.timestampMs = timestampMs
+    }
+}
+
+private extension PhysicalCompassBLE {
+    static func isValidDisplayText(_ value: String) -> Bool {
+        !value.isEmpty &&
+            value.unicodeScalars.count <= maxDisplayCharacters &&
+            value.utf8.count <= maxDisplayBytes
     }
 }
 

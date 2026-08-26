@@ -4,12 +4,20 @@ set -euo pipefail
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_root="$(cd "$script_root/../.." && pwd)"
 test_output_root="$project_root/.local-artifacts/firmware-tests"
+arduino_json_include="$project_root/.local-artifacts/arduino-cli/user/libraries/ArduinoJson/src"
 compiler_bin="${COMPASS_TEST_CXX:-c++}"
+if [[ ! -f "$arduino_json_include/ArduinoJson.h" ]]; then
+  printf '%s\n' "ArduinoJson headers are missing. Run: bun run firmware:setup" >&2
+  exit 1
+fi
 mkdir -p "$test_output_root"
 "$compiler_bin" -std=c++17 -Wall -Wextra -Werror \
   -I "$project_root/firmware/roll-compass-board" \
+  -I "$arduino_json_include" \
   "$project_root/firmware/roll-compass-board/tests/compass_core_test.cpp" \
   "$project_root/firmware/roll-compass-board/compass_math.cpp" \
+  "$project_root/firmware/roll-compass-board/compass_runtime.cpp" \
   "$project_root/firmware/roll-compass-board/needle_spring.cpp" \
+  "$project_root/firmware/roll-compass-board/physical_compass_wire.cpp" \
   -o "$test_output_root/compass-core-test"
 "$test_output_root/compass-core-test"
