@@ -868,6 +868,16 @@ bool lvgl_port_unlock(void)
     return true;
 }
 
+bool lvgl_port_set_touch_enabled(bool enabled)
+{
+    ESP_UTILS_CHECK_NULL_RETURN(lvgl_indev, false, "LVGL touch input is not initialized");
+
+    lv_indev_reset(lvgl_indev, nullptr);
+    if (enabled) lv_indev_wait_release(lvgl_indev);
+    lv_indev_enable(lvgl_indev, enabled);
+    return true;
+}
+
 bool lvgl_port_deinit(void)
 {
 #if !LV_TICK_CUSTOM

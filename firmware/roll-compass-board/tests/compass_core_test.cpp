@@ -11,6 +11,7 @@
 #include "display_buffer_policy.h"
 #include "needle_spring.h"
 #include "physical_compass_wire.h"
+#include "screen_power_button.h"
 
 static void assertNear(float actual, float expected, float tolerance = 0.01f) {
     assert(fabsf(actual - expected) <= tolerance);
@@ -501,6 +502,35 @@ static void assertDisplayBufferPreference() {
         DisplayBufferPreference::DirectDouble);
 }
 
+static void assertScreenPowerButtonRespondsOnPressEdge() {
+    using roll_compass::ScreenPowerButton;
+    using roll_compass::ScreenPowerButtonEvent;
+
+    ScreenPowerButton button(20U);
+    button.reset(false, 100U);
+    assert(button.update(true, 110U) == ScreenPowerButtonEvent::Pressed);
+    assert(button.update(false, 111U) == ScreenPowerButtonEvent::None);
+    assert(button.update(true, 115U) == ScreenPowerButtonEvent::None);
+    assert(button.update(true, 500U) == ScreenPowerButtonEvent::None);
+
+    assert(button.update(false, 510U) == ScreenPowerButtonEvent::None);
+    assert(button.update(false, 529U) == ScreenPowerButtonEvent::None);
+    assert(button.update(false, 530U) == ScreenPowerButtonEvent::None);
+    assert(button.update(true, 531U) == ScreenPowerButtonEvent::Pressed);
+
+    button.reset(true, 1'000U);
+    assert(button.update(true, 2'000U) == ScreenPowerButtonEvent::None);
+    assert(button.update(false, 2'010U) == ScreenPowerButtonEvent::None);
+    assert(button.update(false, 2'029U) == ScreenPowerButtonEvent::None);
+    assert(button.update(false, 2'030U) == ScreenPowerButtonEvent::None);
+    assert(button.update(true, 2'031U) == ScreenPowerButtonEvent::Pressed);
+
+    button.reset(true, UINT32_MAX - 20U);
+    assert(button.update(false, UINT32_MAX - 10U) == ScreenPowerButtonEvent::None);
+    assert(button.update(false, 9U) == ScreenPowerButtonEvent::None);
+    assert(button.update(true, 10U) == ScreenPowerButtonEvent::Pressed);
+}
+
 int main() {
     assertNear(roll_compass::normalizeDegrees(-1.0f), 359.0f);
     assertNear(roll_compass::shortestDeltaDegrees(359.0f, 1.0f), 2.0f);
@@ -544,5 +574,6 @@ int main() {
     assertDiagnosticSweep();
     assertCircularLayoutContainment();
     assertDisplayBufferPreference();
+    assertScreenPowerButtonRespondsOnPressEdge();
     return 0;
 }

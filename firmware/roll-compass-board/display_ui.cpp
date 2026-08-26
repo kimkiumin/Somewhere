@@ -62,6 +62,7 @@ uint32_t stateEnteredMs = 0;
 uint32_t displayedSequence = 0;
 uint8_t mountRotationDegrees = 0;
 bool bleEventsEnabled = false;
+bool uiAwake = true;
 
 int16_t mountRotationTenths() {
     return static_cast<int16_t>(mountRotationDegrees) * 10;
@@ -266,7 +267,7 @@ void renderModel() {
 }
 
 void dispatchAction(const char *action, uint8_t requiredMask) {
-    if (eventCallback != nullptr && bleEventsEnabled &&
+    if (uiAwake && eventCallback != nullptr && bleEventsEnabled &&
         (currentModel.actionMask & requiredMask) != 0) {
         eventCallback(action, displayedSequence);
     }
@@ -290,6 +291,7 @@ void pausedEndClicked(lv_event_t *) {
 }
 
 void displayTapped(lv_event_t *) {
+    if (!uiAwake) return;
     mountRotationDegrees = mountRotationDegrees >= kMaximumMountRotationDegrees
         ? 0
         : static_cast<uint8_t>(mountRotationDegrees + kMountRotationStepDegrees);
@@ -562,4 +564,12 @@ void displayUiTick(uint32_t nowMs) {
 
 void displayUiSetEventCallback(PhysicalCompassEventCallback callback) {
     eventCallback = callback;
+}
+
+bool displayUiSetAwake(bool awake) {
+    if (!lvgl_port_lock(-1)) return false;
+    const bool updated = lvgl_port_set_touch_enabled(awake);
+    if (updated) uiAwake = awake;
+    lvgl_port_unlock();
+    return updated;
 }

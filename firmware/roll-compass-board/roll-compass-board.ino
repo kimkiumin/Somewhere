@@ -12,6 +12,7 @@
 #include "display_ui.h"
 #include "lvgl_v8_port.h"
 #include "physical_compass_wire.h"
+#include "screen_power_button.h"
 
 using namespace esp_panel::board;
 using namespace esp_panel::drivers;
@@ -38,6 +39,10 @@ roll_compass::DiagnosticState diagnosticState;
 char diagnosticLine[96] = {};
 size_t diagnosticLineLength = 0;
 bool diagnosticLineOverflow = false;
+constexpr uint8_t kBootButtonPin = 0;
+roll_compass::ScreenPowerButton screenPowerButton;
+Backlight *displayBacklight = nullptr;
+bool displayAwake = true;
 
 [[noreturn]] void haltDisplayInitialization(const char *reason) {
     Serial.printf("Display initialization halted: %s\n", reason);
@@ -213,6 +218,41 @@ void processSerialDiagnostics() {
     }
 }
 
+void processScreenPowerButton(uint32_t nowMs) {
+    const bool pressed = digitalRead(kBootButtonPin) == LOW;
+    if (screenPowerButton.update(pressed, nowMs) !=
+        roll_compass::ScreenPowerButtonEvent::Pressed) {
+        return;
+    }
+    if (displayBacklight == nullptr) return;
+
+    const bool shouldWake = !displayAwake;
+    if (shouldWake) {
+        if (!displayBacklight->on()) {
+            Serial.println("BOOT screen toggle failed");
+            return;
+        }
+        if (!displayUiSetAwake(true)) {
+            displayBacklight->off();
+            Serial.println("BOOT screen toggle failed");
+            return;
+        }
+        displayAwake = true;
+    } else {
+        if (!displayUiSetAwake(false)) {
+            Serial.println("BOOT screen toggle failed");
+            return;
+        }
+        if (!displayBacklight->off()) {
+            displayUiSetAwake(true);
+            Serial.println("BOOT screen toggle failed");
+            return;
+        }
+        displayAwake = false;
+    }
+    Serial.printf("BOOT screen: %s\n", displayAwake ? "on" : "off");
+}
+
 void initializeBle() {
     BLEDevice::init(physical_compass::kAdvertisedName);
     BLEDevice::setMTU(517);
@@ -301,6 +341,8 @@ void applyPendingState() {
 
 void setup() {
     Serial.begin(115200);
+    pinMode(kBootButtonPin, INPUT_PULLUP);
+    screenPowerButton.reset(digitalRead(kBootButtonPin) == LOW, millis());
     delay(250);
     Serial.println("Roll Compass board boot");
 
@@ -354,6 +396,8 @@ void setup() {
         lvglReady = lvgl_port_init(board->getLCD(), board->getTouch(), bufferMode);
     }
     if (!lvglReady) haltDisplayInitialization("LVGL initialization failed");
+    displayBacklight = board->getBacklight();
+    if (displayBacklight == nullptr) haltDisplayInitialization("backlight unavailable");
     Serial.printf(
         "psram_total=%lu psram_free=%lu display_mode=%s free_heap=%lu\n",
         static_cast<unsigned long>(ESP.getPsramSize()),
@@ -365,6 +409,7 @@ void setup() {
         displayUiBegin();
         lvgl_port_unlock();
     }
+    displayUiSetAwake(displayAwake);
     initializeBle();
     bootStartedAtMs = millis();
     bootComplete = true;
@@ -376,6 +421,7 @@ void loop() {
     applyPendingState();
     processSerialDiagnostics();
     const uint32_t nowMs = millis();
+    processScreenPowerButton(nowMs);
     renderRuntime(nowMs);
     displayUiTick(nowMs);
     delay(5);

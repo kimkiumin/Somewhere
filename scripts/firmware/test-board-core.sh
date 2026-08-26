@@ -20,6 +20,7 @@ mkdir -p "$test_output_root"
   "$project_root/firmware/roll-compass-board/compass_runtime.cpp" \
   "$project_root/firmware/roll-compass-board/needle_spring.cpp" \
   "$project_root/firmware/roll-compass-board/physical_compass_wire.cpp" \
+  "$project_root/firmware/roll-compass-board/screen_power_button.cpp" \
   -o "$test_output_root/compass-core-test"
 "$test_output_root/compass-core-test"
 
@@ -31,3 +32,9 @@ rg -q 'LVGL_BUFFER_PARTIAL' \
   "$project_root/firmware/roll-compass-board/lvgl_v8_port.cpp"
 rg -q '1310720' \
   "$project_root/firmware/roll-compass-board/roll-compass-board.ino"
+rg -Fq 'lv_indev_enable(lvgl_indev, enabled)' \
+  "$project_root/firmware/roll-compass-board/lvgl_v8_port.cpp"
+rg -Fq 'lv_indev_wait_release(lvgl_indev)' \
+  "$project_root/firmware/roll-compass-board/lvgl_v8_port.cpp"
+rg -Fq 'lvgl_port_set_touch_enabled(awake)' \
+  "$project_root/firmware/roll-compass-board/display_ui.cpp"

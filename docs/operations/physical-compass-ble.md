@@ -136,6 +136,12 @@ Touching the circular face cycles the mount correction through
 `0° → 10° → 20° → 30° → 0°`, rotating the complete UI around the 240×240
 center. It resets to `0°` after every boot.
 
+The physical BOOT button is also the screen button after normal startup. One
+short press turns the backlight off and locks touch input; the next press wakes
+the same live BLE journey screen. This does not power down the ESP32. RST keeps
+its normal hardware-reset behavior. Do not hold BOOT while pressing RST or
+powering on unless firmware download mode is intended.
+
 ## First connection flow
 
 1. Flash the board and leave it powered from USB.

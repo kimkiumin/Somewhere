@@ -178,6 +178,14 @@ bool lvgl_port_lock(int timeout_ms);
  */
 bool lvgl_port_unlock(void);
 
+/**
+ * @brief Enable or disable the registered touch input while the LVGL mutex is held.
+ *        Re-enabling waits for a physical release before accepting a new gesture.
+ *
+ * @return true if a touch input device is registered, otherwise false
+ */
+bool lvgl_port_set_touch_enabled(bool enabled);
+
 #ifdef __cplusplus
 }
 #endif

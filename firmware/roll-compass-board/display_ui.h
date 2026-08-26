@@ -13,3 +13,4 @@ void displayUiSetModel(
 );
 void displayUiTick(uint32_t nowMs);
 void displayUiSetEventCallback(PhysicalCompassEventCallback callback);
+bool displayUiSetAwake(bool awake);

@@ -85,6 +85,13 @@ mount angle. The complete circular UI cycles `0° → 10° → 20° → 30° →
 boot always starts at `0°`. The correction rotates the shell, needle, labels,
 and controls around the true 240×240 glass center.
 
+A short press of the physical BOOT button toggles the LCD backlight like a
+phone power button. BLE, the current journey state, and the firmware remain
+active while the screen is dark, and touch input is locked until the next BOOT
+press wakes it. RST remains the hardware reset button. Avoid holding BOOT while
+pressing RST or powering on because that combination selects firmware download
+mode instead of starting the app.
+
 Wi-Fi and the QMI8658 IMU are intentionally not used for heading in this
 checkpoint. Wi-Fi is reserved for a later OTA/diagnostics milestone, and the
 QMI8658 is not a magnetometer. Without a separately wired LIS2MDL, the board
