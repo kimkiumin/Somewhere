@@ -35,6 +35,7 @@
     "firmware:setup": "bash scripts/firmware/setup-toolchain.sh",
     "firmware:assets": "python3 scripts/firmware/generate-compass-assets.py",
     "firmware:ios": "bash scripts/firmware/generate-ios-project.sh",
+    "firmware:test": "bash scripts/firmware/test-board-core.sh",
     "firmware:compile": "bash scripts/firmware/compile-board.sh",
     "firmware:upload": "bash scripts/firmware/upload-board.sh",
     "firmware:monitor": "bash scripts/firmware/monitor-board.sh",
