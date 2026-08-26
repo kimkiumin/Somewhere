@@ -143,9 +143,11 @@ Expander `1.1.0`, esp-lib-utils `0.2.0`, LVGL `8.4.0`, and ArduinoJson `7.4.3`.
 The exact FQBN is
 `esp32:esp32:waveshare_esp32_s3_touch_lcd_21`. Generated compass assets are
 stored in the checked-in `generated-assets-v1.br` build bundle; the wrapper
-restores and integrity-checks the ignored C/C++ inputs before setup, compile,
+validates every embedded digest before writing, refuses linked/reparse output
+paths, and atomically restores the ignored C/C++ inputs before setup, compile,
 or upload. Ordinary firmware changes therefore do not require a Windows image
-or font generation toolchain.
+or font generation toolchain, and a stale linked file cannot redirect the
+restore outside the firmware directory.
 
 Useful serial commands for a phone-free visual check are `sim on`,
 `target 315`, `heading 0`, `sweep cw`, `state near`, `sweep stop`, and

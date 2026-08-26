@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { brotliDecompressSync } from "node:zlib";
@@ -103,20 +103,44 @@ export async function restoreWindowsBoardAssets(options = {}) {
     throw new Error("generated board asset bundle has an unexpected file list");
   }
 
-  await mkdir(firmwareRoot, { recursive: true });
-  const restored = [];
-  for (const asset of payload.files) {
+  const decodedAssets = payload.files.map((asset) => {
     const bytes = Buffer.from(asset.base64, "base64");
     if (sha256(bytes) !== asset.sha256) {
       throw new Error(`generated board asset failed integrity check: ${asset.name}`);
     }
+    return { ...asset, bytes };
+  });
+
+  await mkdir(firmwareRoot, { recursive: true });
+  const firmwareRootStats = await lstat(firmwareRoot);
+  if (!firmwareRootStats.isDirectory() || firmwareRootStats.isSymbolicLink()) {
+    throw new Error("generated board asset restoration refuses a linked firmware directory");
+  }
+
+  const restored = [];
+  for (const asset of decodedAssets) {
     const output = resolve(firmwareRoot, asset.name);
     let currentMatches = false;
     if (existsSync(output)) {
+      const outputStats = await lstat(output);
+      if (!outputStats.isFile() || outputStats.isSymbolicLink() || outputStats.nlink !== 1) {
+        throw new Error(`generated board asset restoration refuses linked output: ${asset.name}`);
+      }
       currentMatches = sha256(await readFile(output)) === asset.sha256;
     }
-    if (!currentMatches) await writeFile(output, bytes);
-    restored.push({ name: asset.name, bytes: bytes.length, sha256: asset.sha256 });
+    if (!currentMatches) {
+      const temporary = resolve(
+        firmwareRoot,
+        `.${asset.name}.${process.pid}.${randomUUID()}.tmp`,
+      );
+      try {
+        await writeFile(temporary, asset.bytes, { flag: "wx" });
+        await rename(temporary, output);
+      } finally {
+        await rm(temporary, { force: true });
+      }
+    }
+    restored.push({ name: asset.name, bytes: asset.bytes.length, sha256: asset.sha256 });
   }
   return restored;
 }

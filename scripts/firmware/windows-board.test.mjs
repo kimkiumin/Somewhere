@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { brotliCompressSync, brotliDecompressSync, constants } from "node:zlib";
@@ -200,6 +200,80 @@ test("generated asset restoration rejects traversal-like filenames", async () =>
       restoreWindowsBoardAssets({ repositoryRoot: targetRoot, bundlePath }),
     ).rejects.toThrow("generated board asset bundle has an unexpected file list");
     expect(existsSync(resolve(targetRoot, "firmware/outside"))).toBeFalse();
+  } finally {
+    await rm(targetRoot, { recursive: true, force: true });
+  }
+});
+
+test("generated asset restoration rejects linked output files", async () => {
+  const targetRoot = await mkdtemp(resolve(tmpdir(), "somewhere-windows-assets-link-"));
+  try {
+    const firmwareRoot = resolve(targetRoot, "firmware/roll-compass-board");
+    const outside = resolve(targetRoot, "outside-sentinel.h");
+    const output = resolve(firmwareRoot, "compass_asset_metrics.h");
+    await mkdir(firmwareRoot, { recursive: true });
+    await writeFile(outside, "outside-must-not-change");
+    await link(outside, output);
+
+    await expect(
+      restoreWindowsBoardAssets({
+        repositoryRoot: targetRoot,
+        bundlePath: resolve(repositoryRoot, "firmware/roll-compass-board/generated-assets-v1.br"),
+      }),
+    ).rejects.toThrow("refuses linked output");
+    expect(await readFile(outside, "utf8")).toBe("outside-must-not-change");
+  } finally {
+    await rm(targetRoot, { recursive: true, force: true });
+  }
+});
+
+test.skipIf(process.platform === "win32")(
+  "generated asset restoration rejects symbolic output files",
+  async () => {
+    const targetRoot = await mkdtemp(resolve(tmpdir(), "somewhere-windows-assets-symlink-"));
+    try {
+      const firmwareRoot = resolve(targetRoot, "firmware/roll-compass-board");
+      const outside = resolve(targetRoot, "outside-sentinel.h");
+      const output = resolve(firmwareRoot, "compass_asset_metrics.h");
+      await mkdir(firmwareRoot, { recursive: true });
+      await writeFile(outside, "outside-must-not-change");
+      await symlink(outside, output, "file");
+
+      await expect(
+        restoreWindowsBoardAssets({
+          repositoryRoot: targetRoot,
+          bundlePath: resolve(repositoryRoot, "firmware/roll-compass-board/generated-assets-v1.br"),
+        }),
+      ).rejects.toThrow("refuses linked output");
+      expect(await readFile(outside, "utf8")).toBe("outside-must-not-change");
+    } finally {
+      await rm(targetRoot, { recursive: true, force: true });
+    }
+  },
+);
+
+test("generated asset restoration validates the whole bundle before writing", async () => {
+  const targetRoot = await mkdtemp(resolve(tmpdir(), "somewhere-windows-assets-atomic-"));
+  try {
+    const sourceBundle = resolve(
+      repositoryRoot,
+      "firmware/roll-compass-board/generated-assets-v1.br",
+    );
+    const payload = JSON.parse(brotliDecompressSync(await readFile(sourceBundle)).toString("utf8"));
+    payload.files[1].sha256 = "0".repeat(64);
+    const bundlePath = resolve(targetRoot, "tampered-late.br");
+    const firstOutput = resolve(
+      targetRoot,
+      "firmware/roll-compass-board/compass_asset_metrics.h",
+    );
+    await mkdir(resolve(targetRoot, "firmware/roll-compass-board"), { recursive: true });
+    await writeFile(firstOutput, "existing-first-asset");
+    await writeFile(bundlePath, compressTestBundle(payload));
+
+    await expect(
+      restoreWindowsBoardAssets({ repositoryRoot: targetRoot, bundlePath }),
+    ).rejects.toThrow("generated board asset failed integrity check");
+    expect(await readFile(firstOutput, "utf8")).toBe("existing-first-asset");
   } finally {
     await rm(targetRoot, { recursive: true, force: true });
   }
