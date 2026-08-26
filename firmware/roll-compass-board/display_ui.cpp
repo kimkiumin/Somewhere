@@ -7,6 +7,7 @@
 
 #include "compass_assets.h"
 #include "display_copy.h"
+#include "display_hangul_font.h"
 #include "lvgl_v8_port.h"
 
 namespace {
@@ -231,11 +232,14 @@ void renderState() {
 }
 
 void buttonClicked(lv_event_t *event) {
-    if (eventCallback == nullptr) return;
     const char *action = static_cast<const char *>(lv_event_get_user_data(event));
-    if (action != nullptr && physical_compass::hasAction(currentState, action)) {
-        eventCallback(action, currentState.sequence);
-    }
+    if (!lvgl_port_lock(-1)) return;
+    PhysicalCompassEventCallback callback = eventCallback;
+    uint32_t sequence = 0;
+    const bool allowed = callback != nullptr && action != nullptr && physical_compass::hasAction(currentState, action);
+    if (allowed) sequence = currentState.sequence;
+    lvgl_port_unlock();
+    if (allowed) callback(action, sequence);
 }
 
 void animateCompass(uint32_t nowMs) {
@@ -270,6 +274,7 @@ void animateCompass(uint32_t nowMs) {
 }  // namespace
 
 void displayUiBegin() {
+    if (!lvgl_port_lock(-1)) return;
     lv_obj_t *screen = lv_scr_act();
     lv_obj_set_style_bg_color(screen, kCanvas, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
@@ -335,7 +340,7 @@ void displayUiBegin() {
     lv_obj_set_style_shadow_width(statusPill, 8, LV_PART_MAIN);
     lv_obj_set_style_shadow_color(statusPill, kBrass, LV_PART_MAIN);
     lv_obj_set_style_shadow_opa(statusPill, LV_OPA_20, LV_PART_MAIN);
-    heroStatus = makeLabel(statusPill, 8, 5, 276, 20, &lv_font_montserrat_12, kMutedInk);
+    heroStatus = makeLabel(statusPill, 8, 5, 276, 20, &display_hangul_font_14, kMutedInk);
     lv_obj_set_style_text_align(heroStatus, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_style_text_letter_space(heroStatus, 1, LV_PART_MAIN);
 
@@ -349,13 +354,14 @@ void displayUiBegin() {
     lv_obj_set_style_shadow_color(infoPill, kBrass, LV_PART_MAIN);
     lv_obj_set_style_shadow_opa(infoPill, LV_OPA_20, LV_PART_MAIN);
 
-    distanceCaption = makeLabel(infoPill, 14, 5, 136, 14, &lv_font_montserrat_10, kMutedInk);
+    distanceCaption = makeLabel(infoPill, 14, 5, 136, 16, &display_hangul_font_14, kMutedInk);
     lv_label_set_text(distanceCaption, "남은 거리");
     distanceValue = makeLabel(infoPill, 14, 18, 136, 30, &lv_font_montserrat_22, kInk);
     lv_label_set_text(distanceValue, "-- m");
-    categoryValue = makeLabel(infoPill, 154, 8, 196, 18, &lv_font_montserrat_12, kInk);
+    categoryValue = makeLabel(infoPill, 154, 8, 196, 18, &display_hangul_font_14, kInk);
+    lv_label_set_long_mode(categoryValue, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text(categoryValue, "분류 대기");
-    priceLabel = makeLabel(infoPill, 154, 28, 196, 14, &lv_font_montserrat_10, kBrass);
+    priceLabel = makeLabel(infoPill, 154, 28, 196, 18, &display_hangul_font_14, kBrass);
     lv_label_set_text(priceLabel, "가격 미정");
 
     for (uint8_t index = 0; index < 4; ++index) {
@@ -368,7 +374,7 @@ void displayUiBegin() {
         lv_obj_add_event_cb(buttons[index], buttonClicked, LV_EVENT_CLICKED, (void *)actionNames[index]);
         buttonLabels[index] = lv_label_create(buttons[index]);
         lv_label_set_text(buttonLabels[index], actionLabels[index]);
-        lv_obj_set_style_text_font(buttonLabels[index], &lv_font_montserrat_10, LV_PART_MAIN);
+        lv_obj_set_style_text_font(buttonLabels[index], &display_hangul_font_14, LV_PART_MAIN);
         lv_obj_set_style_text_letter_space(buttonLabels[index], 1, LV_PART_MAIN);
         lv_obj_center(buttonLabels[index]);
         setButtonVisible(index, false);
@@ -381,26 +387,30 @@ void displayUiBegin() {
     lv_label_set_text(brandLabel, "ROLL THE COMPASS");
     lv_obj_set_style_text_letter_space(brandLabel, 2, LV_PART_MAIN);
 
-    connectionPill = makePill(screen, 332, 13, 128, 24);
-    connectionLabel = makeLabel(connectionPill, 4, 3, 120, 18, &lv_font_montserrat_10, kOxblood);
+    connectionPill = makePill(screen, 176, 307, 128, 24);
+    connectionLabel = makeLabel(connectionPill, 4, 3, 120, 18, &display_hangul_font_14, kOxblood);
     lv_obj_set_style_text_align(connectionLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 
     renderState();
+    lvgl_port_unlock();
 }
 
 void displayUiSetState(const physical_compass::BoardState &state) {
+    if (!lvgl_port_lock(-1)) return;
     currentState = state;
     hasState = true;
     lastStateMs = millis();
     if (currentState.hasBearing) targetNeedleAngle = normalizeDegrees(currentState.bearingDegrees);
-    if (lvgl_port_lock(-1)) {
-        renderState();
-        lvgl_port_unlock();
-    }
+    renderState();
+    lvgl_port_unlock();
 }
 
 void displayUiSetConnection(bool value) {
-    if (connected == value) return;
+    if (!lvgl_port_lock(-1)) return;
+    if (connected == value) {
+        lvgl_port_unlock();
+        return;
+    }
     connected = value;
     if (!connected) {
         currentState = physical_compass::BoardState();
@@ -409,16 +419,13 @@ void displayUiSetConnection(bool value) {
         currentNeedleAngle = 0.0f;
         targetNeedleAngle = 0.0f;
     }
-    if (lvgl_port_lock(-1)) {
-        renderState();
-        lvgl_port_unlock();
-    }
+    renderState();
+    lvgl_port_unlock();
 }
 
 void displayUiTick(uint32_t nowMs) {
     if (lvgl_port_lock(-1)) {
-        if (hasState && nowMs - lastStateMs >= physical_compass::kStaleAfterMs && compassNeedle != nullptr &&
-            !lv_obj_has_flag(compassNeedle, LV_OBJ_FLAG_HIDDEN)) {
+        if (hasState && nowMs - lastStateMs >= physical_compass::kStaleAfterMs) {
             renderState();
         }
         animateCompass(nowMs);
@@ -427,5 +434,7 @@ void displayUiTick(uint32_t nowMs) {
 }
 
 void displayUiSetEventCallback(PhysicalCompassEventCallback callback) {
+    if (!lvgl_port_lock(-1)) return;
     eventCallback = callback;
+    lvgl_port_unlock();
 }

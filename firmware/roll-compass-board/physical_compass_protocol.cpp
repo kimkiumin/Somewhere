@@ -93,7 +93,7 @@ public:
 
     bool parse(JsonValue &value) {
         skipWhitespace();
-        if (!parseValue(value)) return false;
+        if (!parseValue(value, 0)) return false;
         skipWhitespace();
         return position_ == length_;
     }
@@ -113,7 +113,7 @@ private:
         return true;
     }
 
-    bool parseValue(JsonValue &value) {
+    bool parseValue(JsonValue &value, size_t depth) {
         if (position_ >= length_) return false;
         switch (data_[position_]) {
             case 'n': return parseLiteral("null", JsonKind::nullValue, value);
@@ -127,9 +127,11 @@ private:
                 value.kind = JsonKind::string;
                 return parseString(value.string);
             case '[':
-                return parseArray(value);
+                if (depth >= kMaxJsonDepth) return false;
+                return parseArray(value, depth + 1);
             case '{':
-                return parseObject(value);
+                if (depth >= kMaxJsonDepth) return false;
+                return parseObject(value, depth + 1);
             default:
                 if (data_[position_] == '-' || (data_[position_] >= '0' && data_[position_] <= '9')) {
                     value.kind = JsonKind::number;
@@ -248,7 +250,7 @@ private:
         return appendCodePoint(unit, output);
     }
 
-    bool parseArray(JsonValue &value) {
+    bool parseArray(JsonValue &value, size_t depth) {
         if (!consume('[')) return false;
         value.kind = JsonKind::array;
         value.array.clear();
@@ -257,7 +259,7 @@ private:
         while (true) {
             JsonValue item;
             skipWhitespace();
-            if (!parseValue(item)) return false;
+            if (!parseValue(item, depth)) return false;
             value.array.push_back(item);
             skipWhitespace();
             if (consume(']')) return true;
@@ -265,7 +267,7 @@ private:
         }
     }
 
-    bool parseObject(JsonValue &value) {
+    bool parseObject(JsonValue &value, size_t depth) {
         if (!consume('{')) return false;
         value.kind = JsonKind::object;
         value.object.clear();
@@ -280,7 +282,7 @@ private:
             if (!consume(':')) return false;
             skipWhitespace();
             JsonValue item;
-            if (!parseValue(item)) return false;
+            if (!parseValue(item, depth)) return false;
             if (!value.object.emplace(key, item).second) return false;
             skipWhitespace();
             if (consume('}')) return true;
@@ -630,6 +632,7 @@ bool BoardSession::hasFreshState(uint64_t nowMs) const {
 }
 
 bool BoardSession::canEmitAction(const char *action, uint32_t sequence, uint64_t nowMs) const {
+    if (hasPendingState_) return false;
     return hasFreshState(nowMs) && sequence > 0 && sequence == acceptedState_.sequence && hasAction(acceptedState_, action);
 }
 

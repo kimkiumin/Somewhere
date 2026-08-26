@@ -148,6 +148,40 @@ void testReassemblyCoalescingAndOversizeRecovery() {
     expect(accepted.sequence == 4, "valid frame after oversized line is still accepted");
 }
 
+void testPendingNewerStateSuppressesOlderActions() {
+    physical_compass::BoardSession session;
+    session.beginConnection();
+    appendInChunks(session, stateFrame(8, "[]", "[\"stop\"]"), 13);
+    physical_compass::BoardState accepted;
+    expect(session.takePendingState(100, accepted), "accepted state is available before pending-state guard");
+    expect(session.canEmitAction("stop", 8, 101), "accepted state can authorize before a newer state arrives");
+
+    appendInChunks(session, stateFrame(9, "[]", "[\"reveal\"]"), 13);
+    expect(!session.canEmitAction("stop", 8, 102), "older accepted action is blocked while newer state is pending");
+    expect(!session.canEmitAction("reveal", 9, 102), "pending state is not actionable before application");
+    expect(session.takePendingState(103, accepted), "newer state is eventually applied");
+    expect(session.canEmitAction("reveal", 9, 104), "newly accepted state restores only its advertised action");
+}
+
+void testJsonDepthLimitAndSafePriceFallback() {
+    std::string nested = "\"category\"";
+    constexpr size_t expectedMaxJsonDepth = 8;
+    for (size_t depth = 0; depth < expectedMaxJsonDepth + 2; ++depth) {
+        nested = "[" + nested + "]";
+    }
+    const std::string deepFrame = stateFrame(1, nested);
+    physical_compass::BoardState state;
+    expect(!physical_compass::parseStateFrame(
+                reinterpret_cast<const uint8_t *>(deepFrame.data()), deepFrame.size(), state),
+        "JSON nesting beyond the parser budget is rejected before materialization");
+
+    expect(physical_compass::display::priceText("low") == "가벼운 가격대", "low price code has Korean copy");
+    expect(physical_compass::display::priceText("medium") == "보통 가격대", "medium price code has Korean copy");
+    expect(physical_compass::display::priceText("high") == "높은 가격대", "high price code has Korean copy");
+    expect(physical_compass::display::priceText("<arbitrary destination text>") == "가격 미정",
+        "unknown price text falls back instead of rendering wire data");
+}
+
 void testFourActionContractAndGuards() {
     expect(physical_compass::actionIndex("stop") == physical_compass::kStop, "stop is an allowed action");
     expect(physical_compass::actionIndex("continue") == physical_compass::kContinue, "continue is an allowed action");
@@ -212,6 +246,8 @@ int main() {
     testDisconnectClearsFreshnessAndActionAuthority();
     testUtf8BoundariesAndMalformedFrames();
     testReassemblyCoalescingAndOversizeRecovery();
+    testPendingNewerStateSuppressesOlderActions();
+    testJsonDepthLimitAndSafePriceFallback();
     testFourActionContractAndGuards();
     testEventChunkingIsAttSafeAndOrdered();
     testKoreanDisplayCopy();
@@ -220,6 +256,6 @@ int main() {
         std::cerr << failures << " host firmware assertions failed\n";
         return 1;
     }
-    std::cout << "firmware host tests: 7 suites, " << checks << " assertions passed\n";
+    std::cout << "firmware host tests: 9 suites, " << checks << " assertions passed\n";
     return 0;
 }

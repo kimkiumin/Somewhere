@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_ROOT/common.sh"
 require_toolchain
+rm -rf "$FIRMWARE_BUILD_ROOT"
 mkdir -p "$FIRMWARE_BUILD_ROOT"
 
 COMPILE_LOG="$PROJECT_ROOT/.local-artifacts/firmware-compile.log"

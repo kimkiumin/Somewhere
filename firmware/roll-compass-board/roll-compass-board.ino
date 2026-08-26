@@ -20,6 +20,7 @@ BLECharacteristic *stateCharacteristic = nullptr;
 BLECharacteristic *eventCharacteristic = nullptr;
 SemaphoreHandle_t pendingStateMutex = nullptr;
 volatile bool bleConnected = false;
+volatile bool eventNotifyFailed = false;
 physical_compass::BoardSession boardSession;
 
 class ServerCallbacks final : public BLEServerCallbacks {
@@ -51,28 +52,45 @@ class StateCallbacks final : public BLECharacteristicCallbacks {
     }
 };
 
-void sendPhysicalCompassEvent(const char *action, uint32_t sequence) {
+class EventNotifyCallbacks final : public BLECharacteristicCallbacks {
+    void onStatus(BLECharacteristic *, Status status, uint32_t) override {
+        if (status != SUCCESS_NOTIFY) eventNotifyFailed = true;
+    }
+};
+
+void sendPhysicalCompassEventLocked(const char *action, uint32_t sequence) {
     if (!bleConnected || eventCharacteristic == nullptr) return;
     const std::string frame = physical_compass::encodeEvent(action, sequence);
     if (frame.empty()) return;
     const uint16_t connectionId = bleServer == nullptr ? 0 : bleServer->getConnId();
     const uint16_t negotiatedMtu = bleServer == nullptr ? 0 : bleServer->getPeerMTU(connectionId);
     const std::vector<std::string> chunks = physical_compass::chunkEventFrame(frame, negotiatedMtu);
-    for (const std::string &chunk : chunks) {
-        eventCharacteristic->setValue(reinterpret_cast<const uint8_t *>(chunk.data()), chunk.size());
-        eventCharacteristic->notify();
+    for (size_t chunkIndex = 0; chunkIndex < chunks.size(); ++chunkIndex) {
+        bool delivered = false;
+        for (uint8_t attempt = 0; attempt < physical_compass::kMaxEventDeliveryAttempts; ++attempt) {
+            eventNotifyFailed = false;
+            const std::string &chunk = chunks[chunkIndex];
+            eventCharacteristic->setValue(reinterpret_cast<const uint8_t *>(chunk.data()), chunk.size());
+            eventCharacteristic->notify();
+            if (!eventNotifyFailed) {
+                delivered = true;
+                break;
+            }
+        }
+        if (!delivered) {
+            Serial.printf("BLE event chunk failed: %s (%u)\n", action, static_cast<unsigned>(chunkIndex));
+            return;
+        }
     }
     Serial.printf("BLE event: %s\n", action);
 }
 
 void onTouchAction(const char *action, uint32_t sequence) {
-    bool allowed = false;
     if (pendingStateMutex != nullptr && xSemaphoreTake(pendingStateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-        allowed = boardSession.canEmitAction(action, sequence, millis());
+        if (boardSession.canEmitAction(action, sequence, millis())) {
+            sendPhysicalCompassEventLocked(action, sequence);
+        }
         xSemaphoreGive(pendingStateMutex);
-    }
-    if (allowed) {
-        sendPhysicalCompassEvent(action, sequence);
     }
 }
 
@@ -92,6 +110,7 @@ void initializeBle() {
         physical_compass::kEventCharacteristicUuid,
         BLECharacteristic::PROPERTY_NOTIFY
     );
+    eventCharacteristic->setCallbacks(new EventNotifyCallbacks());
     service->start();
 
     BLEAdvertising *advertising = BLEDevice::getAdvertising();
@@ -125,7 +144,6 @@ void setup() {
     Serial.println("Roll Compass board boot");
 
     pendingStateMutex = xSemaphoreCreateMutex();
-    displayUiSetEventCallback(onTouchAction);
 
     Serial.println("Initializing display panel");
     Board *board = new Board();
@@ -135,6 +153,7 @@ void setup() {
 #endif
     assert(board->begin());
     assert(lvgl_port_init(board->getLCD(), board->getTouch()));
+    displayUiSetEventCallback(onTouchAction);
     displayUiBegin();
     initializeBle();
     displayUiSetConnection(false);

@@ -14,3 +14,5 @@ c++ -std=c++17 -Wall -Wextra -Werror -pedantic \
     -o "$BUILD_ROOT/physical_compass_wire_test"
 
 "$BUILD_ROOT/physical_compass_wire_test"
+
+bash "$SCRIPT_ROOT/display_source_contract_test.sh"

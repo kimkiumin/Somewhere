@@ -11,4 +11,5 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
     exit 1
 fi
 
-exec "$PYTHON_BIN" "$SCRIPT_ROOT/generate-compass-assets.py" "$@"
+"$PYTHON_BIN" "$SCRIPT_ROOT/generate-compass-assets.py" "$@"
+exec "$PYTHON_BIN" "$SCRIPT_ROOT/generate-hangul-font.py"

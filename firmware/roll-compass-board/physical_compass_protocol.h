@@ -13,6 +13,8 @@ constexpr size_t kMaxDisplayBytes = 40;
 constexpr size_t kMaxReassemblyBytes = kMaxFrameBytes * 2;
 constexpr size_t kFallbackAttPayloadBytes = 20;
 constexpr size_t kAttProtocolOverheadBytes = 3;
+constexpr size_t kMaxJsonDepth = 8;
+constexpr uint8_t kMaxEventDeliveryAttempts = 3;
 constexpr uint64_t kStaleAfterMs = 6000;
 
 constexpr char kServiceUuid[] = "C1F8A100-35D1-4C53-9A03-7A1B3E620001";

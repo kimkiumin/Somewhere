@@ -15,7 +15,7 @@ std::string priceText(const std::string &value) {
     if (value == "low") return "가벼운 가격대";
     if (value == "medium") return "보통 가격대";
     if (value == "high") return "높은 가격대";
-    return value.empty() ? "가격 미정" : value;
+    return "가격 미정";
 }
 
 std::string phaseStatus(bool fresh, bool credible, bool revealed, bool near, bool connected) {
