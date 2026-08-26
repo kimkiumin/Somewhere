@@ -53,12 +53,14 @@ final class JourneyStore: ObservableObject {
     @Published private(set) var noFitConditions: [SomewhereConditionIssue] = []
     @Published private(set) var lastRevealReason: String?
     @Published private(set) var lastStopReason: String?
-    @Published private(set) var physicalCompassConnectionState: PhysicalCompassConnectionState = .disconnected
+    @Published private(set) var physicalCompassConnectionState: PhysicalCompassConnectionState = .disabled
+    @Published private(set) var isPhysicalCompassHostEnabled: Bool
 
     let locationController: LocationController
     let notificationController: NotificationController
     let physicalCompass: any PhysicalCompassClient
     private let service: any JourneyServiceProtocol
+    private let physicalCompassDefaults: UserDefaults
     private var guidanceEngine = GuidanceEngine()
     private var arrivalGate = ArrivalGate()
     private var trustedRoute: TrustedRoute?
@@ -76,12 +78,17 @@ final class JourneyStore: ObservableObject {
         service: any JourneyServiceProtocol,
         locationController: LocationController = LocationController(),
         notificationController: NotificationController = NotificationController(),
-        physicalCompass: any PhysicalCompassClient = InertPhysicalCompassClient()
+        physicalCompass: any PhysicalCompassClient = InertPhysicalCompassClient(),
+        physicalCompassDefaults: UserDefaults = .standard,
+        physicalCompassHostEnabled: Bool? = nil
     ) {
         self.service = service
         self.locationController = locationController
         self.notificationController = notificationController
         self.physicalCompass = physicalCompass
+        self.physicalCompassDefaults = physicalCompassDefaults
+        self.isPhysicalCompassHostEnabled = physicalCompassHostEnabled
+            ?? PhysicalCompassHostPersistence.load(defaults: physicalCompassDefaults)
         self.preferences = SomewherePreferencesPersistence.loadPreferences()
         self.profile = SomewherePreferencesPersistence.loadProfile()
         self.isOnboardingRequired = !SomewherePreferencesPersistence.hasCompletedOnboarding()
@@ -114,12 +121,28 @@ final class JourneyStore: ObservableObject {
             .sink { [weak self] denied in if denied { self?.presentedError = .unavailable } }
             .store(in: &cancellables)
         physicalCompass.onConnectionState = { [weak self] state in
-            self?.physicalCompassConnectionState = state
+            self?.handlePhysicalCompassConnectionState(state)
         }
         physicalCompass.onEvent = { [weak self] event in
             self?.handlePhysicalCompassEvent(event)
         }
-        physicalCompass.start()
+        if isPhysicalCompassHostEnabled {
+            physicalCompass.start()
+        }
+    }
+
+    func setPhysicalCompassHostEnabled(_ enabled: Bool) {
+        guard enabled != isPhysicalCompassHostEnabled else { return }
+        isPhysicalCompassHostEnabled = enabled
+        PhysicalCompassHostPersistence.save(enabled, defaults: physicalCompassDefaults)
+        lastPhysicalCompassSnapshot = nil
+        if enabled {
+            physicalCompassConnectionState = .scanning
+            physicalCompass.start()
+        } else {
+            physicalCompass.stop()
+            physicalCompassConnectionState = .disabled
+        }
     }
 
     func start(category: String, maxWalkMinutes: Int, budgetBand: String) async {
@@ -504,7 +527,9 @@ final class JourneyStore: ObservableObject {
     }
 
     private func handlePhysicalCompassEvent(_ event: PhysicalCompassEvent) {
-        guard let snapshot = lastPhysicalCompassSnapshot,
+        guard isPhysicalCompassHostEnabled,
+              physicalCompassConnectionState == .connected,
+              let snapshot = lastPhysicalCompassSnapshot,
               let projection,
               case .action(let action, let sequence) = event,
               sequence == snapshot.sequence else { return }
@@ -522,12 +547,32 @@ final class JourneyStore: ObservableObject {
         case .reveal:
             guard projection.actions.contains(.reveal) else { return }
             requestReveal()
-        case .review:
+        }
+    }
+
+    private func handlePhysicalCompassConnectionState(_ state: PhysicalCompassConnectionState) {
+        guard isPhysicalCompassHostEnabled else {
+            physicalCompassConnectionState = .disabled
+            lastPhysicalCompassSnapshot = nil
+            return
+        }
+        physicalCompassConnectionState = state
+        switch state {
+        case .connected:
             break
+        case .stale:
+            lastPhysicalCompassSnapshot = nil
+            syncPhysicalCompass()
+        case .disabled, .unavailable, .disconnected, .scanning, .connecting:
+            lastPhysicalCompassSnapshot = nil
         }
     }
 
     private func syncPhysicalCompass() {
+        guard isPhysicalCompassHostEnabled else {
+            lastPhysicalCompassSnapshot = nil
+            return
+        }
         let nextSequence = physicalCompassSequence + 1
         let remainingDistanceM: Double?
         let bearingDegrees: Double?
@@ -544,10 +589,10 @@ final class JourneyStore: ObservableObject {
         }
 
         let menus = Array((projection?.disclosure?.representativeCategories ?? []).prefix(2)).map {
-            String($0.prefix(PhysicalCompassBLE.maxDisplayCharacters))
+            PhysicalCompassWire.truncateDisplayText($0)
         }
         let priceBand = projection?.disclosure.map {
-            String($0.priceBand.prefix(PhysicalCompassBLE.maxDisplayCharacters))
+            PhysicalCompassWire.truncateDisplayText($0.priceBand)
         }
         let actions = JourneyAction.allCases.compactMap { action -> PhysicalCompassAction? in
             guard projection?.actions.contains(action) == true else { return nil }

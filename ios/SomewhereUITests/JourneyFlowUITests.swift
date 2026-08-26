@@ -535,6 +535,27 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertTrue(app.switches["somewhere.profile-allergies-none"].exists)
     }
 
+    func testPhysicalCompassHostSettingsAreExplicitAndShowDeterministicStatus() {
+        let app = launchStartSurface(extraArguments: [
+            "--ui-test-board-state", "connected",
+        ])
+
+        let menu = app.buttons["somewhere.profile-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 3))
+        menu.tap()
+        let boardEntry = app.buttons["물리 나침반 연결"]
+        XCTAssertTrue(boardEntry.waitForExistence(timeout: 2))
+        boardEntry.tap()
+
+        let surface = app.descendants(matching: .any)["somewhere.physical-compass-settings"]
+        let toggle = app.switches["somewhere.physical-compass-host-toggle"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 3))
+        XCTAssertTrue(toggle.exists)
+        XCTAssertEqual(toggle.value as? String, "1")
+        XCTAssertTrue(app.staticTexts["연결됨"].exists)
+        XCTAssertTrue(app.staticTexts["주변 iPad 또는 iPhone 한 대에서만 연결을 켜세요."].exists)
+    }
+
     func testHarnessCanShowRevealedDestination() {
         let app = launchHarness("arrived-revealed")
         XCTAssertTrue(app.staticTexts["somewhere.revealed-name"].waitForExistence(timeout: 2))
@@ -565,9 +586,9 @@ final class JourneyFlowUITests: XCTestCase {
         return app
     }
 
-    private func launchStartSurface() -> XCUIApplication {
+    private func launchStartSurface(extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-test-no-notifications"]
+        app.launchArguments = ["--ui-test-no-notifications"] + extraArguments
         app.launch()
         let onboarding = app.buttons["somewhere.onboarding-continue"]
         if onboarding.waitForExistence(timeout: 5) {

@@ -35,10 +35,71 @@ final class PhysicalCompassWireTests: XCTestCase {
     }
 
     func testEveryBoardActionRoundTrips() throws {
+        XCTAssertFalse(PhysicalCompassAction.allCases.map(\.rawValue).contains("review"))
         for action in PhysicalCompassAction.allCases {
             let frame = try PhysicalCompassWire.encodeEvent(action, sequence: 9)
             XCTAssertEqual(try PhysicalCompassWire.decodeEvent(frame), .action(action, sequence: 9))
         }
+    }
+
+    func testEventSequenceMustBePositive() throws {
+        XCTAssertThrowsError(try PhysicalCompassWire.encodeEvent(.stop, sequence: 0)) { error in
+            XCTAssertEqual(error as? PhysicalCompassWireError, .invalidSequence)
+        }
+        let zero = Data("{\"v\":1,\"type\":\"event\",\"action\":\"stop\",\"seq\":0}\n".utf8)
+        XCTAssertThrowsError(try PhysicalCompassWire.decodeEvent(zero)) { error in
+            XCTAssertEqual(error as? PhysicalCompassWireError, .invalidSequence)
+        }
+    }
+
+    func testDisplayLimitsUseUTF8BytesAndTruncateAtGraphemeBoundaries() throws {
+        let oversizedKorean = String(repeating: "가", count: 14)
+        XCTAssertGreaterThan(oversizedKorean.utf8.count, PhysicalCompassBLE.maxDisplayBytes)
+        XCTAssertThrowsError(try makeSnapshot(menus: [oversizedKorean])) { error in
+            XCTAssertEqual(error as? PhysicalCompassWireError, .invalidPayload)
+        }
+
+        let truncated = PhysicalCompassWire.truncateDisplayText(oversizedKorean)
+        XCTAssertLessThanOrEqual(truncated.utf8.count, PhysicalCompassBLE.maxDisplayBytes)
+        XCTAssertTrue(oversizedKorean.hasPrefix(truncated))
+        XCTAssertNoThrow(try makeSnapshot(menus: [truncated]))
+    }
+
+    func testTransportQueueFinishesInFlightFrameAndCoalescesOnlyQueuedFrame() throws {
+        var queue = PhysicalCompassFrameQueue()
+        let first = Data("first\n".utf8)
+        let replaced = Data("second\n".utf8)
+        let latest = Data("latest\n".utf8)
+
+        queue.enqueue(first)
+        let firstChunk = try XCTUnwrap(queue.nextChunk(maxLength: 3))
+        XCTAssertEqual(firstChunk.data, Data("fir".utf8))
+        XCTAssertFalse(firstChunk.completesFrame)
+
+        queue.enqueue(replaced)
+        queue.enqueue(latest)
+
+        var emitted = firstChunk.data
+        var completionCount = 0
+        while let chunk = queue.nextChunk(maxLength: 3) {
+            emitted.append(chunk.data)
+            if chunk.completesFrame { completionCount += 1 }
+        }
+
+        XCTAssertEqual(emitted, first + latest)
+        XCTAssertEqual(completionCount, 2)
+        XCTAssertTrue(queue.isEmpty)
+    }
+
+    func testTransportQueueCanBeClearedAcrossReconnectEpochs() throws {
+        var queue = PhysicalCompassFrameQueue()
+        queue.enqueue(Data("stale-state\n".utf8))
+        _ = queue.nextChunk(maxLength: 2)
+
+        queue.removeAll()
+
+        XCTAssertTrue(queue.isEmpty)
+        XCTAssertNil(queue.nextChunk(maxLength: 20))
     }
 
     func testChunkReassemblyHandlesBLEWrites() throws {

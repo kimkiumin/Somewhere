@@ -3,18 +3,32 @@ import Foundation
 enum PhysicalCompassBLE {
     static let contractVersion = 1
     static let maxFrameBytes = 512
-    static let maxDisplayCharacters = 40
+    static let maxDisplayBytes = 40
     static let serviceUUID = "C1F8A100-35D1-4C53-9A03-7A1B3E620001"
     static let stateCharacteristicUUID = "C1F8A101-35D1-4C53-9A03-7A1B3E620001"
     static let eventCharacteristicUUID = "C1F8A102-35D1-4C53-9A03-7A1B3E620001"
     static let advertisedName = "Roll Compass"
 }
 
+enum PhysicalCompassHostPersistence {
+    private static let enabledKey = "somewhere.physical-compass.host-enabled.v1"
+
+    static func load(defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: enabledKey)
+    }
+
+    static func save(_ enabled: Bool, defaults: UserDefaults = .standard) {
+        defaults.set(enabled, forKey: enabledKey)
+    }
+}
+
 enum PhysicalCompassConnectionState: Equatable, Sendable {
+    case disabled
     case unavailable
     case disconnected
     case scanning
     case connecting
+    case stale
     case connected
 }
 
@@ -23,7 +37,6 @@ enum PhysicalCompassAction: String, Codable, CaseIterable, Hashable, Sendable {
     case `continue`
     case confirmStop = "confirm-stop"
     case reveal
-    case review
 }
 
 enum PhysicalCompassEvent: Equatable, Sendable {
@@ -65,10 +78,10 @@ struct PhysicalCompassSnapshot: Equatable, Sendable {
         timestampMs: Int64
     ) throws {
         guard sequence > 0 else { throw PhysicalCompassWireError.invalidSequence }
-        guard !phase.isEmpty, phase.count <= PhysicalCompassBLE.maxDisplayCharacters else {
+        guard PhysicalCompassWire.isValidDisplayText(phase) else {
             throw PhysicalCompassWireError.invalidPayload
         }
-        guard !confidence.isEmpty, confidence.count <= PhysicalCompassBLE.maxDisplayCharacters else {
+        guard PhysicalCompassWire.isValidDisplayText(confidence) else {
             throw PhysicalCompassWireError.invalidPayload
         }
         if let remainingDistanceM,
@@ -80,14 +93,13 @@ struct PhysicalCompassSnapshot: Equatable, Sendable {
             throw PhysicalCompassWireError.invalidNumber
         }
         guard menus.count <= 2,
-              menus.allSatisfy({ !$0.isEmpty && $0.count <= PhysicalCompassBLE.maxDisplayCharacters }) else {
+              menus.allSatisfy(PhysicalCompassWire.isValidDisplayText) else {
             throw PhysicalCompassWireError.invalidPayload
         }
         guard Set(actions).count == actions.count else {
             throw PhysicalCompassWireError.invalidPayload
         }
-        if let priceBand,
-           priceBand.isEmpty || priceBand.count > PhysicalCompassBLE.maxDisplayCharacters {
+        if let priceBand, !PhysicalCompassWire.isValidDisplayText(priceBand) {
             throw PhysicalCompassWireError.invalidPayload
         }
         guard timestampMs >= 0 else { throw PhysicalCompassWireError.invalidNumber }
@@ -125,7 +137,7 @@ enum PhysicalCompassWire {
     }
 
     static func encodeEvent(_ action: PhysicalCompassAction, sequence: Int) throws -> Data {
-        guard sequence >= 0 else { throw PhysicalCompassWireError.invalidSequence }
+        guard sequence > 0 else { throw PhysicalCompassWireError.invalidSequence }
         let envelope = EventEnvelope(
             version: PhysicalCompassBLE.contractVersion,
             type: "event",
@@ -149,7 +161,7 @@ enum PhysicalCompassWire {
             throw PhysicalCompassWireError.invalidVersion
         }
         guard envelope.type == "event" else { throw PhysicalCompassWireError.invalidType }
-        guard envelope.sequence >= 0 else { throw PhysicalCompassWireError.invalidSequence }
+        guard envelope.sequence > 0 else { throw PhysicalCompassWireError.invalidSequence }
         guard let action = PhysicalCompassAction(rawValue: envelope.action) else {
             throw PhysicalCompassWireError.invalidAction
         }
@@ -176,6 +188,21 @@ enum PhysicalCompassWire {
             }
         }
         return frames
+    }
+
+    static func isValidDisplayText(_ value: String) -> Bool {
+        !value.isEmpty && value.utf8.count <= PhysicalCompassBLE.maxDisplayBytes
+    }
+
+    static func truncateDisplayText(_ value: String) -> String {
+        var result = ""
+        result.reserveCapacity(min(value.count, PhysicalCompassBLE.maxDisplayBytes))
+        for character in value {
+            let candidate = result + String(character)
+            guard candidate.utf8.count <= PhysicalCompassBLE.maxDisplayBytes else { break }
+            result = candidate
+        }
+        return result
     }
 
     private static let maxReassemblyBytes = PhysicalCompassBLE.maxFrameBytes * 2

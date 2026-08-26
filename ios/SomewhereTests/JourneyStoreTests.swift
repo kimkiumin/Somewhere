@@ -45,13 +45,19 @@ private final class RecordingPhysicalCompassClient: PhysicalCompassClient {
     var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
     var onEvent: ((PhysicalCompassEvent) -> Void)?
     private(set) var sentSnapshots: [PhysicalCompassSnapshot] = []
+    private(set) var startCount = 0
+    private(set) var stopCount = 0
 
-    func start() {}
-    func stop() {}
+    func start() { startCount += 1 }
+    func stop() { stopCount += 1 }
     func send(_ snapshot: PhysicalCompassSnapshot) { sentSnapshots.append(snapshot) }
 
     func emit(_ event: PhysicalCompassEvent) {
         onEvent?(event)
+    }
+
+    func emitConnection(_ state: PhysicalCompassConnectionState) {
+        onConnectionState?(state)
     }
 }
 
@@ -225,7 +231,11 @@ final class JourneyStoreTests: XCTestCase {
     func testPhysicalCompassProjectionContainsOnlySafeGuidanceFields() throws {
         let following = try projection(phase: "following", revealed: false)
         let compass = RecordingPhysicalCompassClient()
-        let store = JourneyStore(service: FakeJourneyService(response: following), physicalCompass: compass)
+        let store = JourneyStore(
+            service: FakeJourneyService(response: following),
+            physicalCompass: compass,
+            physicalCompassHostEnabled: true
+        )
 
         store.applyServerProjection(following)
 
@@ -240,7 +250,11 @@ final class JourneyStoreTests: XCTestCase {
     func testPhysicalCompassReceivesCrediblePhoneGuidance() throws {
         let following = try projection(phase: "following", revealed: false)
         let compass = RecordingPhysicalCompassClient()
-        let store = JourneyStore(service: FakeJourneyService(response: following), physicalCompass: compass)
+        let store = JourneyStore(
+            service: FakeJourneyService(response: following),
+            physicalCompass: compass,
+            physicalCompassHostEnabled: true
+        )
         store.applyServerProjection(following)
 
         store.presentGuidanceForTesting(bearing: 315, remainingM: 420)
@@ -257,7 +271,12 @@ final class JourneyStoreTests: XCTestCase {
         let paused = try projection(phase: "paused", revealed: false)
         let service = FakeJourneyService(response: paused)
         let compass = RecordingPhysicalCompassClient()
-        let store = JourneyStore(service: service, physicalCompass: compass)
+        let store = JourneyStore(
+            service: service,
+            physicalCompass: compass,
+            physicalCompassHostEnabled: true
+        )
+        compass.emitConnection(.connected)
         store.applyServerProjection(following)
         let snapshot = try XCTUnwrap(compass.sentSnapshots.last)
 
@@ -273,7 +292,12 @@ final class JourneyStoreTests: XCTestCase {
         let following = try projection(phase: "following", revealed: false)
         let service = FakeJourneyService(response: try projection(phase: "paused", revealed: false))
         let compass = RecordingPhysicalCompassClient()
-        let store = JourneyStore(service: service, physicalCompass: compass)
+        let store = JourneyStore(
+            service: service,
+            physicalCompass: compass,
+            physicalCompassHostEnabled: true
+        )
+        compass.emitConnection(.connected)
         store.applyServerProjection(following)
         let snapshot = try XCTUnwrap(compass.sentSnapshots.last)
 
@@ -283,6 +307,62 @@ final class JourneyStoreTests: XCTestCase {
         let commands = await service.capturedCommands()
         XCTAssertEqual(commands, [])
         XCTAssertFalse(store.isGuidancePaused)
+    }
+
+    func testPhysicalCompassHostIsOptInAndPersistsExplicitOwnership() throws {
+        let following = try projection(phase: "following", revealed: false)
+        let compass = RecordingPhysicalCompassClient()
+        let suiteName = "JourneyStoreTests.\(UUID().uuidString)"
+        let suite = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { suite.removePersistentDomain(forName: suiteName) }
+        let store = JourneyStore(
+            service: FakeJourneyService(response: following),
+            physicalCompass: compass,
+            physicalCompassDefaults: suite
+        )
+
+        XCTAssertFalse(store.isPhysicalCompassHostEnabled)
+        XCTAssertEqual(store.physicalCompassConnectionState, .disabled)
+        XCTAssertEqual(compass.startCount, 0)
+
+        store.setPhysicalCompassHostEnabled(true)
+        XCTAssertTrue(store.isPhysicalCompassHostEnabled)
+        XCTAssertTrue(PhysicalCompassHostPersistence.load(defaults: suite))
+        XCTAssertEqual(compass.startCount, 1)
+
+        store.setPhysicalCompassHostEnabled(false)
+        XCTAssertFalse(PhysicalCompassHostPersistence.load(defaults: suite))
+        XCTAssertEqual(compass.stopCount, 1)
+        XCTAssertEqual(store.physicalCompassConnectionState, .disabled)
+    }
+
+    func testReconnectStaleStateRequiresFreshSnapshotBeforeBoardEvents() async throws {
+        let following = try projection(phase: "following", revealed: false)
+        let paused = try projection(phase: "paused", revealed: false)
+        let service = FakeJourneyService(response: paused)
+        let compass = RecordingPhysicalCompassClient()
+        let store = JourneyStore(
+            service: service,
+            physicalCompass: compass,
+            physicalCompassHostEnabled: true
+        )
+        store.applyServerProjection(following)
+        let beforeReconnect = try XCTUnwrap(compass.sentSnapshots.last)
+
+        compass.emitConnection(.stale)
+        let fresh = try XCTUnwrap(compass.sentSnapshots.last)
+        XCTAssertGreaterThan(fresh.sequence, beforeReconnect.sequence)
+
+        compass.emit(.action(.stop, sequence: beforeReconnect.sequence))
+        try await Task.sleep(for: .milliseconds(50))
+        let staleCommands = await service.capturedCommands()
+        XCTAssertEqual(staleCommands, [])
+
+        compass.emitConnection(.connected)
+        compass.emit(.action(.stop, sequence: fresh.sequence))
+        try await Task.sleep(for: .milliseconds(50))
+        let freshCommands = await service.capturedCommands()
+        XCTAssertEqual(freshCommands, [.requestStop])
     }
 
     private func store(phase: String) async throws -> JourneyStore {

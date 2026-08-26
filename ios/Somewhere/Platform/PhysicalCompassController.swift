@@ -2,6 +2,50 @@ import Combine
 import Foundation
 @preconcurrency import CoreBluetooth
 
+struct PhysicalCompassWriteChunk: Equatable, Sendable {
+    let data: Data
+    let completesFrame: Bool
+}
+
+struct PhysicalCompassFrameQueue: Sendable {
+    private var inFlight: Data?
+    private var offset = 0
+    private var queuedLatest: Data?
+
+    var isEmpty: Bool { inFlight == nil && queuedLatest == nil }
+
+    mutating func enqueue(_ frame: Data) {
+        guard !frame.isEmpty else { return }
+        if inFlight == nil {
+            inFlight = frame
+            offset = 0
+        } else {
+            queuedLatest = frame
+        }
+    }
+
+    mutating func nextChunk(maxLength: Int) -> PhysicalCompassWriteChunk? {
+        guard maxLength > 0, let frame = inFlight else { return nil }
+        let end = min(offset + maxLength, frame.count)
+        let data = Data(frame[offset..<end])
+        let completesFrame = end == frame.count
+        if completesFrame {
+            inFlight = queuedLatest
+            queuedLatest = nil
+            offset = 0
+        } else {
+            offset = end
+        }
+        return PhysicalCompassWriteChunk(data: data, completesFrame: completesFrame)
+    }
+
+    mutating func removeAll() {
+        inFlight = nil
+        queuedLatest = nil
+        offset = 0
+    }
+}
+
 @MainActor
 final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconcurrency CBCentralManagerDelegate, @preconcurrency CBPeripheralDelegate {
     var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
@@ -12,9 +56,8 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
     private var stateCharacteristic: CBCharacteristic?
     private var eventCharacteristic: CBCharacteristic?
     private var eventBuffer = Data()
-    private var latestSnapshot: PhysicalCompassSnapshot?
-    private var pendingFrame: Data?
-    private var pendingOffset = 0
+    private var frameQueue = PhysicalCompassFrameQueue()
+    private var transportReady = false
     private var running = false
 
     override init() {
@@ -46,11 +89,9 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
     }
 
     func send(_ snapshot: PhysicalCompassSnapshot) {
-        latestSnapshot = snapshot
-        guard running, let peripheral, let stateCharacteristic else { return }
+        guard running, transportReady, let peripheral, let stateCharacteristic else { return }
         guard let frame = try? PhysicalCompassWire.encodeState(snapshot) else { return }
-        pendingFrame = frame
-        pendingOffset = 0
+        frameQueue.enqueue(frame)
         flushWrites(to: peripheral, characteristic: stateCharacteristic)
     }
 
@@ -59,6 +100,7 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         if central.state == .poweredOn {
             scan()
         } else {
+            clearConnection()
             publish(.unavailable)
         }
     }
@@ -79,7 +121,6 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         guard running, self.peripheral === peripheral else { return }
-        publish(.connected)
         peripheral.discoverServices([Self.serviceUUID])
     }
 
@@ -104,9 +145,10 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard error == nil,
+        guard running, self.peripheral === peripheral,
+              error == nil,
               let service = peripheral.services?.first(where: { $0.uuid == Self.serviceUUID }) else {
-            disconnectAndRetry(peripheral)
+            if self.peripheral === peripheral { disconnectAndRetry(peripheral) }
             return
         }
         peripheral.discoverCharacteristics([Self.stateUUID, Self.eventUUID], for: service)
@@ -117,6 +159,7 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         didDiscoverCharacteristicsFor service: CBService,
         error: Error?
     ) {
+        guard running, self.peripheral === peripheral else { return }
         guard error == nil else {
             disconnectAndRetry(peripheral)
             return
@@ -137,17 +180,17 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         didUpdateNotificationStateFor characteristic: CBCharacteristic,
         error: Error?
     ) {
+        guard running, self.peripheral === peripheral else { return }
         guard error == nil, characteristic.uuid == Self.eventUUID,
               characteristic.isNotifying,
               let stateCharacteristic else {
-            if error != nil { disconnectAndRetry(peripheral) }
+            disconnectAndRetry(peripheral)
             return
         }
-        if let latestSnapshot {
-            send(latestSnapshot)
-        } else {
-            flushWrites(to: peripheral, characteristic: stateCharacteristic)
-        }
+        transportReady = true
+        frameQueue.removeAll()
+        publish(.stale)
+        flushWrites(to: peripheral, characteristic: stateCharacteristic)
     }
 
     func peripheral(
@@ -155,7 +198,10 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         didUpdateValueFor characteristic: CBCharacteristic,
         error: Error?
     ) {
-        guard error == nil, characteristic.uuid == Self.eventUUID, let value = characteristic.value else { return }
+        guard running, self.peripheral === peripheral,
+              transportReady, error == nil,
+              characteristic.uuid == Self.eventUUID,
+              let value = characteristic.value else { return }
         for frame in PhysicalCompassWire.appendChunk(value, to: &eventBuffer) {
             guard let event = try? PhysicalCompassWire.decodeEvent(frame) else { continue }
             onEvent?(event)
@@ -163,7 +209,7 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
     }
 
     func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
-        guard let stateCharacteristic else { return }
+        guard running, self.peripheral === peripheral, let stateCharacteristic else { return }
         flushWrites(to: peripheral, characteristic: stateCharacteristic)
     }
 
@@ -178,19 +224,14 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
     }
 
     private func flushWrites(to peripheral: CBPeripheral, characteristic: CBCharacteristic) {
-        guard characteristic.properties.contains(.writeWithoutResponse),
-              let pendingFrame else { return }
+        guard transportReady, characteristic.properties.contains(.writeWithoutResponse) else { return }
         let chunkSize = max(1, peripheral.maximumWriteValueLength(for: .withoutResponse))
-        while pendingOffset < pendingFrame.count && peripheral.canSendWriteWithoutResponse {
-            let end = min(pendingOffset + chunkSize, pendingFrame.count)
-            peripheral.writeValue(Data(pendingFrame[pendingOffset..<end]), for: characteristic, type: .withoutResponse)
-            pendingOffset = end
-        }
-        if pendingOffset >= pendingFrame.count {
-            self.pendingFrame = nil
-            pendingOffset = 0
-        } else {
-            self.pendingFrame = pendingFrame
+        while peripheral.canSendWriteWithoutResponse,
+              let chunk = frameQueue.nextChunk(maxLength: chunkSize) {
+            peripheral.writeValue(chunk.data, for: characteristic, type: .withoutResponse)
+            if chunk.completesFrame {
+                publish(.connected)
+            }
         }
     }
 
@@ -205,8 +246,8 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         stateCharacteristic = nil
         eventCharacteristic = nil
         eventBuffer.removeAll(keepingCapacity: false)
-        pendingFrame = nil
-        pendingOffset = 0
+        frameQueue.removeAll()
+        transportReady = false
     }
 
     private func publish(_ value: PhysicalCompassConnectionState) {

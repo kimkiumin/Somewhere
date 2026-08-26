@@ -9,6 +9,7 @@ struct ConstraintView: View {
     @State private var budgetSliderValue: Double
     @State private var showsAdvanced = false
     @State private var showsProfile = false
+    @State private var showsPhysicalCompass = false
     @State private var isShowingConditions = false
 
     init(store: JourneyStore) {
@@ -51,6 +52,12 @@ struct ConstraintView: View {
                     draft.allergies = allergies
                 }
             }
+        }
+        .sheet(isPresented: $showsPhysicalCompass) {
+            SomewhereBoundedSheet {
+                PhysicalCompassSettingsView(store: store)
+            }
+            .presentationDetents([.medium])
         }
     }
 
@@ -127,6 +134,11 @@ struct ConstraintView: View {
                     scrollToConditions()
                 } label: {
                     Label("탐색 조건 수정", systemImage: "slider.horizontal.3")
+                }
+                Button {
+                    showsPhysicalCompass = true
+                } label: {
+                    Label("물리 나침반 연결", systemImage: "dot.radiowaves.left.and.right")
                 }
             } label: {
                 Image(systemName: "gearshape.fill")

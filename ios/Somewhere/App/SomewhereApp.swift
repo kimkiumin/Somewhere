@@ -28,12 +28,30 @@ struct SomewhereApp: App {
         let suppressNotifications = ProcessInfo.processInfo.arguments.contains("--ui-test-no-notifications")
         #else
         let suppressNotifications = false
-#endif
+        #endif
         let notificationController = NotificationController(suppressScheduling: suppressNotifications)
+        let physicalCompass: any PhysicalCompassClient
+        let physicalCompassHostEnabled: Bool?
+        #if DEBUG
+        if let testState = Self.uiTestPhysicalCompassState() {
+            physicalCompass = UITestPhysicalCompassClient(
+                state: testState,
+                action: Self.uiTestPhysicalCompassAction()
+            )
+            physicalCompassHostEnabled = true
+        } else {
+            physicalCompass = PhysicalCompassController()
+            physicalCompassHostEnabled = nil
+        }
+        #else
+        physicalCompass = PhysicalCompassController()
+        physicalCompassHostEnabled = nil
+        #endif
         let value = JourneyStore(
             service: service,
             notificationController: notificationController,
-            physicalCompass: PhysicalCompassController()
+            physicalCompass: physicalCompass,
+            physicalCompassHostEnabled: physicalCompassHostEnabled
         )
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--ui-test-private") {
@@ -73,12 +91,74 @@ struct SomewhereApp: App {
         _store = StateObject(wrappedValue: value)
     }
 
+    #if DEBUG
+    private static func uiTestPhysicalCompassState() -> PhysicalCompassConnectionState? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "--ui-test-board-state"),
+              arguments.indices.contains(index + 1) else { return nil }
+        return switch arguments[index + 1] {
+        case "disabled": .disabled
+        case "unavailable": .unavailable
+        case "disconnected": .disconnected
+        case "scanning": .scanning
+        case "connecting": .connecting
+        case "stale": .stale
+        case "connected": .connected
+        default: nil
+        }
+    }
+
+    private static func uiTestPhysicalCompassAction() -> PhysicalCompassAction? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "--ui-test-board-event"),
+              arguments.indices.contains(index + 1) else { return nil }
+        return PhysicalCompassAction(rawValue: arguments[index + 1])
+    }
+    #endif
+
     var body: some Scene {
         WindowGroup {
             RootView(store: store)
         }
     }
 }
+
+#if DEBUG
+@MainActor
+private final class UITestPhysicalCompassClient: PhysicalCompassClient {
+    var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
+    var onEvent: ((PhysicalCompassEvent) -> Void)?
+
+    private var state: PhysicalCompassConnectionState
+    private var pendingAction: PhysicalCompassAction?
+
+    init(state: PhysicalCompassConnectionState, action: PhysicalCompassAction?) {
+        self.state = state
+        self.pendingAction = action
+    }
+
+    func start() {
+        onConnectionState?(state)
+    }
+
+    func stop() {
+        state = .disabled
+        onConnectionState?(.disabled)
+    }
+
+    func send(_ snapshot: PhysicalCompassSnapshot) {
+        if state == .stale {
+            state = .connected
+            onConnectionState?(.connected)
+        }
+        guard state == .connected,
+              let action = pendingAction,
+              snapshot.actions.contains(action) else { return }
+        pendingAction = nil
+        onEvent?(.action(action, sequence: snapshot.sequence))
+    }
+}
+#endif
 
 #if DEBUG
 private enum UITestProjectionFactory {
