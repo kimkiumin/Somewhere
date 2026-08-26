@@ -74,7 +74,7 @@
 #define LVGL_PORT_AVOID_TEARING_MODE            (CONFIG_LVGL_PORT_AVOID_TEARING_MODE)
                                                         // Valid if using ESP-IDF
 #else
-#define LVGL_PORT_AVOID_TEARING_MODE            (0)     // Valid if using Arduino
+#define LVGL_PORT_AVOID_TEARING_MODE            (3)     // Valid if using Arduino
 #endif
 
 #if LVGL_PORT_AVOID_TEARING_MODE != 0
@@ -134,6 +134,11 @@
 extern "C" {
 #endif
 
+typedef enum {
+    LVGL_BUFFER_DIRECT_DOUBLE,
+    LVGL_BUFFER_PARTIAL,
+} lvgl_port_buffer_mode_t;
+
 /**
  * @brief Porting LVGL with LCD and touch panel. This function should be called after the initialization of the LCD and touch panel.
  *
@@ -142,7 +147,11 @@ extern "C" {
  *
  * @return true if success, otherwise false
  */
-bool lvgl_port_init(esp_panel::drivers::LCD *lcd, esp_panel::drivers::Touch *tp);
+bool lvgl_port_init(
+    esp_panel::drivers::LCD *lcd,
+    esp_panel::drivers::Touch *tp,
+    lvgl_port_buffer_mode_t buffer_mode
+);
 
 /**
  * @brief Deinitialize the LVGL porting.

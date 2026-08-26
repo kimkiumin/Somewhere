@@ -8,6 +8,7 @@
 #include <lvgl.h>
 #include "compass_diagnostics.h"
 #include "compass_runtime.h"
+#include "display_buffer_policy.h"
 #include "display_ui.h"
 #include "lvgl_v8_port.h"
 #include "physical_compass_wire.h"
@@ -37,6 +38,12 @@ roll_compass::DiagnosticState diagnosticState;
 char diagnosticLine[96] = {};
 size_t diagnosticLineLength = 0;
 bool diagnosticLineOverflow = false;
+
+[[noreturn]] void haltDisplayInitialization(const char *reason) {
+    Serial.printf("Display initialization halted: %s\n", reason);
+    Serial.flush();
+    while (true) delay(1000);
+}
 
 void clearPendingStateBuffersLocked() {
     lastSnapshotMs = 0;
@@ -303,13 +310,57 @@ void setup() {
     displayUiSetEventCallback(onTouchAction);
 
     Serial.println("Initializing display panel");
+    bool useDirectMode = roll_compass::displayBufferPreference(
+        ESP.getFreePsram(),
+        1310720
+    ) == roll_compass::DisplayBufferPreference::DirectDouble;
+    bool usedPartialFallback = false;
     Board *board = new Board();
-    board->init();
-#if LVGL_PORT_AVOID_TEARING_MODE
-    board->getLCD()->configFrameBufferNumber(LVGL_PORT_DISP_BUFFER_NUM);
-#endif
-    assert(board->begin());
-    assert(lvgl_port_init(board->getLCD(), board->getTouch()));
+    bool boardReady = board->init();
+    if (boardReady) {
+        boardReady = board->getLCD()->configFrameBufferNumber(useDirectMode ? 2 : 1) && board->begin();
+    }
+    if (!boardReady && useDirectMode) {
+        Serial.println("display_mode=partial_fallback board_retry=1");
+        delete board;
+        useDirectMode = false;
+        usedPartialFallback = true;
+        board = new Board();
+        boardReady = board->init();
+        if (boardReady) {
+            boardReady = board->getLCD()->configFrameBufferNumber(useDirectMode ? 2 : 1) && board->begin();
+        }
+    }
+    if (!boardReady) haltDisplayInitialization("panel begin failed");
+
+    lvgl_port_buffer_mode_t bufferMode =
+        useDirectMode ? LVGL_BUFFER_DIRECT_DOUBLE : LVGL_BUFFER_PARTIAL;
+    bool lvglReady = lvgl_port_init(board->getLCD(), board->getTouch(), bufferMode);
+    if (!lvglReady && useDirectMode) {
+        if (!lvgl_port_deinit()) {
+            haltDisplayInitialization("direct LVGL cleanup failed");
+        }
+        delete board;
+        useDirectMode = false;
+        usedPartialFallback = true;
+        bufferMode = LVGL_BUFFER_PARTIAL;
+        Serial.println("display_mode=partial_fallback lvgl_retry=1");
+        board = new Board();
+        boardReady = board->init();
+        if (boardReady) {
+            boardReady = board->getLCD()->configFrameBufferNumber(useDirectMode ? 2 : 1) && board->begin();
+        }
+        if (!boardReady) haltDisplayInitialization("partial panel retry failed");
+        lvglReady = lvgl_port_init(board->getLCD(), board->getTouch(), bufferMode);
+    }
+    if (!lvglReady) haltDisplayInitialization("LVGL initialization failed");
+    Serial.printf(
+        "psram_total=%lu psram_free=%lu display_mode=%s free_heap=%lu\n",
+        static_cast<unsigned long>(ESP.getPsramSize()),
+        static_cast<unsigned long>(ESP.getFreePsram()),
+        useDirectMode ? "direct_double" : (usedPartialFallback ? "partial_fallback" : "partial"),
+        static_cast<unsigned long>(ESP.getFreeHeap())
+    );
     if (lvgl_port_lock(-1)) {
         displayUiBegin();
         lvgl_port_unlock();

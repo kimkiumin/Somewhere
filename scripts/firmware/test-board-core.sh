@@ -22,3 +22,12 @@ mkdir -p "$test_output_root"
   "$project_root/firmware/roll-compass-board/physical_compass_wire.cpp" \
   -o "$test_output_root/compass-core-test"
 "$test_output_root/compass-core-test"
+
+rg -q '#define LVGL_PORT_AVOID_TEARING_MODE[[:space:]]*[(]3[)]' \
+  "$project_root/firmware/roll-compass-board/lvgl_v8_port.h"
+rg -Fq 'configFrameBufferNumber(useDirectMode ? 2 : 1)' \
+  "$project_root/firmware/roll-compass-board/roll-compass-board.ino"
+rg -q 'LVGL_BUFFER_PARTIAL' \
+  "$project_root/firmware/roll-compass-board/lvgl_v8_port.cpp"
+rg -q '1310720' \
+  "$project_root/firmware/roll-compass-board/roll-compass-board.ino"

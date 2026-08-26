@@ -8,7 +8,8 @@ board is a low-screen BLE display and touch companion.
 
 ## Transport boundaries
 
-- USB is used only to flash firmware and read 115200-baud serial diagnostics.
+- USB is used to flash firmware and run deterministic 115200-baud serial
+  diagnostics; it is not the production journey transport.
 - BLE is the runtime link between the iPhone app and the board.
 - Wi-Fi is intentionally deferred to a later OTA/diagnostics milestone.
 - The QMI8658 IMU is diagnostics-only; it is not a magnetometer and must not
@@ -58,9 +59,32 @@ BOARD_PORT=/dev/cu.usbmodem5B901259011 bun run firmware:upload
 BOARD_PORT=/dev/cu.usbmodem5B901259011 bun run firmware:monitor
 ```
 
-Upload compiles first and does not pass an erase flag. A physical serial boot
-check should show `Roll Compass board boot`, `BLE advertising: Roll Compass`,
-and `Ready: connect from the Somewhere iPhone app`.
+Upload compiles first and does not pass an erase flag. The monitor requests DTR
+and RTS disabled. If opening the native USB-Serial/JTAG port still interrupts
+boot on macOS, keep the monitor open and press the physical RST button once.
+A physical serial boot check should show `Roll Compass board boot`, a
+`psram_total=...` line with `display_mode=direct_double` (or `partial` /
+`partial_fallback`),
+`BLE advertising: Roll Compass`, and
+`Ready: connect from the Somewhere iPhone app`.
+
+For a phone-free visual check, send these newline-delimited commands in the
+monitor:
+
+```text
+sim on
+target 315
+heading 0
+sweep cw
+state near
+sweep stop
+sim off
+```
+
+Other accepted states are `guiding`, `paused`, `arrived`, `calibrating`,
+`sensor-missing`, and `anomaly`; `sweep ccw`, `declination -180..180`, and any
+`target`/`heading` from `0` through less than `360` are also accepted. While
+simulation is active, touch controls cannot emit BLE events.
 
 ## BLE runtime contract
 
@@ -72,15 +96,18 @@ The board advertises as `Roll Compass` and exposes:
 | Phone → board state write | `C1F8A101-35D1-4C53-9A03-7A1B3E620001` |
 | Board → phone event notify | `C1F8A102-35D1-4C53-9A03-7A1B3E620001` |
 
-Messages are compact UTF-8 JSON terminated by `\n`, with a 512-byte logical
+Messages use strict contract v2 compact UTF-8 JSON terminated by `\n`, with a 512-byte logical
 frame limit. iOS chunks state writes to the negotiated BLE write size; the
 board reassembles them before validation. The board rejects unknown versions,
 unknown actions, invalid numbers, oversized frames, and malformed state.
 
 Phone-to-board state contains only phase, approximate distance, phone-computed
-bearing when credible, confidence, at most two broad categories, price band,
+true-north target bearing plus magnetic declination when credible, confidence,
+at most two broad categories, price band,
 reveal boolean, and currently advertised guarded actions. Destination identity
-is never sent to the board.
+is never sent to the board. The two north-reference fields are present or
+absent together, so a stale or low-confidence phone heading cannot leave a
+plausible-looking old arrow on the display.
 
 Touch intents are accepted only when the action is present in the latest phone
 projection. The iPhone maps them through `JourneyStore`:
@@ -101,6 +128,13 @@ The board display follows the Roll Compass moodboard: a warm circular compass
 face, antique-brass shell, oxblood needle, pulsing treasure signal, and rounded
 touch actions. The iPhone remains the source of truth for the needle bearing;
 the board does not calculate its own heading.
+
+The display prefers two full RGB565 framebuffers in PSRAM and LVGL direct mode
+to prevent visible tearing during the needle sweep. It automatically falls
+back to partial 20-row buffers when memory or initialization is insufficient.
+Touching the circular face cycles the mount correction through
+`0° → 10° → 20° → 30° → 0°`, rotating the complete UI around the 240×240
+center. It resets to `0°` after every boot.
 
 ## First connection flow
 
@@ -123,6 +157,14 @@ XPC environment cannot prove a physical BLE connection. Physical validation
 requires a real iPhone and the flashed board. The current app deliberately
 does not declare `bluetooth-central`, so background and locked-screen behavior
 is outside this milestone.
+
+The onboard QMI8658 measures acceleration and rotation rate but not magnetic
+north. Until an external LIS2MDL magnetometer is wired and calibrated, rotating
+the standalone board cannot make it behave as an independent compass. The
+expected safe runtime state is therefore sensor-missing unless the iPhone owns
+orientation or USB simulation is explicitly enabled. A microSD card does not
+change this sensor requirement and does not expand the executable app
+partition.
 
 For the complete contract and rationale, see
 `docs/superpowers/specs/2026-08-25-roll-compass-physical-compass-ble-design.md`

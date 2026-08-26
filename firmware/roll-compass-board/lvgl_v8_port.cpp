@@ -18,9 +18,13 @@ using namespace esp_panel::drivers;
 #define LVGL_PORT_BUFFER_NUM_MAX                (2)
 
 static SemaphoreHandle_t lvgl_mux = nullptr;                  // LVGL mutex
-static TaskHandle_t lvgl_task_handle = nullptr;
+static DRAM_ATTR TaskHandle_t lvgl_task_handle = nullptr;
 static esp_timer_handle_t lvgl_tick_timer = NULL;
 static void *lvgl_buf[LVGL_PORT_BUFFER_NUM_MAX] = {};
+static lvgl_port_buffer_mode_t lvgl_buffer_mode = LVGL_BUFFER_PARTIAL;
+static LCD *lvgl_lcd = nullptr;
+static lv_disp_t *lvgl_disp = nullptr;
+static lv_indev_t *lvgl_indev = nullptr;
 
 #if LVGL_PORT_ROTATION_DEGREE != 0
 static void *get_next_frame_buffer(LCD *lcd)
@@ -464,11 +468,19 @@ IRAM_ATTR bool onLcdVsyncCallback(void *user_data)
         lvgl_port_lcd_last_buf = lvgl_port_lcd_next_buf;
     }
 #else
-    TaskHandle_t task_handle = (TaskHandle_t)user_data;
+    TaskHandle_t *task_handle_ref = (TaskHandle_t *)user_data;
+    TaskHandle_t task_handle = task_handle_ref == nullptr ? nullptr : *task_handle_ref;
+    if (task_handle == nullptr) return false;
     // Notify that the current LCD frame buffer has been transmitted
     xTaskNotifyFromISR(task_handle, ULONG_MAX, eNoAction, &need_yield);
 #endif
     return (need_yield == pdTRUE);
+}
+
+IRAM_ATTR bool onLcdVsyncIgnored(void *user_data)
+{
+    (void)user_data;
+    return false;
 }
 
 #else
@@ -532,6 +544,23 @@ static void update_callback(lv_disp_drv_t *drv)
 
 #endif /* LVGL_PORT_AVOID_TEAR */
 
+static void partial_flush_callback(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map)
+{
+    LCD *lcd = (LCD *)drv->user_data;
+    const int offsetx1 = area->x1;
+    const int offsetx2 = area->x2;
+    const int offsety1 = area->y1;
+    const int offsety2 = area->y2;
+
+    lcd->drawBitmap(
+        offsetx1, offsety1, offsetx2 - offsetx1 + 1, offsety2 - offsety1 + 1,
+        (const uint8_t *)color_map
+    );
+    if (lcd->getBus()->getBasicAttributes().type == ESP_PANEL_BUS_TYPE_RGB) {
+        lv_disp_flush_ready(drv);
+    }
+}
+
 void rounder_callback(lv_disp_drv_t *drv, lv_area_t *area)
 {
     LCD *lcd = (LCD *)drv->user_data;
@@ -553,7 +582,7 @@ void rounder_callback(lv_disp_drv_t *drv, lv_area_t *area)
     }
 }
 
-static lv_disp_t *display_init(LCD *lcd)
+static lv_disp_t *display_init(LCD *lcd, lvgl_port_buffer_mode_t buffer_mode)
 {
     ESP_UTILS_CHECK_FALSE_RETURN(lcd != nullptr, nullptr, "Invalid LCD device");
     ESP_UTILS_CHECK_FALSE_RETURN(lcd->getRefreshPanelHandle() != nullptr, nullptr, "LCD device is not initialized");
@@ -566,47 +595,41 @@ static lv_disp_t *display_init(LCD *lcd)
     auto lcd_height = lcd->getFrameHeight();
     int buffer_size = 0;
 
-    ESP_UTILS_LOGD("Malloc memory for LVGL buffer");
-#if !LVGL_PORT_AVOID_TEAR
-    // Avoid tearing function is disabled
-    buffer_size = lcd_width * LVGL_PORT_BUFFER_SIZE_HEIGHT;
-    for (int i = 0; (i < LVGL_PORT_BUFFER_NUM) && (i < LVGL_PORT_BUFFER_NUM_MAX); i++) {
-        lvgl_buf[i] = heap_caps_malloc(buffer_size * sizeof(lv_color_t), LVGL_PORT_BUFFER_MALLOC_CAPS);
-        assert(lvgl_buf[i]);
-        ESP_UTILS_LOGD("Buffer[%d] address: %p, size: %d", i, lvgl_buf[i], buffer_size * sizeof(lv_color_t));
+    lvgl_buf[0] = nullptr;
+    lvgl_buf[1] = nullptr;
+    if (buffer_mode == LVGL_BUFFER_PARTIAL) {
+        ESP_UTILS_LOGD("Allocating partial LVGL draw buffers");
+        buffer_size = lcd_width * LVGL_PORT_BUFFER_SIZE_HEIGHT;
+        for (int i = 0; (i < LVGL_PORT_BUFFER_NUM) && (i < LVGL_PORT_BUFFER_NUM_MAX); i++) {
+            lvgl_buf[i] = heap_caps_malloc(buffer_size * sizeof(lv_color_t), LVGL_PORT_BUFFER_MALLOC_CAPS);
+            if (lvgl_buf[i] == nullptr) {
+                for (int cleanup_index = 0; cleanup_index <= i; cleanup_index++) {
+                    free(lvgl_buf[cleanup_index]);
+                    lvgl_buf[cleanup_index] = nullptr;
+                }
+                ESP_UTILS_LOGE("Allocate partial LVGL buffer failed");
+                return nullptr;
+            }
+            ESP_UTILS_LOGD(
+                "Buffer[%d] address: %p, size: %d", i, lvgl_buf[i],
+                buffer_size * sizeof(lv_color_t)
+            );
+        }
+    } else {
+        ESP_UTILS_LOGD("Using double LCD framebuffers for LVGL direct mode");
+        buffer_size = lcd_width * lcd_height;
+        lvgl_buf[0] = lcd->getFrameBufferByIndex(0);
+        lvgl_buf[1] = lcd->getFrameBufferByIndex(1);
+        ESP_UTILS_CHECK_NULL_RETURN(lvgl_buf[0], nullptr, "LCD framebuffer 0 is unavailable");
+        ESP_UTILS_CHECK_NULL_RETURN(lvgl_buf[1], nullptr, "LCD framebuffer 1 is unavailable");
     }
-#else
-    // To avoid the tearing effect, we should use at least two frame buffers: one for LVGL rendering and another for LCD refresh
-    buffer_size = lcd_width * lcd_height;
-#if (LVGL_PORT_DISP_BUFFER_NUM >= 3) && (LVGL_PORT_ROTATION_DEGREE == 0) && LVGL_PORT_FULL_REFRESH
-
-    // With the usage of three buffers and full-refresh, we always have one buffer available for rendering,
-    // eliminating the need to wait for the LCD's sync signal
-    lvgl_port_lcd_last_buf = lcd->getFrameBufferByIndex(0);
-    lvgl_buf[0] = lcd->getFrameBufferByIndex(1);
-    lvgl_buf[1] = lcd->getFrameBufferByIndex(2);
-    lvgl_port_lcd_next_buf = lvgl_port_lcd_last_buf;
-    lvgl_port_flush_next_buf = lvgl_buf[1];
-
-#elif (LVGL_PORT_DISP_BUFFER_NUM >= 3) && (LVGL_PORT_ROTATION_DEGREE != 0)
-
-    lvgl_buf[0] = lcd->getFrameBufferByIndex(2);
-
-#elif LVGL_PORT_DISP_BUFFER_NUM >= 2
-
-    for (int i = 0; (i < LVGL_PORT_DISP_BUFFER_NUM) && (i < LVGL_PORT_BUFFER_NUM_MAX); i++) {
-        lvgl_buf[i] = lcd->getFrameBufferByIndex(i);
-    }
-
-#endif
-#endif /* LVGL_PORT_AVOID_TEAR */
 
     // initialize LVGL draw buffers
     lv_disp_draw_buf_init(&disp_buf, lvgl_buf[0], lvgl_buf[1], buffer_size);
 
     ESP_UTILS_LOGD("Register display driver to LVGL");
     lv_disp_drv_init(&disp_drv);
-    disp_drv.flush_cb = flush_callback;
+    disp_drv.flush_cb = buffer_mode == LVGL_BUFFER_DIRECT_DOUBLE ? flush_callback : partial_flush_callback;
 #if (LVGL_PORT_ROTATION_DEGREE == 90) || (LVGL_PORT_ROTATION_DEGREE == 270)
     disp_drv.hor_res = lcd_height;
     disp_drv.ver_res = lcd_width;
@@ -614,21 +637,7 @@ static lv_disp_t *display_init(LCD *lcd)
     disp_drv.hor_res = lcd_width;
     disp_drv.ver_res = lcd_height;
 #endif
-#if LVGL_PORT_AVOID_TEAR    // Only available when the tearing effect is enabled
-#if LVGL_PORT_FULL_REFRESH
-    disp_drv.full_refresh = 1;
-#elif LVGL_PORT_DIRECT_MODE
-    disp_drv.direct_mode = 1;
-#endif
-#else                       // Only available when the tearing effect is disabled
-    if (lcd->getBasicAttributes().basic_bus_spec.isFunctionValid(LCD::BasicBusSpecification::FUNC_SWAP_XY) &&
-            lcd->getBasicAttributes().basic_bus_spec.isFunctionValid(LCD::BasicBusSpecification::FUNC_MIRROR_X) &&
-            lcd->getBasicAttributes().basic_bus_spec.isFunctionValid(LCD::BasicBusSpecification::FUNC_MIRROR_Y)) {
-        disp_drv.drv_update_cb = update_callback;
-    } else {
-        disp_drv.sw_rotate = 1;
-    }
-#endif /* LVGL_PORT_AVOID_TEAR */
+    disp_drv.direct_mode = buffer_mode == LVGL_BUFFER_DIRECT_DOUBLE ? 1 : 0;
     disp_drv.draw_buf = &disp_buf;
     disp_drv.user_data = (void *)lcd;
     // Only available when the coordinate alignment is enabled
@@ -678,7 +687,8 @@ static lv_indev_t *indev_init(Touch *tp)
     static lv_indev_drv_t indev_drv_tp;
 
     if (tp->isInterruptEnabled()) {
-        touch_detected = xSemaphoreCreateBinary();
+        if (touch_detected == nullptr) touch_detected = xSemaphoreCreateBinary();
+        ESP_UTILS_CHECK_NULL_RETURN(touch_detected, nullptr, "Create touch interrupt semaphore failed");
         tp->attachInterruptCallback(onTouchInterruptCallback, tp);
     }
     ESP_UTILS_LOGD("Register input driver to LVGL");
@@ -704,25 +714,29 @@ static bool tick_init(void)
         .callback = &tick_increment,
         .name = "LVGL tick"
     };
-    ESP_UTILS_CHECK_ERROR_RETURN(
-        esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer), false, "Create LVGL tick timer failed"
-    );
-    ESP_UTILS_CHECK_ERROR_RETURN(
-        esp_timer_start_periodic(lvgl_tick_timer, LVGL_PORT_TICK_PERIOD_MS * 1000), false,
-        "Start LVGL tick timer failed"
-    );
+    esp_err_t result = esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer);
+    ESP_UTILS_CHECK_ERROR_RETURN(result, false, "Create LVGL tick timer failed");
+    result = esp_timer_start_periodic(lvgl_tick_timer, LVGL_PORT_TICK_PERIOD_MS * 1000);
+    if (result != ESP_OK) {
+        esp_timer_delete(lvgl_tick_timer);
+        lvgl_tick_timer = nullptr;
+        ESP_UTILS_LOGE("Start LVGL tick timer failed: %s", esp_err_to_name(result));
+        return false;
+    }
 
     return true;
 }
 
 static bool tick_deinit(void)
 {
+    if (lvgl_tick_timer == nullptr) return true;
     ESP_UTILS_CHECK_ERROR_RETURN(
         esp_timer_stop(lvgl_tick_timer), false, "Stop LVGL tick timer failed"
     );
     ESP_UTILS_CHECK_ERROR_RETURN(
         esp_timer_delete(lvgl_tick_timer), false, "Delete LVGL tick timer failed"
     );
+    lvgl_tick_timer = nullptr;
     return true;
 }
 #endif
@@ -755,20 +769,24 @@ IRAM_ATTR bool onDrawBitmapFinishCallback(void *user_data)
     return false;
 }
 
-bool lvgl_port_init(LCD *lcd, Touch *tp)
+bool lvgl_port_init(LCD *lcd, Touch *tp, lvgl_port_buffer_mode_t buffer_mode)
 {
     ESP_UTILS_CHECK_FALSE_RETURN(lcd != nullptr, false, "Invalid LCD device");
+    lvgl_lcd = lcd;
 
     auto bus_type = lcd->getBus()->getBasicAttributes().type;
-#if LVGL_PORT_AVOID_TEAR
-    ESP_UTILS_CHECK_FALSE_RETURN(
-        (bus_type == ESP_PANEL_BUS_TYPE_RGB) || (bus_type == ESP_PANEL_BUS_TYPE_MIPI_DSI), false,
-        "Avoid tearing function only works with RGB/MIPI-DSI LCD now"
-    );
+    if (buffer_mode == LVGL_BUFFER_DIRECT_DOUBLE) {
+        ESP_UTILS_CHECK_FALSE_RETURN(
+            (bus_type == ESP_PANEL_BUS_TYPE_RGB) || (bus_type == ESP_PANEL_BUS_TYPE_MIPI_DSI), false,
+            "Direct double buffering only works with RGB/MIPI-DSI LCD now"
+        );
+    }
+    lvgl_buffer_mode = buffer_mode;
     ESP_UTILS_LOGI(
-        "Avoid tearing is enabled, mode: %d, rotation: %d", LVGL_PORT_AVOID_TEARING_MODE, LVGL_PORT_ROTATION_DEGREE
+        "LVGL buffer mode: %s, rotation: %d",
+        buffer_mode == LVGL_BUFFER_DIRECT_DOUBLE ? "direct_double" : "partial",
+        LVGL_PORT_ROTATION_DEGREE
     );
-#endif
 
     lv_disp_t *disp = nullptr;
     lv_indev_t *indev = nullptr;
@@ -779,8 +797,9 @@ bool lvgl_port_init(LCD *lcd, Touch *tp)
 #endif
 
     ESP_UTILS_LOGI("Initializing LVGL display driver");
-    disp = display_init(lcd);
+    disp = display_init(lcd, buffer_mode);
     ESP_UTILS_CHECK_NULL_RETURN(disp, false, "Initialize LVGL display driver failed");
+    lvgl_disp = disp;
     // Record the initial rotation of the display
     lv_disp_set_rotation(disp, LV_DISP_ROT_NONE);
 
@@ -794,6 +813,7 @@ bool lvgl_port_init(LCD *lcd, Touch *tp)
         ESP_UTILS_LOGD("Initialize LVGL input driver");
         indev = indev_init(tp);
         ESP_UTILS_CHECK_NULL_RETURN(indev, false, "Initialize LVGL input driver failed");
+        lvgl_indev = indev;
 
 #if LVGL_PORT_ROTATION_DEGREE != 0
         auto &transformation = tp->getTransformation();
@@ -814,15 +834,19 @@ bool lvgl_port_init(LCD *lcd, Touch *tp)
     lvgl_mux = xSemaphoreCreateRecursiveMutex();
     ESP_UTILS_CHECK_NULL_RETURN(lvgl_mux, false, "Create LVGL mutex failed");
 
+    if (buffer_mode == LVGL_BUFFER_DIRECT_DOUBLE) {
+        ESP_UTILS_CHECK_FALSE_RETURN(
+            lcd->attachRefreshFinishCallback(onLcdVsyncCallback, (void *)&lvgl_task_handle),
+            false,
+            "Attach LCD VSYNC callback failed"
+        );
+    }
+
     ESP_UTILS_LOGD("Create LVGL task");
     BaseType_t core_id = (LVGL_PORT_TASK_CORE < 0) ? tskNO_AFFINITY : LVGL_PORT_TASK_CORE;
     BaseType_t ret = xTaskCreatePinnedToCore(lvgl_port_task, "lvgl", LVGL_PORT_TASK_STACK_SIZE, NULL,
                      LVGL_PORT_TASK_PRIORITY, &lvgl_task_handle, core_id);
     ESP_UTILS_CHECK_FALSE_RETURN(ret == pdPASS, false, "Create LVGL task failed");
-
-#if LVGL_PORT_AVOID_TEAR
-    lcd->attachRefreshFinishCallback(onLcdVsyncCallback, (void *)lvgl_task_handle);
-#endif
 
     return true;
 }
@@ -850,30 +874,75 @@ bool lvgl_port_deinit(void)
     ESP_UTILS_CHECK_FALSE_RETURN(tick_deinit(), false, "Deinitialize LVGL tick failed");
 #endif
 
-    ESP_UTILS_CHECK_FALSE_RETURN(lvgl_port_lock(-1), false, "Lock LVGL failed");
-    if (lvgl_task_handle != nullptr) {
+    if (lvgl_mux != nullptr) {
+        ESP_UTILS_CHECK_FALSE_RETURN(lvgl_port_lock(-1), false, "Lock LVGL failed");
+        if (lvgl_lcd != nullptr && lvgl_buffer_mode == LVGL_BUFFER_DIRECT_DOUBLE) {
+            ESP_UTILS_CHECK_FALSE_RETURN(
+                lvgl_lcd->attachRefreshFinishCallback(onLcdVsyncIgnored, &lvgl_task_handle),
+                false,
+                "Replace LCD VSYNC callback failed"
+            );
+        }
+        if (lvgl_task_handle != nullptr) {
+            vTaskDelete(lvgl_task_handle);
+            lvgl_task_handle = nullptr;
+        }
+        if (lvgl_indev != nullptr) {
+            lv_indev_delete(lvgl_indev);
+            lvgl_indev = nullptr;
+        }
+        if (lvgl_disp != nullptr) {
+            lv_disp_remove(lvgl_disp);
+            lvgl_disp = nullptr;
+        }
+        ESP_UTILS_CHECK_FALSE_RETURN(lvgl_port_unlock(), false, "Unlock LVGL failed");
+    } else if (lvgl_task_handle != nullptr) {
+        if (lvgl_lcd != nullptr && lvgl_buffer_mode == LVGL_BUFFER_DIRECT_DOUBLE) {
+            ESP_UTILS_CHECK_FALSE_RETURN(
+                lvgl_lcd->attachRefreshFinishCallback(onLcdVsyncIgnored, &lvgl_task_handle),
+                false,
+                "Replace LCD VSYNC callback failed"
+            );
+        }
         vTaskDelete(lvgl_task_handle);
         lvgl_task_handle = nullptr;
+    } else {
+        if (lvgl_lcd != nullptr && lvgl_buffer_mode == LVGL_BUFFER_DIRECT_DOUBLE) {
+            ESP_UTILS_CHECK_FALSE_RETURN(
+                lvgl_lcd->attachRefreshFinishCallback(onLcdVsyncIgnored, &lvgl_task_handle),
+                false,
+                "Replace LCD VSYNC callback failed"
+            );
+        }
+        if (lvgl_indev != nullptr) {
+            lv_indev_delete(lvgl_indev);
+            lvgl_indev = nullptr;
+        }
+        if (lvgl_disp != nullptr) {
+            lv_disp_remove(lvgl_disp);
+            lvgl_disp = nullptr;
+        }
     }
-    ESP_UTILS_CHECK_FALSE_RETURN(lvgl_port_unlock(), false, "Unlock LVGL failed");
 
 #if LV_ENABLE_GC || !LV_MEM_CUSTOM
     lv_deinit();
 #else
     ESP_UTILS_LOGW("LVGL memory is custom, `lv_deinit()` will not work");
 #endif
-#if !LVGL_PORT_AVOID_TEAR
-    for (int i = 0; i < LVGL_PORT_BUFFER_NUM; i++) {
-        if (lvgl_buf[i] != nullptr) {
-            free(lvgl_buf[i]);
-            lvgl_buf[i] = nullptr;
+    if (lvgl_buffer_mode == LVGL_BUFFER_PARTIAL) {
+        for (int i = 0; i < LVGL_PORT_BUFFER_NUM; i++) {
+            if (lvgl_buf[i] != nullptr) {
+                free(lvgl_buf[i]);
+                lvgl_buf[i] = nullptr;
+            }
         }
     }
-#endif
     if (lvgl_mux != nullptr) {
         vSemaphoreDelete(lvgl_mux);
         lvgl_mux = nullptr;
     }
+    lvgl_buffer_mode = LVGL_BUFFER_PARTIAL;
+    lvgl_lcd = nullptr;
 
     return true;
 }

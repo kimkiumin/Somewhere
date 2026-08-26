@@ -8,6 +8,7 @@
 #include "compass_diagnostics.h"
 #include "compass_layout.h"
 #include "compass_runtime.h"
+#include "display_buffer_policy.h"
 #include "needle_spring.h"
 #include "physical_compass_wire.h"
 
@@ -491,6 +492,15 @@ static void assertCircularLayoutContainment() {
     assert(roll_compass::rectFitsCircle(roll_compass::kPausedEndBounds, 240, 240, 214));
 }
 
+static void assertDisplayBufferPreference() {
+    using roll_compass::DisplayBufferPreference;
+
+    assert(roll_compass::displayBufferPreference(1'310'719U, 1'310'720U) ==
+        DisplayBufferPreference::Partial);
+    assert(roll_compass::displayBufferPreference(1'310'720U, 1'310'720U) ==
+        DisplayBufferPreference::DirectDouble);
+}
+
 int main() {
     assertNear(roll_compass::normalizeDegrees(-1.0f), 359.0f);
     assertNear(roll_compass::shortestDeltaDegrees(359.0f, 1.0f), 2.0f);
@@ -533,5 +543,6 @@ int main() {
     assertDiagnosticStateInjection();
     assertDiagnosticSweep();
     assertCircularLayoutContainment();
+    assertDisplayBufferPreference();
     return 0;
 }

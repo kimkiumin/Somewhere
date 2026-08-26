@@ -30,7 +30,7 @@ intentionally clipped by the 480×480 face. The dial owns most of the display
 while status, distance, and touch actions sit on top as small rounded overlays
 rather than separate cards.
 
-## USB flashing and logs
+## USB flashing and diagnostics
 
 The connected CH343P USB-UART port is normally exposed as
 `/dev/cu.usbmodem*`. Upload compiles first and does not erase flash:
@@ -42,7 +42,16 @@ bun run firmware:monitor
 ```
 
 The port can change after a reset. If more than one modem is connected, set
-`BOARD_PORT` explicitly. Serial speed is 115200.
+`BOARD_PORT` explicitly. Serial speed is 115200. The monitor requests DTR and
+RTS disabled. If macOS still interrupts boot while opening the native
+USB-Serial/JTAG port, leave the monitor connected and press the physical RST
+button once; subsequent logs and commands then use the already-open port.
+
+The serial console also drives a deterministic visual preview. Start with
+`sim on`, then use `target 0..359`, `heading 0..359`, `declination -180..180`,
+`sweep cw`, `sweep ccw`, `sweep stop`, and `state guiding|near|paused|arrived|calibrating|sensor-missing|anomaly`.
+`sim off` returns control to the live runtime. Simulated buttons never emit BLE
+actions.
 
 ## BLE runtime contract
 
@@ -54,7 +63,9 @@ The port can change after a reset. If more than one modem is connected, set
 State and event messages are newline-delimited compact JSON. The board rejects
 unknown versions/actions, invalid numbers, oversized frames, and any payload
 that does not contain the safe state fields. Destination identity is not part
-of the board contract.
+of the board contract. Contract v2 sends the north-referenced target bearing
+and magnetic declination as an all-or-nothing pair; it does not send a
+phone-relative arrow angle.
 
 ## Display behavior
 
@@ -64,6 +75,18 @@ phone-computed direction only when confidence is `credible`, approximate
 distance, safe category/price cues, and only the actions advertised by the
 phone. A stale state hides the arrow and disables actions.
 
-Wi-Fi and the QMI8658 IMU are intentionally not used in the journey path.
-Wi-Fi is reserved for a later OTA/diagnostics milestone, and the IMU is not a
-magnetometer so it must not calculate compass heading.
+The renderer prefers two 480×480 RGB565 framebuffers in PSRAM with LVGL direct
+mode. If the PSRAM reserve or panel/LVGL initialization is insufficient, it
+falls back to two 20-row internal-RAM draw buffers. Boot logs identify the
+selected `display_mode` and current PSRAM/free-heap values.
+
+Tap anywhere outside an active action to compensate for the physical USB-port
+mount angle. The complete circular UI cycles `0° → 10° → 20° → 30° → 0°`;
+boot always starts at `0°`. The correction rotates the shell, needle, labels,
+and controls around the true 240×240 glass center.
+
+Wi-Fi and the QMI8658 IMU are intentionally not used for heading in this
+checkpoint. Wi-Fi is reserved for a later OTA/diagnostics milestone, and the
+QMI8658 is not a magnetometer. Without a separately wired LIS2MDL, the board
+cannot react to its own physical rotation: the phone remains the heading source
+and the no-sensor state is expected outside explicit USB simulation.
