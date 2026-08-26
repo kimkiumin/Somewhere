@@ -35,6 +35,10 @@ build/
 # Native iOS generated output and private signing material
 ios/Somewhere.xcodeproj/
 firmware/roll-compass-board/compass_assets.h
+firmware/roll-compass-board/compass_asset_metrics.h
+firmware/roll-compass-board/roll_compass_wordmark_font.c
+firmware/roll-compass-board/roll_compass_korean_16.c
+firmware/roll-compass-board/roll_compass_korean_20.c
 # Local manual field-test routes can contain precise coordinates.
 ios/*.gpx
 DerivedData/
