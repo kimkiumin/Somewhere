@@ -20,8 +20,12 @@ constexpr lv_coord_t kCompassBackdropY = -20;
 constexpr lv_coord_t kGlowSize = 500;
 constexpr lv_coord_t kGlowX = -10;
 constexpr lv_coord_t kGlowY = -10;
+constexpr float kDisplayCenter = 240.0f;
+constexpr float kDisplayMountRotationDegrees = 30.0f;
+constexpr int16_t kDisplayMountRotationTenths = 300;
 const lv_coord_t kSparkleX[] = {24, 448, 56, 424};
 const lv_coord_t kSparkleY[] = {118, 92, 338, 314};
+lv_coord_t sparkleMountedY[4] = {0, 0, 0, 0};
 
 const lv_color_t kCanvas = lv_color_hex(0xF8F3E8);
 const lv_color_t kPaper = lv_color_hex(0xF1E6CE);
@@ -58,6 +62,31 @@ float targetNeedleAngle = 0.0f;
 
 const char *const actionNames[] = {"stop", "continue", "confirm-stop", "reveal"};
 const char *const actionLabels[] = {"STOP", "CONTINUE", "CONFIRM", "REVEAL"};
+
+void applyMountRotation(lv_obj_t *object, bool rotateObject = true) {
+    if (object == nullptr) return;
+    const float radians = kDisplayMountRotationDegrees * static_cast<float>(M_PI) / 180.0f;
+    const float cosine = cosf(radians);
+    const float sine = sinf(radians);
+    const float width = static_cast<float>(lv_obj_get_width(object));
+    const float height = static_cast<float>(lv_obj_get_height(object));
+    const float centerX = static_cast<float>(lv_obj_get_x(object)) + width * 0.5f;
+    const float centerY = static_cast<float>(lv_obj_get_y(object)) + height * 0.5f;
+    const float deltaX = centerX - kDisplayCenter;
+    const float deltaY = centerY - kDisplayCenter;
+    const float mountedCenterX = kDisplayCenter + deltaX * cosine - deltaY * sine;
+    const float mountedCenterY = kDisplayCenter + deltaX * sine + deltaY * cosine;
+    lv_obj_set_pos(
+        object,
+        static_cast<lv_coord_t>(lroundf(mountedCenterX - width * 0.5f)),
+        static_cast<lv_coord_t>(lroundf(mountedCenterY - height * 0.5f))
+    );
+    if (rotateObject) {
+        lv_obj_set_style_transform_pivot_x(object, static_cast<lv_coord_t>(width * 0.5f), LV_PART_MAIN);
+        lv_obj_set_style_transform_pivot_y(object, static_cast<lv_coord_t>(height * 0.5f), LV_PART_MAIN);
+        lv_obj_set_style_transform_angle(object, kDisplayMountRotationTenths, LV_PART_MAIN);
+    }
+}
 
 lv_obj_t *makeCard(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coord_t width, lv_coord_t height) {
     lv_obj_t *card = lv_obj_create(parent);
@@ -261,7 +290,10 @@ void animateCompass(uint32_t nowMs) {
         const float delta = roll_compass::shortestDeltaDegrees(currentNeedleAngle, targetNeedleAngle);
         currentNeedleAngle = roll_compass::normalizeDegrees(currentNeedleAngle + delta * 0.18f);
         if (fabsf(delta) < 0.08f) currentNeedleAngle = targetNeedleAngle;
-        lv_img_set_angle(compassNeedle, static_cast<int16_t>(lroundf(currentNeedleAngle * 10.0f)));
+        lv_img_set_angle(
+            compassNeedle,
+            static_cast<int16_t>(lroundf(currentNeedleAngle * 10.0f)) + kDisplayMountRotationTenths
+        );
     }
 
     const bool hunting = currentModel.state == roll_compass::CompassOsState::Pairing ||
@@ -281,7 +313,7 @@ void animateCompass(uint32_t nowMs) {
             ? static_cast<uint8_t>(55 + sparkleWave * 190)
             : static_cast<uint8_t>(18 + sparkleWave * 38);
         lv_obj_set_style_opa(sparkles[index], opacity, LV_PART_MAIN);
-        lv_obj_set_y(sparkles[index], kSparkleY[index] + static_cast<lv_coord_t>(sparkleWave * 5.0f));
+        lv_obj_set_y(sparkles[index], sparkleMountedY[index] + static_cast<lv_coord_t>(sparkleWave * 5.0f));
     }
 }
 
@@ -323,12 +355,14 @@ void displayUiBegin() {
     compassShell = lv_img_create(screen);
     lv_img_set_src(compassShell, &rollCompassShellImage);
     lv_obj_set_pos(compassShell, kCompassX, kCompassY);
+    lv_img_set_pivot(compassShell, kCompassSize / 2, kCompassSize / 2);
+    lv_img_set_angle(compassShell, kDisplayMountRotationTenths);
     lv_obj_clear_flag(compassShell, LV_OBJ_FLAG_CLICKABLE);
 
     compassNeedle = lv_img_create(screen);
     lv_img_set_src(compassNeedle, &rollCompassNeedleImage);
     lv_img_set_pivot(compassNeedle, kCompassSize / 2, kCompassSize / 2);
-    lv_img_set_angle(compassNeedle, 0);
+    lv_img_set_angle(compassNeedle, kDisplayMountRotationTenths);
     lv_obj_set_pos(compassNeedle, kCompassX, kCompassY);
     lv_obj_clear_flag(compassNeedle, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(compassNeedle, LV_OBJ_FLAG_HIDDEN);
@@ -342,6 +376,8 @@ void displayUiBegin() {
         lv_obj_set_style_bg_color(sparkles[index], index % 2 == 0 ? kBrass : kOxblood, LV_PART_MAIN);
         lv_obj_set_style_bg_opa(sparkles[index], LV_OPA_70, LV_PART_MAIN);
         lv_obj_clear_flag(sparkles[index], LV_OBJ_FLAG_CLICKABLE);
+        applyMountRotation(sparkles[index], false);
+        sparkleMountedY[index] = lv_obj_get_y(sparkles[index]);
     }
 
     // Status is a translucent capsule on the dial, not a separate panel.
@@ -356,6 +392,7 @@ void displayUiBegin() {
     heroStatus = makeLabel(statusPill, 8, 5, 276, 20, &lv_font_montserrat_12, kMutedInk);
     lv_obj_set_style_text_align(heroStatus, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_style_text_letter_space(heroStatus, 1, LV_PART_MAIN);
+    applyMountRotation(statusPill);
 
     // One compact information capsule replaces the former rectangular rows.
     lv_obj_t *infoPill = makePill(screen, 58, 372, 364, 52);
@@ -375,6 +412,7 @@ void displayUiBegin() {
     lv_label_set_text(clueValue, "HIDDEN CLUE");
     priceLabel = makeLabel(infoPill, 154, 28, 196, 14, &lv_font_montserrat_10, kBrass);
     lv_label_set_text(priceLabel, "SPOILS UNKNOWN");
+    applyMountRotation(infoPill);
 
     for (uint8_t index = 0; index < 4; ++index) {
         buttons[index] = lv_btn_create(screen);
@@ -391,6 +429,7 @@ void displayUiBegin() {
         lv_obj_center(buttonLabels[index]);
         setButtonVisible(index, false);
         styleButton(index, false);
+        applyMountRotation(buttons[index]);
     }
 
     // Keep the tiny chrome in the foreground while the compass remains the
@@ -398,10 +437,12 @@ void displayUiBegin() {
     brandLabel = makeLabel(screen, 24, 15, 250, 20, &lv_font_montserrat_12, kInk);
     lv_label_set_text(brandLabel, "ROLL THE COMPASS");
     lv_obj_set_style_text_letter_space(brandLabel, 2, LV_PART_MAIN);
+    applyMountRotation(brandLabel);
 
     connectionPill = makePill(screen, 332, 13, 128, 24);
     connectionLabel = makeLabel(connectionPill, 4, 3, 120, 18, &lv_font_montserrat_10, kOxblood);
     lv_obj_set_style_text_align(connectionLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    applyMountRotation(connectionPill);
 
     renderState();
 }
