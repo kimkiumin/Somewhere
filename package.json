@@ -32,6 +32,12 @@
     "verify:native-evidence": "bun test scripts/ios/verify-native-evidence.test.mjs && bun scripts/ios/verify-native-evidence.mjs --help",
     "verify:release-authority": "bun test scripts/public-release/*.test.mjs && bun scripts/public-release/verify-public-release.mjs --help",
     "build:production": "bun scripts/release/build-production.mjs",
+    "firmware:setup": "bash scripts/firmware/setup-toolchain.sh",
+    "firmware:assets": "python3 scripts/firmware/generate-compass-assets.py",
+    "firmware:ios": "bash scripts/firmware/generate-ios-project.sh",
+    "firmware:compile": "bash scripts/firmware/compile-board.sh",
+    "firmware:upload": "bash scripts/firmware/upload-board.sh",
+    "firmware:monitor": "bash scripts/firmware/monitor-board.sh",
     "typecheck": "bun run --cwd contracts typecheck && bun run --cwd app typecheck && bun run --cwd server typecheck",
     "lint": "bun run --cwd app lint && bun run --cwd server lint",
     "build": "bun run --cwd app build"

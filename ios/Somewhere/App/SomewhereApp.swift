@@ -28,9 +28,13 @@ struct SomewhereApp: App {
         let suppressNotifications = ProcessInfo.processInfo.arguments.contains("--ui-test-no-notifications")
         #else
         let suppressNotifications = false
-        #endif
+#endif
         let notificationController = NotificationController(suppressScheduling: suppressNotifications)
-        let value = JourneyStore(service: service, notificationController: notificationController)
+        let value = JourneyStore(
+            service: service,
+            notificationController: notificationController,
+            physicalCompass: PhysicalCompassController()
+        )
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--ui-test-private") {
             var preferences = value.preferences

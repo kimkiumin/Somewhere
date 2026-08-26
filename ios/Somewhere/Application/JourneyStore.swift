@@ -23,6 +23,16 @@ protocol JourneyServiceProtocol: Sendable {
 }
 
 @MainActor
+private final class InertPhysicalCompassClient: PhysicalCompassClient {
+    var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
+    var onEvent: ((PhysicalCompassEvent) -> Void)?
+
+    func start() {}
+    func stop() {}
+    func send(_ snapshot: PhysicalCompassSnapshot) {}
+}
+
+@MainActor
 final class JourneyStore: ObservableObject {
     @Published private(set) var projection: JourneyProjection?
     @Published private(set) var isWorking = false
@@ -43,9 +53,11 @@ final class JourneyStore: ObservableObject {
     @Published private(set) var noFitConditions: [SomewhereConditionIssue] = []
     @Published private(set) var lastRevealReason: String?
     @Published private(set) var lastStopReason: String?
+    @Published private(set) var physicalCompassConnectionState: PhysicalCompassConnectionState = .disconnected
 
     let locationController: LocationController
     let notificationController: NotificationController
+    let physicalCompass: any PhysicalCompassClient
     private let service: any JourneyServiceProtocol
     private var guidanceEngine = GuidanceEngine()
     private var arrivalGate = ArrivalGate()
@@ -57,15 +69,19 @@ final class JourneyStore: ObservableObject {
     private var pendingSafetyCommands: [(JourneyCommand, Bool)] = []
     private var pollTask: Task<Void, Never>?
     private var cancellables: Set<AnyCancellable> = []
+    private var physicalCompassSequence = 0
+    private var lastPhysicalCompassSnapshot: PhysicalCompassSnapshot?
 
     init(
         service: any JourneyServiceProtocol,
         locationController: LocationController = LocationController(),
-        notificationController: NotificationController = NotificationController()
+        notificationController: NotificationController = NotificationController(),
+        physicalCompass: any PhysicalCompassClient = InertPhysicalCompassClient()
     ) {
         self.service = service
         self.locationController = locationController
         self.notificationController = notificationController
+        self.physicalCompass = physicalCompass
         self.preferences = SomewherePreferencesPersistence.loadPreferences()
         self.profile = SomewherePreferencesPersistence.loadProfile()
         self.isOnboardingRequired = !SomewherePreferencesPersistence.hasCompletedOnboarding()
@@ -97,6 +113,13 @@ final class JourneyStore: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] denied in if denied { self?.presentedError = .unavailable } }
             .store(in: &cancellables)
+        physicalCompass.onConnectionState = { [weak self] state in
+            self?.physicalCompassConnectionState = state
+        }
+        physicalCompass.onEvent = { [weak self] event in
+            self?.handlePhysicalCompassEvent(event)
+        }
+        physicalCompass.start()
     }
 
     func start(category: String, maxWalkMinutes: Int, budgetBand: String) async {
@@ -294,6 +317,7 @@ final class JourneyStore: ObservableObject {
         noFitConditions = []
         lastRevealReason = nil
         lastStopReason = nil
+        syncPhysicalCompass()
     }
 
     func reviewNoFit() {
@@ -327,6 +351,7 @@ final class JourneyStore: ObservableObject {
             finalCorridorDeviationM: 0,
             routeProgressIsCredible: true
         ))
+        syncPhysicalCompass()
     }
     #endif
 
@@ -351,6 +376,7 @@ final class JourneyStore: ObservableObject {
                 await self?.execute(.refresh)
             }
         }
+        syncPhysicalCompass()
     }
 
     func updateGuidance(location: LocationSample, heading: HeadingSample, route: TrustedRoute, now: Date) {
@@ -359,6 +385,7 @@ final class JourneyStore: ObservableObject {
             if guidance != pausedGuidance {
                 guidance = pausedGuidance
             }
+            syncPhysicalCompass()
             return
         }
         let nextGuidance = guidanceEngine.update(location: location, heading: heading, route: route, now: now)
@@ -379,6 +406,7 @@ final class JourneyStore: ObservableObject {
                 Task { await execute(.recordArrival) }
             }
         }
+        syncPhysicalCompass()
     }
 
     var guidanceTitle: String {
@@ -470,5 +498,80 @@ final class JourneyStore: ObservableObject {
     private func refreshAfterSequenceConflict() async {
         guard let refreshed = try? await service.perform(.refresh, current: projection) else { return }
         applyServerProjection(refreshed)
+    }
+
+    private func handlePhysicalCompassEvent(_ event: PhysicalCompassEvent) {
+        guard let snapshot = lastPhysicalCompassSnapshot,
+              let projection,
+              case .action(let action, let sequence) = event,
+              sequence == snapshot.sequence else { return }
+
+        switch action {
+        case .stop:
+            guard projection.actions.contains(.stop) else { return }
+            requestStop()
+        case .continue:
+            guard projection.actions.contains(.continue) else { return }
+            Task { await cancelStop() }
+        case .confirmStop:
+            guard projection.actions.contains(.confirmStop) else { return }
+            Task { await confirmStop() }
+        case .reveal:
+            guard projection.actions.contains(.reveal) else { return }
+            requestReveal()
+        case .review:
+            break
+        }
+    }
+
+    private func syncPhysicalCompass() {
+        let nextSequence = physicalCompassSequence + 1
+        let remainingDistanceM: Double?
+        let bearingDegrees: Double?
+        let confidence: String
+        switch guidance {
+        case .credible(let reading):
+            remainingDistanceM = reading.remainingM
+            bearingDegrees = reading.arrowDegrees
+            confidence = "credible"
+        case .suppressed(let reason):
+            remainingDistanceM = projection?.disclosure?.routeDistanceM
+            bearingDegrees = nil
+            confidence = reason.rawValue
+        }
+
+        let menus = Array((projection?.disclosure?.representativeCategories ?? []).prefix(2)).map {
+            String($0.prefix(PhysicalCompassBLE.maxDisplayCharacters))
+        }
+        let priceBand = projection?.disclosure.map {
+            String($0.priceBand.prefix(PhysicalCompassBLE.maxDisplayCharacters))
+        }
+        let actions = JourneyAction.allCases.compactMap { action -> PhysicalCompassAction? in
+            guard projection?.actions.contains(action) == true else { return nil }
+            switch action {
+            case .stop: return .stop
+            case .continue: return .continue
+            case .confirmStop: return .confirmStop
+            case .reveal: return .reveal
+            default: return nil
+            }
+        }
+
+        guard let snapshot = try? PhysicalCompassSnapshot(
+            sequence: nextSequence,
+            phase: projection?.phase.rawValue ?? "idle",
+            remainingDistanceM: remainingDistanceM,
+            bearingDegrees: bearingDegrees,
+            confidence: confidence,
+            menus: menus,
+            priceBand: priceBand,
+            actions: actions,
+            revealed: projection?.revealed == true,
+            timestampMs: Int64(Date().timeIntervalSince1970 * 1000)
+        ) else { return }
+        guard snapshot != lastPhysicalCompassSnapshot else { return }
+        physicalCompassSequence = nextSequence
+        lastPhysicalCompassSnapshot = snapshot
+        physicalCompass.send(snapshot)
     }
 }

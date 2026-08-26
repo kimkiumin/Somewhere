@@ -30,9 +30,11 @@ build/
 .vite/
 .vitest/
 .wrangler/
+.tools/
 
 # Native iOS generated output and private signing material
 ios/Somewhere.xcodeproj/
+firmware/roll-compass-board/compass_assets.h
 # Local manual field-test routes can contain precise coordinates.
 ios/*.gpx
 DerivedData/

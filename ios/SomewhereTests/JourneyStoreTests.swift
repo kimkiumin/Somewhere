@@ -41,6 +41,21 @@ private actor QueuedJourneyService: JourneyServiceProtocol {
 }
 
 @MainActor
+private final class RecordingPhysicalCompassClient: PhysicalCompassClient {
+    var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
+    var onEvent: ((PhysicalCompassEvent) -> Void)?
+    private(set) var sentSnapshots: [PhysicalCompassSnapshot] = []
+
+    func start() {}
+    func stop() {}
+    func send(_ snapshot: PhysicalCompassSnapshot) { sentSnapshots.append(snapshot) }
+
+    func emit(_ event: PhysicalCompassEvent) {
+        onEvent?(event)
+    }
+}
+
+@MainActor
 final class JourneyStoreTests: XCTestCase {
     func testReadyProjectionRemainsHidden() throws { XCTAssertNil(try projection(phase: "ready", revealed: false).reveal) }
     func testCommitUsesServerProjection() async throws {
@@ -194,6 +209,69 @@ final class JourneyStoreTests: XCTestCase {
 
         XCTAssertEqual(publications.count, 1)
         withExtendedLifetime(cancellable) {}
+    }
+
+    func testPhysicalCompassProjectionContainsOnlySafeGuidanceFields() throws {
+        let following = try projection(phase: "following", revealed: false)
+        let compass = RecordingPhysicalCompassClient()
+        let store = JourneyStore(service: FakeJourneyService(response: following), physicalCompass: compass)
+
+        store.applyServerProjection(following)
+
+        let snapshot = try XCTUnwrap(compass.sentSnapshots.last)
+        XCTAssertEqual(snapshot.phase, "following")
+        XCTAssertNil(snapshot.bearingDegrees)
+        XCTAssertFalse(snapshot.revealed)
+        XCTAssertLessThanOrEqual(snapshot.menus.count, 2)
+        XCTAssertEqual(snapshot.actions, [.stop])
+    }
+
+    func testPhysicalCompassReceivesCrediblePhoneGuidance() throws {
+        let following = try projection(phase: "following", revealed: false)
+        let compass = RecordingPhysicalCompassClient()
+        let store = JourneyStore(service: FakeJourneyService(response: following), physicalCompass: compass)
+        store.applyServerProjection(following)
+
+        store.presentGuidanceForTesting(bearing: 315, remainingM: 420)
+
+        let snapshot = try XCTUnwrap(compass.sentSnapshots.last)
+        XCTAssertEqual(snapshot.bearingDegrees, 315)
+        XCTAssertEqual(snapshot.remainingDistanceM, 420)
+        XCTAssertEqual(snapshot.confidence, "credible")
+        XCTAssertFalse(snapshot.revealed)
+    }
+
+    func testPhysicalCompassStopEventDispatchesGuardedJourneyCommand() async throws {
+        let following = try projection(phase: "following", revealed: false)
+        let paused = try projection(phase: "paused", revealed: false)
+        let service = FakeJourneyService(response: paused)
+        let compass = RecordingPhysicalCompassClient()
+        let store = JourneyStore(service: service, physicalCompass: compass)
+        store.applyServerProjection(following)
+        let snapshot = try XCTUnwrap(compass.sentSnapshots.last)
+
+        compass.emit(.action(.stop, sequence: snapshot.sequence))
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertTrue(store.isGuidancePaused)
+        let commands = await service.capturedCommands()
+        XCTAssertEqual(commands, [.requestStop])
+    }
+
+    func testPhysicalCompassIgnoresStaleEventSequence() async throws {
+        let following = try projection(phase: "following", revealed: false)
+        let service = FakeJourneyService(response: try projection(phase: "paused", revealed: false))
+        let compass = RecordingPhysicalCompassClient()
+        let store = JourneyStore(service: service, physicalCompass: compass)
+        store.applyServerProjection(following)
+        let snapshot = try XCTUnwrap(compass.sentSnapshots.last)
+
+        compass.emit(.action(.stop, sequence: snapshot.sequence - 1))
+        try await Task.sleep(for: .milliseconds(50))
+
+        let commands = await service.capturedCommands()
+        XCTAssertEqual(commands, [])
+        XCTAssertFalse(store.isGuidancePaused)
     }
 
     private func store(phase: String) async throws -> JourneyStore {
