@@ -7,6 +7,11 @@ what to read, where the implementation lives, and how to reproduce the app on a
 Mac. It cannot override the product authority described in
 [`../README.md`](../README.md).
 
+If the collaborator does not have macOS/Xcode, start with the focused
+[`non-mac-ios-collaboration-handoff.md`](non-mac-ios-collaboration-handoff.md).
+It records the current integration branch, the offline exhibition/Release
+boundary, what can be changed on Windows, and the Mac/CI verification contract.
+
 ## Start here
 
 Read in this order:
@@ -90,15 +95,12 @@ must be recorded because it is not byte-identical to an older CI build.
 gh repo clone kimkiumin/Somewhere Somewhere
 cd Somewhere
 git fetch origin
-git switch --track origin/codex/roll-compass-native-app
+git switch --track origin/codex/ipad-board-integration
 bun install --frozen-lockfile
 xcodegen generate --spec ios/project.yml
 xcodebuild -list -project ios/Somewhere.xcodeproj
 open ios/Somewhere.xcodeproj
 ```
-
-If the review branch has not been published yet, use
-`origin/codex/v2-macos-handoff` and apply the reviewed changes separately.
 
 In Xcode, choose the shared `Somewhere` scheme, select an installed iPhone
 Simulator, and press Run. Simulator builds do not require an Apple signing team.
@@ -154,8 +156,12 @@ continue the work without reconstructing the discussion:
 
 ## Portrait exhibition handoff (2026-08-26)
 
-Branch to review: `codex/ipad-exhibition`. Do not use
-`codex/roll-compass-native-app` as the review branch for this handoff.
+Branch to review: `codex/ipad-board-integration`. The offline exhibition
+implementation baseline is `67cb03b`; review the latest branch HEAD rather than
+stopping at that baseline. The earlier `codex/ipad-exhibition` branch records
+the pre-integration simulator evidence and is no longer the current handoff
+branch. Do not use `codex/roll-compass-native-app` as the review branch for this
+handoff.
 
 | Device | Role | Completion evidence |
 | --- | --- | --- |
@@ -642,6 +648,7 @@ not be treated as a Mac prerequisite.
 You are working on the native iPhone app for Roll the compass! in the Somewhere
 repository. Read AGENTS.md, docs/README.md,
 docs/product/roll-the-compass-ios-requirements.md, ios/README.md, and
+docs/operations/non-mac-ios-collaboration-handoff.md, then
 docs/operations/native-ios-collaboration-handoff.md in that order. Treat the
 v0.1 prototype and v0.2 web app as historical evidence. Preserve the native
 SwiftUI/Core Location architecture, hidden-destination boundary, immediate Stop,

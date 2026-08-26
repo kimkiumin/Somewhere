@@ -17,6 +17,10 @@ Before changing the current interface, read the
 [native product requirements](../docs/product/roll-the-compass-ios-requirements.md).
 For a clean-clone Mac/Xcode walkthrough and collaborator/AI handoff, use the
 [native collaboration runbook](../docs/operations/native-ios-collaboration-handoff.md).
+Collaborators without macOS or Ubuntu should start with the
+[non-Mac iOS handoff](../docs/operations/non-mac-ios-collaboration-handoff.md),
+which explains the current branch, the Debug exhibition/Release boundary, and
+how GitHub-hosted macOS and Ubuntu checks replace unavailable local toolchains.
 
 The checked-in bundle identifiers are intentionally non-production examples. Linux verification proves source/contract consistency only. It does **not** prove Xcode compilation, signing, simulator behavior, TestFlight distribution, or physical iPhone behavior.
 

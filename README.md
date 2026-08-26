@@ -11,7 +11,9 @@ Roll the compass!는 사용자가 정한 최소 조건 안에서 검증된 목�
 [`docs/product/roll-the-compass-ios-requirements.md`](docs/product/roll-the-compass-ios-requirements.md),
 Mac/Xcode 개발과 AI 협업 절차는
 [`docs/operations/native-ios-collaboration-handoff.md`](docs/operations/native-ios-collaboration-handoff.md)를
-먼저 확인하세요.
+확인하세요. Mac이나 Ubuntu가 없는 협업자는
+[`docs/operations/non-mac-ios-collaboration-handoff.md`](docs/operations/non-mac-ios-collaboration-handoff.md)에서
+현재 브랜치, 전시/제품 실행 경계, GitHub PR 검증 절차를 먼저 확인하세요.
 
 ```text
 최소 조건 → 숨겨진 목적지 하나를 한 번에 확정 → 경로 기반 안내
@@ -21,7 +23,7 @@ Mac/Xcode 개발과 AI 협업 절차는
 ## 현재 구현
 
 - 모바일 전용 V2 웹앱과 실제 Cloudflare Workers 백엔드
-- SwiftUI/Core Location 기반 네이티브 iPhone 앱과 Simulator GPS QA
+- SwiftUI/Core Location 기반 네이티브 iPhone/iPad 앱과 Simulator GPS QA
 - 익명 세션, CSRF/Origin/Host 검증, 요청 순서와 멱등성 경계
 - D1, SQLite Durable Objects, Queues/DLQ/Cron, Static Assets
 - 서버가 소유하는 숨겨진 목적지와 목적지 정체를 노출하지 않는 응답
@@ -52,7 +54,9 @@ Study A 기반 RC 정책, 동일 빌드의 iPhone 15 Pro Max 실기기 4회,
 - 목적지 직선 방위 fallback은 없습니다. 경로·위치·방향 신뢰도가 깨지면
   화살표를 즉시 숨깁니다.
 - 잠금 화면이나 백그라운드 내비게이션을 약속하지 않습니다.
-- 넓은 화면에서도 소비자 제품은 가운데 놓인 하나의 휴대폰 캔버스입니다.
+- 세로 iPad에서는 작은 휴대폰 화면을 가운데 띄우지 않고 가용 공간을 쓰는
+  단일 어댑티브 캔버스를 사용합니다. iPhone과 같은 정보 위계와 진행 중
+  한 화면·비스크롤 원칙은 유지합니다.
 
 정본 우선순위와 역사 문서는 [문서 권위 인덱스](docs/README.md),
 기계 판독 기준은 [V2 권위 맵](docs/authority-map-v2.json)을 따릅니다.

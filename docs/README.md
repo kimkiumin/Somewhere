@@ -53,7 +53,7 @@ authority order above. In particular, `codex_handoff_agents.md`,
 `repo_setup_guide.md`, `codex_first_prompt.md`, and `combined_source_pack.md`
 remain working or historical material, not V2 onboarding authority.
 
-For the current native implementation, use these two focused documents:
+For the current native implementation, use these focused documents:
 
 - [Roll the compass! iOS product requirements](product/roll-the-compass-ios-requirements.md)
   records the owner's current visual, interaction, disclosure, and acceptance
@@ -61,6 +61,10 @@ For the current native implementation, use these two focused documents:
 - [Native iOS collaboration handoff](operations/native-ios-collaboration-handoff.md)
   gives a Mac/Xcode quickstart, source map, deterministic demo modes, real local
   Worker test path, physical-iPhone boundary, and an AI contributor checklist.
+- [Non-Mac iOS collaboration handoff](operations/non-mac-ios-collaboration-handoff.md)
+  is the current entry point for Windows/GitHub-only collaborators. It separates
+  the Debug exhibition path from the Release product path, identifies what can
+  be reviewed without Xcode, and defines the exact Mac/CI verification handoff.
 
 ## Historical v0.2 application
 

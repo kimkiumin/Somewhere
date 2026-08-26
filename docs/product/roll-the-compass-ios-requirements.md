@@ -3,7 +3,7 @@
 Status: owner-directed implementation requirements, 2026-08-20
 
 This document translates the project owner's current product direction and
-visual references into an implementation contract for the native iPhone app.
+visual references into an implementation contract for the native iPhone/iPad app.
 It does not make signing, TestFlight, field-study, provider-rights, legal, or
 public-release claims. A newer explicit owner decision takes precedence; in all
 other conflicts follow the authority order in [`../README.md`](../README.md).
@@ -54,8 +54,8 @@ lines, maps, and destination identity remain absent from active guidance.
 - Starting from the compass is the primary action.
 - Redundant explanations, restore/debug controls, and destination content are
   not shown.
-- The launch composition must fit the target iPhone viewport without requiring
-  a scroll to understand how to start.
+- The launch composition must fit the target portrait iPhone/iPad viewport
+  without requiring a scroll to understand how to start.
 
 ### Conditions and profile
 
@@ -94,8 +94,8 @@ lines, maps, and destination identity remain absent from active guidance.
 - Suppress precise pointing when location, heading, route freshness, or corridor
   confidence is insufficient. Never manufacture a straight destination bearing
   as a safe walking route.
-- Keep the main guidance surface usable in one viewport on the target iPhone;
-  avoid a scrolling dashboard during a walk.
+- Keep the main guidance surface usable in one viewport on the target portrait
+  iPhone/iPad; avoid a scrolling dashboard during a walk.
 - Do not show venue name, exact address, photos, ratings, reviews, a map, or a
   route polyline.
 - There is no direct active-guidance Reveal button in the current owner-directed
