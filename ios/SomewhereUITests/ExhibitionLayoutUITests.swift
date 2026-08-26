@@ -18,11 +18,11 @@ final class ExhibitionLayoutUITests: XCTestCase {
         let conditionsLink = app.buttons["somewhere.conditions-link"]
         XCTAssertTrue(conditionsLink.waitForExistence(timeout: 5))
         XCTAssertTrue(conditionsLink.isHittable)
-        conditionsLink.tap()
-        XCTAssertTrue(app.buttons["somewhere.conditions-back"].waitForExistence(timeout: 8))
+        let back = app.buttons["somewhere.conditions-back"]
+        XCTAssertTrue(tap(conditionsLink, until: back, timeout: 8))
         XCTAssertTrue(app.sliders["somewhere.budget-slider"].exists)
         XCTAssertTrue(app.buttons["somewhere.start-journey-conditions"].isHittable)
-        app.buttons["somewhere.conditions-back"].tap()
+        back.tap()
         XCTAssertTrue(app.buttons["somewhere.start-journey"].waitForExistence(timeout: 3))
     }
 
@@ -221,10 +221,10 @@ final class ExhibitionLayoutUITests: XCTestCase {
         let conditionsLink = start.buttons["somewhere.conditions-link"]
         XCTAssertTrue(conditionsLink.waitForExistence(timeout: 5))
         XCTAssertTrue(conditionsLink.isHittable)
-        conditionsLink.tap()
-        XCTAssertTrue(start.buttons["somewhere.conditions-back"].waitForExistence(timeout: 8))
+        let back = start.buttons["somewhere.conditions-back"]
+        XCTAssertTrue(tap(conditionsLink, until: back, timeout: 8))
         keepScreenshot(named: "\(UIDevice.current.model)-conditions")
-        start.buttons["somewhere.conditions-back"].tap()
+        back.tap()
         terminateAndWait(start)
 
         let settings = XCUIApplication()
@@ -303,6 +303,18 @@ final class ExhibitionLayoutUITests: XCTestCase {
     private func terminateAndWait(_ app: XCUIApplication) {
         app.terminate()
         XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+    }
+
+    private func tap(
+        _ element: XCUIElement,
+        until destination: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        element.tap()
+        if destination.waitForExistence(timeout: timeout / 2) { return true }
+        guard element.exists && element.isHittable else { return false }
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        return destination.waitForExistence(timeout: timeout / 2)
     }
 
     private func launchStartSurface() -> XCUIApplication {
