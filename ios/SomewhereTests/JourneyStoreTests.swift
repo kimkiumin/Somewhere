@@ -220,25 +220,120 @@ final class JourneyStoreTests: XCTestCase {
 
         let snapshot = try XCTUnwrap(compass.sentSnapshots.last)
         XCTAssertEqual(snapshot.phase, "following")
-        XCTAssertNil(snapshot.bearingDegrees)
+        XCTAssertNil(snapshot.targetTrueBearingDegrees)
+        XCTAssertNil(snapshot.magneticDeclinationDegreesEast)
         XCTAssertFalse(snapshot.revealed)
         XCTAssertLessThanOrEqual(snapshot.menus.count, 2)
         XCTAssertEqual(snapshot.actions, [.stop])
     }
 
     func testPhysicalCompassReceivesCrediblePhoneGuidance() throws {
+        let now = Date(timeIntervalSince1970: 3_000)
+        let following = try projection(phase: "following", revealed: false)
+        let compass = RecordingPhysicalCompassClient()
+        let store = JourneyStore(
+            service: FakeJourneyService(response: following),
+            physicalCompass: compass,
+            now: { now }
+        )
+        store.applyServerProjection(following)
+        let route = TrustedRoute(
+            geometry: [
+                Coordinate(latitude: 37.5440, longitude: 127.0370),
+                Coordinate(latitude: 37.5450, longitude: 127.0370),
+                Coordinate(latitude: 37.5450, longitude: 127.0380),
+            ],
+            routeDigest: "sha256:" + String(repeating: "a", count: 64),
+            routeVersion: "test-v1",
+            expiresAt: now.addingTimeInterval(600),
+            receivedAt: now
+        )
+        let location = LocationSample(
+            coordinate: Coordinate(latitude: 37.5442, longitude: 127.0370),
+            horizontalAccuracyM: 5,
+            capturedAt: now
+        )
+        let heading = HeadingSample(
+            trueHeadingDegrees: 0,
+            magneticHeadingDegrees: 8.2,
+            magneticDeclinationDegreesEast: -8.2,
+            accuracyDegrees: 5,
+            capturedAt: now
+        )
+
+        store.updateGuidance(location: location, heading: heading, route: route, now: now)
+
+        let snapshot = try XCTUnwrap(compass.sentSnapshots.last)
+        XCTAssertNotNil(snapshot.targetTrueBearingDegrees)
+        XCTAssertEqual(snapshot.magneticDeclinationDegreesEast, -8.2)
+        XCTAssertNotNil(snapshot.remainingDistanceM)
+        XCTAssertEqual(snapshot.confidence, "credible")
+        XCTAssertFalse(snapshot.revealed)
+    }
+
+    func testPhysicalCompassSuppressesDirectionWithoutDeclination() throws {
         let following = try projection(phase: "following", revealed: false)
         let compass = RecordingPhysicalCompassClient()
         let store = JourneyStore(service: FakeJourneyService(response: following), physicalCompass: compass)
         store.applyServerProjection(following)
 
-        store.presentGuidanceForTesting(bearing: 315, remainingM: 420)
+        store.presentGuidanceForTesting(
+            bearing: 315,
+            remainingM: 420,
+            magneticDeclinationDegreesEast: nil
+        )
 
         let snapshot = try XCTUnwrap(compass.sentSnapshots.last)
-        XCTAssertEqual(snapshot.bearingDegrees, 315)
+        XCTAssertNil(snapshot.targetTrueBearingDegrees)
+        XCTAssertNil(snapshot.magneticDeclinationDegreesEast)
         XCTAssertEqual(snapshot.remainingDistanceM, 420)
-        XCTAssertEqual(snapshot.confidence, "credible")
-        XCTAssertFalse(snapshot.revealed)
+        XCTAssertEqual(snapshot.confidence, GuidanceSuppression.invalidHeading.rawValue)
+    }
+
+    func testPhysicalCompassDoesNotRestampExpiredHeadingAsCredible() throws {
+        var clock = Date(timeIntervalSince1970: 4_000)
+        let following = try projection(phase: "following", revealed: false)
+        let compass = RecordingPhysicalCompassClient()
+        let store = JourneyStore(
+            service: FakeJourneyService(response: following),
+            notificationController: NotificationController(suppressScheduling: true),
+            physicalCompass: compass,
+            now: { clock }
+        )
+        store.applyServerProjection(following)
+        let route = TrustedRoute(
+            geometry: [
+                Coordinate(latitude: 37.5440, longitude: 127.0370),
+                Coordinate(latitude: 37.5450, longitude: 127.0370),
+                Coordinate(latitude: 37.5450, longitude: 127.0380),
+            ],
+            routeDigest: "sha256:" + String(repeating: "a", count: 64),
+            routeVersion: "test-v1",
+            expiresAt: clock.addingTimeInterval(600),
+            receivedAt: clock
+        )
+        let location = LocationSample(
+            coordinate: Coordinate(latitude: 37.5442, longitude: 127.0370),
+            horizontalAccuracyM: 5,
+            capturedAt: clock
+        )
+        let heading = HeadingSample(
+            trueHeadingDegrees: 0,
+            magneticHeadingDegrees: 8.2,
+            magneticDeclinationDegreesEast: -8.2,
+            accuracyDegrees: 5,
+            capturedAt: clock
+        )
+        store.updateGuidance(location: location, heading: heading, route: route, now: clock)
+        XCTAssertNotNil(try XCTUnwrap(compass.sentSnapshots.last).targetTrueBearingDegrees)
+
+        clock = clock.addingTimeInterval(Double(NavigationPolicy.headingMaxAgeMs) / 1_000 + 1)
+        store.applyServerProjection(following)
+
+        let expired = try XCTUnwrap(compass.sentSnapshots.last)
+        XCTAssertNil(expired.targetTrueBearingDegrees)
+        XCTAssertNil(expired.magneticDeclinationDegreesEast)
+        XCTAssertEqual(expired.confidence, GuidanceSuppression.invalidHeading.rawValue)
     }
 
     func testPhysicalCompassStopEventDispatchesGuardedJourneyCommand() async throws {

@@ -1,7 +1,7 @@
 import Foundation
 
 enum PhysicalCompassBLE {
-    static let contractVersion = 1
+    static let contractVersion = 2
     static let maxFrameBytes = 512
     static let maxDisplayCharacters = 40
     static let serviceUUID = "C1F8A100-35D1-4C53-9A03-7A1B3E620001"
@@ -44,7 +44,8 @@ struct PhysicalCompassSnapshot: Equatable, Sendable {
     let sequence: Int
     let phase: String
     let remainingDistanceM: Double?
-    let bearingDegrees: Double?
+    let targetTrueBearingDegrees: Double?
+    let magneticDeclinationDegreesEast: Double?
     let confidence: String
     let menus: [String]
     let priceBand: String?
@@ -56,7 +57,8 @@ struct PhysicalCompassSnapshot: Equatable, Sendable {
         sequence: Int,
         phase: String,
         remainingDistanceM: Double?,
-        bearingDegrees: Double?,
+        targetTrueBearingDegrees: Double?,
+        magneticDeclinationDegreesEast: Double?,
         confidence: String,
         menus: [String],
         priceBand: String?,
@@ -75,8 +77,15 @@ struct PhysicalCompassSnapshot: Equatable, Sendable {
            (!remainingDistanceM.isFinite || remainingDistanceM < 0) {
             throw PhysicalCompassWireError.invalidNumber
         }
-        if let bearingDegrees,
-           (!bearingDegrees.isFinite || !(0..<360).contains(bearingDegrees)) {
+        let hasTarget = targetTrueBearingDegrees != nil
+        let hasDeclination = magneticDeclinationDegreesEast != nil
+        guard hasTarget == hasDeclination else { throw PhysicalCompassWireError.invalidPayload }
+        if let targetTrueBearingDegrees,
+           (!targetTrueBearingDegrees.isFinite || !(0..<360).contains(targetTrueBearingDegrees)) {
+            throw PhysicalCompassWireError.invalidNumber
+        }
+        if let magneticDeclinationDegreesEast,
+           (!magneticDeclinationDegreesEast.isFinite || !(-180...180).contains(magneticDeclinationDegreesEast)) {
             throw PhysicalCompassWireError.invalidNumber
         }
         guard menus.count <= 2,
@@ -95,7 +104,8 @@ struct PhysicalCompassSnapshot: Equatable, Sendable {
         self.sequence = sequence
         self.phase = phase
         self.remainingDistanceM = remainingDistanceM
-        self.bearingDegrees = bearingDegrees
+        self.targetTrueBearingDegrees = targetTrueBearingDegrees
+        self.magneticDeclinationDegreesEast = magneticDeclinationDegreesEast
         self.confidence = confidence
         self.menus = menus
         self.priceBand = priceBand
@@ -203,7 +213,8 @@ private struct StateEnvelope: Encodable {
     let sequence: Int
     let phase: String
     let distance: Double?
-    let bearing: Double?
+    let targetTrueBearingDegrees: Double?
+    let magneticDeclinationDegreesEast: Double?
     let confidence: String
     let menus: [String]
     let priceBand: String?
@@ -217,7 +228,8 @@ private struct StateEnvelope: Encodable {
         sequence = snapshot.sequence
         phase = snapshot.phase
         distance = snapshot.remainingDistanceM
-        bearing = snapshot.bearingDegrees
+        targetTrueBearingDegrees = snapshot.targetTrueBearingDegrees
+        magneticDeclinationDegreesEast = snapshot.magneticDeclinationDegreesEast
         confidence = snapshot.confidence
         menus = snapshot.menus
         priceBand = snapshot.priceBand
@@ -232,7 +244,8 @@ private struct StateEnvelope: Encodable {
         case sequence = "seq"
         case phase
         case distance = "d"
-        case bearing = "b"
+        case targetTrueBearingDegrees = "tb"
+        case magneticDeclinationDegreesEast = "md"
         case confidence = "c"
         case menus = "m"
         case priceBand = "p"
@@ -248,7 +261,8 @@ private struct StateEnvelope: Encodable {
         try values.encode(sequence, forKey: .sequence)
         try values.encode(phase, forKey: .phase)
         try values.encodeIfPresent(distance, forKey: .distance)
-        try values.encodeIfPresent(bearing, forKey: .bearing)
+        try values.encodeIfPresent(targetTrueBearingDegrees, forKey: .targetTrueBearingDegrees)
+        try values.encodeIfPresent(magneticDeclinationDegreesEast, forKey: .magneticDeclinationDegreesEast)
         try values.encode(confidence, forKey: .confidence)
         try values.encode(menus, forKey: .menus)
         try values.encodeIfPresent(priceBand, forKey: .priceBand)
