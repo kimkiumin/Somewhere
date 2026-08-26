@@ -184,6 +184,28 @@ push된 다음, 동일한 LVGL 8.4 화면·runtime 소스를 SDL2 어댑터에�
 7. 원형 LCD가 관련되면 compile, flash, serial, touch, BOOT/RST 결과
 8. Linux 운영 변경이면 별도의 `verify:ops`/`verify:release` 결과
 
+## 2026-08-27 최초 구현 영수증
+
+앱 통합 SHA `cc3ce09546636ee491125955ab7866ca7963f8b1`에서 다음을
+확인했다.
+
+- `verify:ios-source`: 36 통과, 0 실패; source/field validator `PASS`
+- `verify:native-evidence`: 14 통과, 0 실패
+- 변경 문서 상대 링크: 63개 확인, 0개 누락
+- Xcode 26.6 + iOS 26.5 `Somewhere iPhone 13` Simulator에서 Build iOS
+  Apps로 Debug ARM64 빌드·설치·Home Screen 실행 성공
+- 빌드된 Info.plist: `SomewhereAPIOrigin=https://example.invalid`,
+  `SomewhereExhibitionDemo=YES`
+- 로컬 Simulator ZIP SHA-256:
+  `56a267536882b19f857e7fe61f71f596b50568bbf99532f8408b7ceed14b92c7`
+
+새 workflow가 기본 브랜치에 아직 등록되지 않은 이 최초 push에서는 GitHub
+Actions API가 workflow 조회를 `404`로 거부했고 hosted artifact run은 생성되지
+않았다. 따라서 위 결과를 GitHub hosted `PASS`로 바꾸어 기록하지 않는다.
+workflow가 기본 브랜치에 반영된 뒤 수동 실행하여 macOS artifact ZIP과 manifest를
+다시 받아야 한다. 로컬 ZIP은 build 명령·manifest 계약의 검증 근거이며 GitHub
+artifact를 대신하는 장기 배포본이 아니다.
+
 ## 외부 근거
 
 - [Apple Xcode SDK 및 시스템 요구사항](https://developer.apple.com/xcode/system-requirements/)
