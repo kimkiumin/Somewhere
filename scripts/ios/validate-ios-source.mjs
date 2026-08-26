@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
@@ -20,6 +20,7 @@ export const IOS_SOURCE_REQUIREMENTS = Object.freeze({
     "ios/Somewhere/Platform/PhysicalCompassController.swift",
     "ios/Somewhere/Resources/Info.plist",
     "ios/Somewhere/Resources/PrivacyInfo.xcprivacy",
+    "ios/Somewhere/Resources/Assets.xcassets/RollCompassAppIcon.appiconset/Contents.json",
     "ios/SomewhereTests/WireContractTests.swift",
     "ios/SomewhereTests/PhysicalCompassWireTests.swift",
     "ios/SomewhereTests/GuidanceEngineTests.swift",
@@ -183,6 +184,24 @@ export async function validateIOSSource(repositoryRoot, options = {}) {
   const infoPlist = contents.get("ios/Somewhere/Resources/Info.plist");
   assert(infoPlist.includes("NSBluetoothAlwaysUsageDescription"), "Info.plist must explain Bluetooth usage");
   assert(!infoPlist.includes("bluetooth-central"), "native app must not promise background Bluetooth navigation");
+
+  const iconCatalogPath = "ios/Somewhere/Resources/Assets.xcassets/RollCompassAppIcon.appiconset/Contents.json";
+  const iconCatalog = JSON.parse(contents.get(iconCatalogPath));
+  const iconDirectory = resolve(root, iconCatalogPath, "..");
+  const assignedIconFiles = [...new Set(iconCatalog.images.map((image) => image.filename).filter(Boolean))].sort();
+  assert(assignedIconFiles.length > 0, "app icon catalog must assign at least one raster file");
+  for (const filename of assignedIconFiles) {
+    try {
+      await readFile(resolve(iconDirectory, filename));
+    } catch {
+      throw new Error(`assigned app icon is missing: ${filename}`);
+    }
+  }
+  const iconRasterFiles = (await readdir(iconDirectory)).filter((name) => name.endsWith(".png")).sort();
+  assert(
+    comparable(iconRasterFiles) === comparable(assignedIconFiles),
+    "app icon catalog contains unassigned raster files",
+  );
 
   return {
     gate: "PASS",

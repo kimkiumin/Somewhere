@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parse, stringify } from "yaml";
@@ -12,6 +12,19 @@ import {
 const repositoryRoot = resolve(import.meta.dir, "../..");
 
 describe("native iOS source gate", () => {
+  test("ships a complete app icon set without unassigned raster files", async () => {
+    const iconDirectory = resolve(
+      repositoryRoot,
+      "ios/Somewhere/Resources/Assets.xcassets/RollCompassAppIcon.appiconset",
+    );
+    const catalog = JSON.parse(await readFile(resolve(iconDirectory, "Contents.json"), "utf8"));
+    const assigned = new Set(catalog.images.map((image) => image.filename).filter(Boolean));
+    const rasterFiles = (await readdir(iconDirectory)).filter((name) => name.endsWith(".png"));
+
+    for (const filename of assigned) await access(resolve(iconDirectory, filename));
+    expect(rasterFiles.sort()).toEqual([...assigned].sort());
+  });
+
   test("matches the canonical V1 wire contract and native safety boundary", async () => {
     const result = await validateIOSSource(repositoryRoot);
 
