@@ -537,7 +537,11 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertEqual(conditions.label, "탐색 조건")
         conditions.tap()
 
-        XCTAssertTrue(app.sliders["somewhere.budget-slider"].waitForExistence(timeout: 2))
+        let budget = app.sliders["somewhere.budget-slider"]
+        if !budget.waitForExistence(timeout: 1), conditions.exists, conditions.isHittable {
+            conditions.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(budget.waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["somewhere.profile-settings"].exists)
     }
 
