@@ -74,6 +74,22 @@ struct PhysicalCompassConnectionEpoch: Sendable {
     }
 }
 
+struct PhysicalCompassDiscoveryGate: Sendable {
+    static func accepts(
+        running: Bool,
+        isCurrentCentral: Bool,
+        centralIsPoweredOn: Bool,
+        awaitsCentralRefresh: Bool,
+        hasPeripheral: Bool
+    ) -> Bool {
+        running
+            && isCurrentCentral
+            && centralIsPoweredOn
+            && !awaitsCentralRefresh
+            && !hasPeripheral
+    }
+}
+
 @MainActor
 private final class PhysicalCompassPeripheralDelegateProxy: NSObject, @preconcurrency CBPeripheralDelegate {
     weak var owner: PhysicalCompassController?
@@ -199,7 +215,13 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         advertisementData: [String: Any],
         rssi RSSI: NSNumber
     ) {
-        guard running, self.central === central, self.peripheral == nil else { return }
+        guard PhysicalCompassDiscoveryGate.accepts(
+            running: running,
+            isCurrentCentral: self.central === central,
+            centralIsPoweredOn: central.state == .poweredOn,
+            awaitsCentralRefresh: refreshCentralWhenPoweredOn,
+            hasPeripheral: self.peripheral != nil
+        ) else { return }
         self.peripheral = peripheral
         let epoch = connectionEpoch.begin()
         let delegate = PhysicalCompassPeripheralDelegateProxy(owner: self, epoch: epoch)

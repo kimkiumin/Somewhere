@@ -115,6 +115,38 @@ final class PhysicalCompassWireTests: XCTestCase {
         XCTAssertTrue(epoch.accepts(second))
     }
 
+    func testDiscoveryGateRejectsEveryInactiveLifecycleBoundary() {
+        XCTAssertTrue(PhysicalCompassDiscoveryGate.accepts(
+            running: true,
+            isCurrentCentral: true,
+            centralIsPoweredOn: true,
+            awaitsCentralRefresh: false,
+            hasPeripheral: false
+        ))
+
+        let rejected: [(Bool, Bool, Bool, Bool, Bool)] = [
+            // stopped, retired central, powered off, power-cycle refresh pending, already connecting
+            (false, true, true, false, false),
+            (true, false, true, false, false),
+            (true, true, false, false, false),
+            (true, true, true, true, false),
+            (true, true, true, false, true),
+            // A late discovery delivered during a power cycle must remain rejected even if
+            // CoreBluetooth has already flipped the central back to powered-on.
+            (true, true, true, true, false),
+        ]
+
+        for lifecycle in rejected {
+            XCTAssertFalse(PhysicalCompassDiscoveryGate.accepts(
+                running: lifecycle.0,
+                isCurrentCentral: lifecycle.1,
+                centralIsPoweredOn: lifecycle.2,
+                awaitsCentralRefresh: lifecycle.3,
+                hasPeripheral: lifecycle.4
+            ))
+        }
+    }
+
     func testEveryConnectionStateHasDeterministicKoreanStatusCopy() {
         let states: [PhysicalCompassConnectionState] = [
             .disabled, .unavailable, .disconnected, .scanning, .connecting, .stale, .connected,

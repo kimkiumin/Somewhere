@@ -155,6 +155,7 @@ private final class UITestPhysicalCompassClient: PhysicalCompassClient {
     }
 
     func send(_ snapshot: PhysicalCompassSnapshot) {
+        guard state == .connected || state == .stale else { return }
         onSnapshotSent?(snapshot.sequence)
         if state == .stale {
             state = .connected
