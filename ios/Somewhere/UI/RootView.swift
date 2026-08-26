@@ -18,30 +18,18 @@ struct RootView: View {
                 SomewhereBoundedSurface { rootContent }
                     .padding(.horizontal, layout.horizontalPadding)
                     .padding(.vertical, 18)
+                    .safeAreaInset(edge: .top, spacing: 8) {
+                        if let error = store.presentedError {
+                            errorBanner(error)
+                                .frame(maxWidth: layout.contentMaxWidth)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 8)
+                        }
+                    }
             }
             .environment(\.somewhereLayout, layout)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("somewhere.layout.\(layout.mode.rawValue)")
-            .overlay(alignment: .top) {
-                if let error = store.presentedError {
-                    HStack(spacing: 10) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        Text(errorMessage(error)).font(.footnote)
-                        Button("닫기") { store.dismissError() }
-                            .frame(minHeight: 44)
-                            .accessibilityLabel("오류 안내 닫기")
-                    }
-                    .padding(.horizontal, 16)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(Color.white.opacity(0.8), lineWidth: 1)
-                    }
-                    .padding(.top, 8)
-                    .accessibilityLabel("여정 오류: \(errorMessage(error))")
-                }
-            }
             .sheet(isPresented: $store.showsStopConfirmation) {
                 SomewhereBoundedSheet {
                     StopConfirmationView(store: store)
@@ -95,6 +83,32 @@ struct RootView: View {
         } else {
             ConstraintView(store: store)
         }
+    }
+
+    private func errorBanner(_ error: JourneyStoreError) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text(errorMessage(error))
+                .font(.footnote)
+                .multilineTextAlignment(.leading)
+                .accessibilityLabel("여정 오류: \(errorMessage(error))")
+                .accessibilityIdentifier("somewhere.error-message")
+            Spacer(minLength: 0)
+            Button("닫기") { store.dismissError() }
+                .frame(minHeight: 44)
+                .accessibilityLabel("오류 안내 닫기")
+                .accessibilityIdentifier("somewhere.error-dismiss")
+        }
+        .padding(.horizontal, 16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.8), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("somewhere.error")
     }
 
     private func errorMessage(_ error: JourneyStoreError) -> String {

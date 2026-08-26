@@ -91,7 +91,7 @@ struct RecoveryView: View {
             Spacer()
             SomewhereSignalPill(
                 icon: projection.revealed == true ? "eye.fill" : "eye.slash.fill",
-                title: projection.revealed == true ? "공개됨" : "보물 숨김",
+                title: projection.revealed == true ? "공개됨" : "목적지 숨김",
                 tint: projection.revealed == true ? SomewherePalette.success : SomewherePalette.accent
             )
         }

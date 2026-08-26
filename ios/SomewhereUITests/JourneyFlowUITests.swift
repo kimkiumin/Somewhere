@@ -77,6 +77,35 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertTrue(summary.label.contains("왼쪽 앞 방향으로 이동"))
         XCTAssertTrue(summary.label.contains("다음 동작"))
         XCTAssertTrue(summary.label.contains("우회전"))
+        XCTAssertFalse(summary.label.contains("테스트로"))
+    }
+
+    func testErrorMessageAndDismissStayAccessibleWithoutCoveringGuidanceControls() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-test-state", "ready",
+            "--ui-test-error",
+            "--ui-test-no-notifications",
+        ]
+        app.launch()
+
+        let error = app.descendants(matching: .any)["somewhere.error"]
+        let message = app.descendants(matching: .any)["somewhere.error-message"]
+        let dismiss = app.buttons["somewhere.error-dismiss"]
+        let header = app.buttons["somewhere.back"]
+        let primary = app.buttons["somewhere.commit"]
+        let window = app.windows.firstMatch
+
+        XCTAssertTrue(error.waitForExistence(timeout: 2))
+        XCTAssertTrue(message.waitForExistence(timeout: 2))
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 2))
+        XCTAssertTrue(header.waitForExistence(timeout: 2))
+        XCTAssertTrue(primary.waitForExistence(timeout: 2))
+        XCTAssertTrue(message.isHittable)
+        XCTAssertTrue(dismiss.isHittable)
+        XCTAssertTrue(window.frame.contains(error.frame))
+        XCTAssertFalse(error.frame.intersects(header.frame))
+        XCTAssertFalse(error.frame.intersects(primary.frame))
     }
 
     func testAccessibilityTextKeepsStopVisibleWithoutScrolling() {
@@ -348,6 +377,8 @@ final class JourneyFlowUITests: XCTestCase {
         let app = launchHarness("stopped")
         XCTAssertTrue(app.buttons["somewhere.stop-reason.safety-concern"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["somewhere.skip-stop-reason"].exists)
+        XCTAssertTrue(app.staticTexts["목적지 숨김"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.staticTexts["보물 숨김"].exists)
     }
 
     func testRichArrivalHierarchyIsRendered() {

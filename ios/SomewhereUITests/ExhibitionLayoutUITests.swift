@@ -202,7 +202,7 @@ final class ExhibitionLayoutUITests: XCTestCase {
                 app.descendants(matching: .any)[requiredElement].waitForExistence(timeout: 3)
             )
             keepScreenshot(named: "\(UIDevice.current.model)-\(state)")
-            app.terminate()
+            terminateAndWait(app)
         }
     }
 
@@ -216,48 +216,70 @@ final class ExhibitionLayoutUITests: XCTestCase {
         XCTAssertTrue(start.buttons["somewhere.conditions-back"].waitForExistence(timeout: 8))
         keepScreenshot(named: "\(UIDevice.current.model)-conditions")
         start.buttons["somewhere.conditions-back"].tap()
-        start.terminate()
+        terminateAndWait(start)
 
         let settings = XCUIApplication()
         settings.launchArguments = ["--ui-test-profile-settings", "--ui-test-no-notifications"]
         settings.launch()
         XCTAssertTrue(settings.buttons["somewhere.profile-save"].waitForExistence(timeout: 3))
         keepScreenshot(named: "\(UIDevice.current.model)-settings")
-        settings.terminate()
+        terminateAndWait(settings)
 
         for (argument, required, name) in [
             ("--ui-test-no-fit", "somewhere.no-fit-review", "no-fit"),
             ("--ui-test-feedback", "somewhere.feedback.like", "feedback"),
-            ("--ui-test-error", "오류 안내 닫기", "error"),
         ] {
             let app = XCUIApplication()
             app.launchArguments = [argument, "--ui-test-no-notifications"]
             app.launch()
-            let element: XCUIElement
-            if name == "error" {
-                let dismiss = app.buttons[required]
-                element = dismiss.waitForExistence(timeout: 1)
-                    ? dismiss
-                    : app.buttons["여정 오류: 연결이나 위치를 확인하고 다시 시도해 주세요."]
-            } else {
-                element = app.descendants(matching: .any)[required]
-            }
+            let element = app.descendants(matching: .any)[required]
             XCTAssertTrue(element.waitForExistence(timeout: 3))
             keepScreenshot(named: "\(UIDevice.current.model)-\(name)")
-            app.terminate()
+            terminateAndWait(app)
         }
 
         let paused = launchHarness("following", credibleGuidance: true)
         paused.buttons["somewhere.stop"].tap()
         XCTAssertTrue(paused.buttons["somewhere.continue-journey"].waitForExistence(timeout: 3))
         keepScreenshot(named: "\(UIDevice.current.model)-stop-confirmation")
-        paused.terminate()
+        terminateAndWait(paused)
+    }
+
+    func testCaptureErrorUsesIndependentAccessibleBanner() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-test-error",
+            "--ui-test-state", "ready",
+            "--ui-test-no-notifications",
+        ]
+        app.launch()
+
+        let error = app.descendants(matching: .any)["somewhere.error"]
+        let message = app.descendants(matching: .any)["somewhere.error-message"]
+        let dismiss = app.buttons["somewhere.error-dismiss"]
+        let header = app.buttons["somewhere.back"]
+        let primary = app.buttons["somewhere.commit"]
+        let window = app.windows.firstMatch
+
+        XCTAssertTrue(error.waitForExistence(timeout: 3))
+        XCTAssertTrue(message.waitForExistence(timeout: 3))
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 3))
+        XCTAssertTrue(header.waitForExistence(timeout: 3))
+        XCTAssertTrue(primary.waitForExistence(timeout: 3))
+        XCTAssertTrue(message.isHittable)
+        XCTAssertTrue(dismiss.isHittable)
+        XCTAssertTrue(window.frame.contains(error.frame))
+        XCTAssertFalse(error.frame.intersects(header.frame))
+        XCTAssertFalse(error.frame.intersects(primary.frame))
+        keepScreenshot(named: "\(UIDevice.current.model)-error")
+        terminateAndWait(app)
     }
 
     private func launchHarness(_ state: String, credibleGuidance: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-test-state", state, "--ui-test-no-notifications"]
-        if credibleGuidance { app.launchArguments.append("--ui-test-credible-guidance") }
+        app.launchArguments = credibleGuidance
+            ? ["--ui-test-state", state, "--ui-test-credible-guidance", "--ui-test-no-notifications"]
+            : ["--ui-test-state", state, "--ui-test-no-notifications"]
         app.launch()
         return app
     }
@@ -267,6 +289,11 @@ final class ExhibitionLayoutUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    private func terminateAndWait(_ app: XCUIApplication) {
+        app.terminate()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
     }
 
     private func launchStartSurface() -> XCUIApplication {

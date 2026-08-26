@@ -459,7 +459,6 @@ struct CompassView: View {
                     } else if let instruction = step.instruction, !instruction.isEmpty {
                         parts.append(instruction)
                     }
-                    if let road = step.road, !road.isEmpty { parts.append(road) }
                     return parts.joined(separator: " · ")
                 }
                 return "나침반 바늘과 남은 거리만 확인하세요."
