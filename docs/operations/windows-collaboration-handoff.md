@@ -106,6 +106,11 @@ bun run verify:windows
 If a local branch already exists, `git switch codex/roll-compass-native-app`
 followed by `git pull --ff-only` is safer than creating it again.
 
+The repository pins text files to LF through `.gitattributes`. Git for Windows
+may keep its normal `core.autocrlf` setting; do not bulk-convert the checkout to
+CRLF, because the shared Biome formatting gate verifies the checked-in LF
+contract on every platform.
+
 `verify:windows` is the shared Windows smoke gate: firmware command-plan tests,
 contract tests, TypeScript checks, lint, the web build, and platform-neutral iOS
 source validators. It intentionally does not pretend to be the full release
