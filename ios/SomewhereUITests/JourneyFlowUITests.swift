@@ -556,6 +556,20 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["주변 iPad 또는 iPhone 한 대에서만 연결을 켜세요."].exists)
     }
 
+    func testDeliveredPhysicalCompassStopEventOpensTheNativeStopSheet() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-test-state", "following",
+            "--ui-test-board-state", "connected",
+            "--ui-test-board-event", "stop",
+            "--ui-test-no-notifications",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["somewhere.continue-journey"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["somewhere.confirm-stop"].exists)
+    }
+
     func testPhysicalCompassSettingsRemainOperableAtAccessibilityTextSize() {
         let app = launchStartSurface(extraArguments: [
             "--ui-test-board-state", "disconnected",

@@ -135,6 +135,7 @@ struct SomewhereApp: App {
 private final class UITestPhysicalCompassClient: PhysicalCompassClient {
     var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
     var onEvent: ((PhysicalCompassEvent) -> Void)?
+    var onSnapshotSent: ((Int) -> Void)?
 
     private var state: PhysicalCompassConnectionState
     private var pendingAction: PhysicalCompassAction?
@@ -154,6 +155,7 @@ private final class UITestPhysicalCompassClient: PhysicalCompassClient {
     }
 
     func send(_ snapshot: PhysicalCompassSnapshot) {
+        onSnapshotSent?(snapshot.sequence)
         if state == .stale {
             state = .connected
             onConnectionState?(.connected)

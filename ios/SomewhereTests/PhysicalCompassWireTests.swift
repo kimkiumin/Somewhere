@@ -71,29 +71,30 @@ final class PhysicalCompassWireTests: XCTestCase {
         let replaced = Data("second\n".utf8)
         let latest = Data("latest\n".utf8)
 
-        queue.enqueue(first)
+        queue.enqueue(first, sequence: 11)
         let firstChunk = try XCTUnwrap(queue.nextChunk(maxLength: 3))
         XCTAssertEqual(firstChunk.data, Data("fir".utf8))
         XCTAssertFalse(firstChunk.completesFrame)
+        XCTAssertNil(firstChunk.completedSequence)
 
-        queue.enqueue(replaced)
-        queue.enqueue(latest)
+        queue.enqueue(replaced, sequence: 12)
+        queue.enqueue(latest, sequence: 13)
 
         var emitted = firstChunk.data
-        var completionCount = 0
+        var completedSequences: [Int] = []
         while let chunk = queue.nextChunk(maxLength: 3) {
             emitted.append(chunk.data)
-            if chunk.completesFrame { completionCount += 1 }
+            if let sequence = chunk.completedSequence { completedSequences.append(sequence) }
         }
 
         XCTAssertEqual(emitted, first + latest)
-        XCTAssertEqual(completionCount, 2)
+        XCTAssertEqual(completedSequences, [11, 13])
         XCTAssertTrue(queue.isEmpty)
     }
 
     func testTransportQueueCanBeClearedAcrossReconnectEpochs() throws {
         var queue = PhysicalCompassFrameQueue()
-        queue.enqueue(Data("stale-state\n".utf8))
+        queue.enqueue(Data("stale-state\n".utf8), sequence: 21)
         _ = queue.nextChunk(maxLength: 2)
 
         queue.removeAll()
@@ -102,7 +103,7 @@ final class PhysicalCompassWireTests: XCTestCase {
         XCTAssertNil(queue.nextChunk(maxLength: 20))
     }
 
-    func testConnectionEpochRejectsLateCallbacksWhenTheSamePeripheralReconnects() {
+    func testPeripheralEpochRejectsLateCallbacksWithinAnActiveCentralSession() {
         var epoch = PhysicalCompassConnectionEpoch()
         let first = epoch.begin()
 

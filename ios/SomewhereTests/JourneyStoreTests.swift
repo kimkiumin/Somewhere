@@ -44,13 +44,24 @@ private actor QueuedJourneyService: JourneyServiceProtocol {
 private final class RecordingPhysicalCompassClient: PhysicalCompassClient {
     var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
     var onEvent: ((PhysicalCompassEvent) -> Void)?
+    var onSnapshotSent: ((Int) -> Void)?
+    var automaticallyConfirmSnapshots = true
     private(set) var sentSnapshots: [PhysicalCompassSnapshot] = []
     private(set) var startCount = 0
     private(set) var stopCount = 0
 
     func start() { startCount += 1 }
     func stop() { stopCount += 1 }
-    func send(_ snapshot: PhysicalCompassSnapshot) { sentSnapshots.append(snapshot) }
+    func send(_ snapshot: PhysicalCompassSnapshot) {
+        sentSnapshots.append(snapshot)
+        if automaticallyConfirmSnapshots {
+            onSnapshotSent?(snapshot.sequence)
+        }
+    }
+
+    func confirmDelivery(of sequence: Int) {
+        onSnapshotSent?(sequence)
+    }
 
     func emit(_ event: PhysicalCompassEvent) {
         onEvent?(event)
@@ -307,6 +318,37 @@ final class JourneyStoreTests: XCTestCase {
         let commands = await service.capturedCommands()
         XCTAssertEqual(commands, [])
         XCTAssertFalse(store.isGuidancePaused)
+    }
+
+    func testBoardAuthorityAdvancesOnlyAfterTheNewSnapshotIsFullyDelivered() async throws {
+        let following = try projection(phase: "following", revealed: false)
+        let paused = try projection(phase: "paused", revealed: false)
+        let service = FakeJourneyService(response: paused)
+        let compass = RecordingPhysicalCompassClient()
+        compass.automaticallyConfirmSnapshots = false
+        let store = JourneyStore(
+            service: service,
+            physicalCompass: compass,
+            physicalCompassHostEnabled: true
+        )
+        compass.emitConnection(.connected)
+        store.applyServerProjection(following)
+        let delivered = try XCTUnwrap(compass.sentSnapshots.last)
+        compass.confirmDelivery(of: delivered.sequence)
+
+        store.presentGuidanceForTesting(bearing: 315, remainingM: 420)
+        let pending = try XCTUnwrap(compass.sentSnapshots.last)
+        XCTAssertGreaterThan(pending.sequence, delivered.sequence)
+
+        compass.emit(.action(.stop, sequence: pending.sequence))
+        try await Task.sleep(for: .milliseconds(50))
+        let commandsBeforeDelivery = await service.capturedCommands()
+        XCTAssertEqual(commandsBeforeDelivery, [])
+
+        compass.emit(.action(.stop, sequence: delivered.sequence))
+        try await Task.sleep(for: .milliseconds(50))
+        let commandsAfterDeliveredEvent = await service.capturedCommands()
+        XCTAssertEqual(commandsAfterDeliveredEvent, [.requestStop])
     }
 
     func testPhysicalCompassHostIsOptInAndPersistsExplicitOwnership() throws {

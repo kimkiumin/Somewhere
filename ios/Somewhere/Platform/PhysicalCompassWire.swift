@@ -47,6 +47,7 @@ enum PhysicalCompassEvent: Equatable, Sendable {
 protocol PhysicalCompassClient: AnyObject {
     var onConnectionState: ((PhysicalCompassConnectionState) -> Void)? { get set }
     var onEvent: ((PhysicalCompassEvent) -> Void)? { get set }
+    var onSnapshotSent: ((Int) -> Void)? { get set }
 
     func start()
     func stop()

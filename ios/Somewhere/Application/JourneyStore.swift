@@ -43,6 +43,7 @@ enum PhysicalCompassActionAuthority {
 private final class InertPhysicalCompassClient: PhysicalCompassClient {
     var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
     var onEvent: ((PhysicalCompassEvent) -> Void)?
+    var onSnapshotSent: ((Int) -> Void)?
 
     func start() {}
     func stop() {}
@@ -90,6 +91,7 @@ final class JourneyStore: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private var physicalCompassSequence = 0
     private var lastPhysicalCompassSnapshot: PhysicalCompassSnapshot?
+    private var pendingPhysicalCompassSnapshots: [Int: PhysicalCompassSnapshot] = [:]
 
     init(
         service: any JourneyServiceProtocol,
@@ -143,6 +145,9 @@ final class JourneyStore: ObservableObject {
         physicalCompass.onEvent = { [weak self] event in
             self?.handlePhysicalCompassEvent(event)
         }
+        physicalCompass.onSnapshotSent = { [weak self] sequence in
+            self?.handlePhysicalCompassSnapshotSent(sequence)
+        }
         if isPhysicalCompassHostEnabled {
             physicalCompass.start()
         }
@@ -152,7 +157,7 @@ final class JourneyStore: ObservableObject {
         guard enabled != isPhysicalCompassHostEnabled else { return }
         isPhysicalCompassHostEnabled = enabled
         PhysicalCompassHostPersistence.save(enabled, defaults: physicalCompassDefaults)
-        lastPhysicalCompassSnapshot = nil
+        clearPhysicalCompassAuthority()
         if enabled {
             physicalCompassConnectionState = .scanning
             physicalCompass.start()
@@ -571,7 +576,7 @@ final class JourneyStore: ObservableObject {
     private func handlePhysicalCompassConnectionState(_ state: PhysicalCompassConnectionState) {
         guard isPhysicalCompassHostEnabled else {
             physicalCompassConnectionState = .disabled
-            lastPhysicalCompassSnapshot = nil
+            clearPhysicalCompassAuthority()
             return
         }
         physicalCompassConnectionState = state
@@ -579,16 +584,29 @@ final class JourneyStore: ObservableObject {
         case .connected:
             break
         case .stale:
-            lastPhysicalCompassSnapshot = nil
+            clearPhysicalCompassAuthority()
             syncPhysicalCompass()
         case .disabled, .unavailable, .disconnected, .scanning, .connecting:
-            lastPhysicalCompassSnapshot = nil
+            clearPhysicalCompassAuthority()
         }
+    }
+
+    private func handlePhysicalCompassSnapshotSent(_ sequence: Int) {
+        guard isPhysicalCompassHostEnabled,
+              let snapshot = pendingPhysicalCompassSnapshots.removeValue(forKey: sequence),
+              sequence > (lastPhysicalCompassSnapshot?.sequence ?? 0) else { return }
+        lastPhysicalCompassSnapshot = snapshot
+        pendingPhysicalCompassSnapshots = pendingPhysicalCompassSnapshots.filter { $0.key > sequence }
+    }
+
+    private func clearPhysicalCompassAuthority() {
+        lastPhysicalCompassSnapshot = nil
+        pendingPhysicalCompassSnapshots.removeAll(keepingCapacity: true)
     }
 
     private func syncPhysicalCompass() {
         guard isPhysicalCompassHostEnabled else {
-            lastPhysicalCompassSnapshot = nil
+            clearPhysicalCompassAuthority()
             return
         }
         let nextSequence = physicalCompassSequence + 1
@@ -635,9 +653,12 @@ final class JourneyStore: ObservableObject {
             revealed: projection?.revealed == true,
             timestampMs: Int64(Date().timeIntervalSince1970 * 1000)
         ) else { return }
-        guard snapshot != lastPhysicalCompassSnapshot else { return }
         physicalCompassSequence = nextSequence
-        lastPhysicalCompassSnapshot = snapshot
+        pendingPhysicalCompassSnapshots[nextSequence] = snapshot
+        if pendingPhysicalCompassSnapshots.count > 8,
+           let oldest = pendingPhysicalCompassSnapshots.keys.min() {
+            pendingPhysicalCompassSnapshots.removeValue(forKey: oldest)
+        }
         physicalCompass.send(snapshot)
     }
 }

@@ -37,6 +37,19 @@ describe("native iOS source gate", () => {
     expect(start).toContain("activateCentralIfNeeded()");
   });
 
+  test("retires the central across reconnects and rejects callbacks from an old manager", async () => {
+    const controller = await readFile(
+      resolve(repositoryRoot, "ios/Somewhere/Platform/PhysicalCompassController.swift"),
+      "utf8",
+    );
+
+    expect(controller.match(/self\.central === central/g)?.length).toBeGreaterThanOrEqual(6);
+    expect(controller).toContain("handleConnectionLoss(retiring: central)");
+    expect(controller).toContain("replaceCentralAfterYield(retiring: central)");
+    expect(controller).toContain("central.delegate = nil");
+    expect(controller).toContain("self.central = nil");
+  });
+
   test("isolates UI tests from a persisted physical-host opt-in", async () => {
     const appSource = await readFile(
       resolve(repositoryRoot, "ios/Somewhere/App/SomewhereApp.swift"),
