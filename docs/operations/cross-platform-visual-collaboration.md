@@ -187,20 +187,26 @@ push된 다음, 동일한 LVGL 8.4 화면·runtime 소스를 SDL2 어댑터에�
 7. 원형 LCD가 관련되면 compile, flash, serial, touch, BOOT/RST 결과
 8. Linux 운영 변경이면 별도의 `verify:ops`/`verify:release` 결과
 
-## 2026-08-27 최초 구현 영수증
+## 2026-08-27 구현 및 재검증 영수증
 
-앱 통합 SHA `cc3ce09546636ee491125955ab7866ca7963f8b1`에서 다음을
-확인했다.
+호스티드 미리보기 기준 앱 통합 SHA
+`c0720263523747cf0dca8d9227f7aeef517627d3`과, 아래 iPad test guard 보정이
+적용된 현재 브랜치 상태에서 다음을 다시 확인했다.
 
+- 앱 단위 테스트 183, E2E 34, 계약 15, 서버 238 통과; WebKit 자동화 한계
+  3개는 의도적으로 skip
 - `verify:ios-source`: 36 통과, 0 실패; source/field validator `PASS`
 - `verify:native-evidence`: 14 통과, 0 실패
-- 변경 문서 상대 링크: 63개 확인, 0개 누락
+- `verify:release-authority`: 8 통과, 0 실패
+- 타입검사, 린트, production build 통과
+- iPhone 13 Simulator 전체 XCTest: unit 68 통과, UI 55개 실행 중 0 실패와
+  환경·기기 조건에 따른 의도적 skip 9개, 최종 `TEST SUCCEEDED`
+- 누락됐던 iPad 전용 중단-이유 레이아웃 test guard를 보완한 뒤 iPhone에서는
+  의도적 skip, 정확한 iPad Pro 11형 2세대에서는 1 통과, 0 실패
 - Xcode 26.6 + iOS 26.5 `Somewhere iPhone 13` Simulator에서 Build iOS
   Apps로 Debug ARM64 빌드·설치·Home Screen 실행 성공
 - 빌드된 Info.plist: `SomewhereAPIOrigin=https://example.invalid`,
   `SomewhereExhibitionDemo=YES`
-- 로컬 Simulator ZIP SHA-256:
-  `56a267536882b19f857e7fe61f71f596b50568bbf99532f8408b7ceed14b92c7`
 
 최초 hosted run
 [`32984412855`](https://github.com/kimkiumin/Somewhere/actions/runs/32984412855)는
@@ -209,16 +215,24 @@ job 시작 전 `startup_failure`로 종료됐다. 같은 시각 GitHub Status는
 표시했다. workflow runtime을 30분으로 제한한 SHA `7e7786c` push에서 두 번째
 run
 [`32985450887`](https://github.com/kimkiumin/Somewhere/actions/runs/32985450887)이
-정상 생성됐지만 장애 중 queue에 남아 있다. 따라서 위 로컬 결과를 GitHub hosted
-`PASS`로 바꾸어 기록하지 않는다. 로컬 ZIP은 build 명령·manifest 계약의 검증
-근거이며 GitHub artifact를 대신하는 장기 배포본이 아니다.
+생성됐지만 runner step을 시작하지 못한 채 15분 뒤 취소됐다. 장애 중 실행이므로
+코드 실패 근거로 사용하지 않는다.
 
-보드 브랜치 SHA `8088d81ded88da56c9d3d9fc41e8de1e4365a6f8`도
+장애 이후 위 미리보기 기준 SHA를 대상으로 수동 재실행한
+[`32986482520`](https://github.com/kimkiumin/Somewhere/actions/runs/32986482520)은
+checkout, 고정 Bun 설치, source gate, XcodeGen, ARM64 Simulator build, manifest
+검사, artifact upload를 모두 통과했다. 내려받은 artifact ZIP도 `unzip -t`를
+통과했고 manifest의 `finalSha`가 위 미리보기 기준 SHA와 일치한다. hosted Simulator ZIP
+SHA-256은
+`bd82b35eb0450f62d5dc3d9527464826cd8bc080792a2ead66c206ef2c6e7044`다.
+
+보드 브랜치 SHA `d9258cf34f7244efcab44e2bbca38473f343309c`도
 별도로 확인했다.
 
 - BOOT 즉시 화면 토글 커밋: `0ee5774`
 - Windows 협업·PowerShell·Arduino CLI·CI 커밋: `8088d81`
-- Windows command-plan 단위 테스트: 10 통과, 0 실패
+- generated asset 전체 선검증·linked/reparse 거부·원자 복원 보정: `d9258cf`
+- Windows command-plan·asset restore 단위 테스트: 13 통과, 0 실패
 - `verify:windows`: 계약 15, 타입검사, 린트, 웹 build, 플랫폼 중립 iOS
   source gate 통과
 - Waveshare ESP32-S3-Touch-LCD-2.1 firmware compile 성공: flash 56%,

@@ -472,7 +472,11 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["보물 숨김"].exists)
     }
 
-    func testIPadStopReasonsFitWithoutScrolling() {
+    func testIPadStopReasonsFitWithoutScrolling() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("The no-scroll stop-reason composition is iPad-specific")
+        }
+
         let app = launchHarness("stopped")
         let identifiers = [
             "safety-concern",
