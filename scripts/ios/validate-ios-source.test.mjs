@@ -25,6 +25,28 @@ describe("native iOS source gate", () => {
     expect(rasterFiles.sort()).toEqual([...assigned].sort());
   });
 
+  test("keeps CoreBluetooth dormant until the physical host is explicitly enabled", async () => {
+    const controller = await readFile(
+      resolve(repositoryRoot, "ios/Somewhere/Platform/PhysicalCompassController.swift"),
+      "utf8",
+    );
+    const initializer = controller.match(/override init\(\) \{[\s\S]*?\n    \}/)?.[0] ?? "";
+    const start = controller.match(/func start\(\) \{[\s\S]*?\n    \}/)?.[0] ?? "";
+
+    expect(initializer).not.toContain("CBCentralManager(");
+    expect(start).toContain("activateCentralIfNeeded()");
+  });
+
+  test("isolates UI tests from a persisted physical-host opt-in", async () => {
+    const appSource = await readFile(
+      resolve(repositoryRoot, "ios/Somewhere/App/SomewhereApp.swift"),
+      "utf8",
+    );
+
+    expect(appSource).toContain("Self.isUITestHarness()");
+    expect(appSource).toContain("physicalCompassHostEnabled = false");
+  });
+
   test("matches the canonical V1 wire contract and native safety boundary", async () => {
     const result = await validateIOSSource(repositoryRoot);
 

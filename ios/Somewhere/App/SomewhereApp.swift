@@ -39,6 +39,9 @@ struct SomewhereApp: App {
                 action: Self.uiTestPhysicalCompassAction()
             )
             physicalCompassHostEnabled = true
+        } else if Self.isUITestHarness() {
+            physicalCompass = UITestPhysicalCompassClient(state: .disabled, action: nil)
+            physicalCompassHostEnabled = false
         } else {
             physicalCompass = PhysicalCompassController()
             physicalCompassHostEnabled = nil
@@ -92,6 +95,10 @@ struct SomewhereApp: App {
     }
 
     #if DEBUG
+    private static func isUITestHarness() -> Bool {
+        ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("--ui-test-") }
+    }
+
     private static func uiTestPhysicalCompassState() -> PhysicalCompassConnectionState? {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "--ui-test-board-state"),

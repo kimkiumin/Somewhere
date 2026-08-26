@@ -111,7 +111,7 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
     var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
     var onEvent: ((PhysicalCompassEvent) -> Void)?
 
-    private var central: CBCentralManager!
+    private var central: CBCentralManager?
     private var peripheral: CBPeripheral?
     private var peripheralDelegate: PhysicalCompassPeripheralDelegateProxy?
     private var connectionEpoch = PhysicalCompassConnectionEpoch()
@@ -124,7 +124,6 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
 
     override init() {
         super.init()
-        central = CBCentralManager(delegate: self, queue: .main)
     }
 
     deinit {
@@ -132,9 +131,12 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
     }
 
     func start() {
+        guard !running else { return }
         running = true
+        activateCentralIfNeeded()
+        guard let central else { return }
         guard central.state == .poweredOn else {
-            publish(.unavailable)
+            if central.state != .unknown { publish(.unavailable) }
             return
         }
         scan()
@@ -142,11 +144,12 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
 
     func stop() {
         running = false
-        central.stopScan()
+        central?.stopScan()
         if let peripheral {
-            central.cancelPeripheralConnection(peripheral)
+            central?.cancelPeripheralConnection(peripheral)
         }
         clearConnection()
+        central = nil
         publish(.disconnected)
     }
 
@@ -173,7 +176,7 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         advertisementData: [String: Any],
         rssi RSSI: NSNumber
     ) {
-        guard running else { return }
+        guard running, self.peripheral == nil else { return }
         self.peripheral = peripheral
         let epoch = connectionEpoch.begin()
         let delegate = PhysicalCompassPeripheralDelegateProxy(owner: self, epoch: epoch)
@@ -279,7 +282,7 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
     }
 
     private func scan() {
-        guard running, central.state == .poweredOn else { return }
+        guard running, let central, central.state == .poweredOn else { return }
         central.stopScan()
         central.scanForPeripherals(
             withServices: [Self.serviceUUID],
@@ -301,8 +304,13 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
     }
 
     private func disconnectAndRetry(_ peripheral: CBPeripheral) {
-        central.cancelPeripheralConnection(peripheral)
+        central?.cancelPeripheralConnection(peripheral)
         handleConnectionLoss()
+    }
+
+    private func activateCentralIfNeeded() {
+        guard central == nil else { return }
+        central = CBCentralManager(delegate: self, queue: .main)
     }
 
     private func handleConnectionLoss() {
