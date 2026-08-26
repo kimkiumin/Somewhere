@@ -6,6 +6,7 @@
 
 #include "compass_math.h"
 #include "compass_diagnostics.h"
+#include "compass_layout.h"
 #include "compass_runtime.h"
 #include "needle_spring.h"
 #include "physical_compass_wire.h"
@@ -481,6 +482,15 @@ static void assertDiagnosticSweep() {
     assertNear(input.boardMagneticHeadingDegrees, 45.0f);
 }
 
+static void assertCircularLayoutContainment() {
+    assert(roll_compass::rectFitsCircle(roll_compass::kBrandBounds, 240, 240, 214));
+    assert(roll_compass::rectFitsCircle(roll_compass::kStatusBounds, 240, 240, 214));
+    assert(roll_compass::rectFitsCircle(roll_compass::kDistanceBounds, 240, 240, 214));
+    assert(roll_compass::rectFitsCircle(roll_compass::kPrimaryActionBounds, 240, 240, 214));
+    assert(roll_compass::rectFitsCircle(roll_compass::kPausedContinueBounds, 240, 240, 214));
+    assert(roll_compass::rectFitsCircle(roll_compass::kPausedEndBounds, 240, 240, 214));
+}
+
 int main() {
     assertNear(roll_compass::normalizeDegrees(-1.0f), 359.0f);
     assertNear(roll_compass::shortestDeltaDegrees(359.0f, 1.0f), 2.0f);
@@ -522,5 +532,6 @@ int main() {
     assertDiagnosticParsing();
     assertDiagnosticStateInjection();
     assertDiagnosticSweep();
+    assertCircularLayoutContainment();
     return 0;
 }
