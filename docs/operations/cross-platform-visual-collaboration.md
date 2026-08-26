@@ -35,7 +35,10 @@ CoreBluetooth, 알림, 카메라, 성능, 화면 밝기, 터치 감각은 Mac과
 - 앱 통합 브랜치: `codex/ipad-board-integration`
 - 보드 통합 브랜치: `codex/roll-compass-native-app`
 - 앱 기준: 항상 `origin/codex/ipad-board-integration`의 정확한 40자 SHA
-- 보드 기준: Windows 도구와 BOOT/RST 작업이 push된 뒤 그 원격 40자 SHA
+- 보드 기준 SHA:
+  `8088d81ded88da56c9d3d9fc41e8de1e4365a6f8`
+- 보드용 Windows 명령과 역할별 안내:
+  [해당 SHA의 Windows collaboration handoff](https://github.com/kimkiumin/Somewhere/blob/8088d81ded88da56c9d3d9fc41e8de1e4365a6f8/docs/operations/windows-collaboration-handoff.md)
 
 시안 파일명, 이슈, Appetize 링크에는 반드시 앱 또는 보드 SHA를 적는다.
 “최신 버전”만 적으면 같은 화면인지 재현할 수 없다.
@@ -205,6 +208,21 @@ Actions API가 workflow 조회를 `404`로 거부했고 hosted artifact run은 �
 workflow가 기본 브랜치에 반영된 뒤 수동 실행하여 macOS artifact ZIP과 manifest를
 다시 받아야 한다. 로컬 ZIP은 build 명령·manifest 계약의 검증 근거이며 GitHub
 artifact를 대신하는 장기 배포본이 아니다.
+
+보드 브랜치 SHA `8088d81ded88da56c9d3d9fc41e8de1e4365a6f8`도
+별도로 확인했다.
+
+- BOOT 즉시 화면 토글 커밋: `0ee5774`
+- Windows 협업·PowerShell·Arduino CLI·CI 커밋: `8088d81`
+- Windows command-plan 단위 테스트: 10 통과, 0 실패
+- `verify:windows`: 계약 15, 타입검사, 린트, 웹 build, 플랫폼 중립 iOS
+  source gate 통과
+- Waveshare ESP32-S3-Touch-LCD-2.1 firmware compile 성공: flash 56%,
+  global RAM 9%
+
+이 검증 호스트에는 `pwsh`가 없어 PowerShell 자체와 COM 포트·플래시는 실행하지
+않았다. 새 Windows workflow 역시 기본 브랜치 반영 전에는 hosted run이 생성되지
+않으므로, 실제 Windows runner와 물리 보드 증거는 별도 상태로 유지한다.
 
 ## 외부 근거
 
