@@ -22,6 +22,23 @@ protocol JourneyServiceProtocol: Sendable {
     func perform(_ command: JourneyCommand, current: JourneyProjection?) async throws -> JourneyProjection?
 }
 
+enum PhysicalCompassActionAuthority {
+    static func allows(
+        _ action: PhysicalCompassAction,
+        advertised: [PhysicalCompassAction],
+        journey: [JourneyAction]
+    ) -> Bool {
+        guard advertised.contains(action) else { return false }
+        let required: JourneyAction = switch action {
+        case .stop: .stop
+        case .continue: .continue
+        case .confirmStop: .confirmStop
+        case .reveal: .reveal
+        }
+        return journey.contains(required)
+    }
+}
+
 @MainActor
 private final class InertPhysicalCompassClient: PhysicalCompassClient {
     var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
@@ -532,20 +549,21 @@ final class JourneyStore: ObservableObject {
               let snapshot = lastPhysicalCompassSnapshot,
               let projection,
               case .action(let action, let sequence) = event,
-              sequence == snapshot.sequence else { return }
+              sequence == snapshot.sequence,
+              PhysicalCompassActionAuthority.allows(
+                action,
+                advertised: snapshot.actions,
+                journey: projection.actions
+              ) else { return }
 
         switch action {
         case .stop:
-            guard projection.actions.contains(.stop) else { return }
             requestStop()
         case .continue:
-            guard projection.actions.contains(.continue) else { return }
             Task { await cancelStop() }
         case .confirmStop:
-            guard projection.actions.contains(.confirmStop) else { return }
             Task { await confirmStop() }
         case .reveal:
-            guard projection.actions.contains(.reveal) else { return }
             requestReveal()
         }
     }

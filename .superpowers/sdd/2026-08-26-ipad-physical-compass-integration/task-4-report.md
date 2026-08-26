@@ -23,6 +23,21 @@ composition.
 - Display fields now use UTF-8 byte limits and grapheme-safe truncation. The
   unused `review` action was removed.
 
+## Independent review closure
+
+The first independent review found five gaps: callbacks from a previous use of
+the same `CBPeripheral` could be mistaken for the current connection, a board
+event was not checked against the advertised action set as well as the live
+journey, disconnect immediately collapsed into scanning, large accessibility
+text could clip the fixed-height settings sheet, and the settings/status tests
+did not cover those branches.
+
+The review round closes those gaps by binding every peripheral callback to a
+monotonic connection epoch, requiring both snapshot and journey authority,
+publishing `disconnected` before retrying, providing deterministic Korean copy
+for every transport state, and adding an adaptive settings-only scroll fallback
+at Accessibility XXXL. The main journey remains a non-scrolling composition.
+
 ## TDD evidence
 
 ### RED
@@ -58,6 +73,27 @@ Observed compile failures included missing `PhysicalCompassBLE.maxDisplayBytes`,
   unit and 35 UI scenarios
   (`.omo/evidence/task-4/green-ios-source-final.log`).
 - `git diff --check`: clean.
+
+### Review-fix RED → GREEN
+
+- RED compile evidence for the missing connection epoch and dual action
+  authority: `.omo/evidence/task-4/review-red-focused.log`.
+- RED source-gate evidence for missing settings/transport coverage:
+  `.omo/evidence/task-4/review-red-field-gate.log`.
+- RED compile evidence for missing deterministic status presentation:
+  `.omo/evidence/task-4/review-red-status-copy.log`.
+- Final focused store/wire run: 40 passed, 0 failed
+  (`.omo/evidence/task-4/review-green-focused-final.log`).
+- Accessibility XXXL settings scenario on iPhone 13: 1 passed, 0 failed
+  (`.omo/evidence/task-4/review-green-accessibility-final-2.log`).
+- Final normal-size board settings on iPhone 13 and iPad Pro 11-inch (2nd
+  generation): 1 passed on each device, 0 failed
+  (`.omo/evidence/task-4/review-green-board-iphone13-final.log`,
+  `.omo/evidence/task-4/review-green-board-ipad-final.log`).
+- Final source/field gate: 30 passed, 0 failed; field-flow gate reports 28 unit
+  and 36 UI scenarios (`bun run verify:ios-source`).
+- Final review-fix Release simulator build:
+  `.omo/evidence/task-4/review-green-release-build-final.log`.
 
 All peripheral callbacks are also bound to the currently selected peripheral,
 so late callbacks from a cancelled reconnect epoch cannot mutate the new

@@ -10,6 +10,8 @@ export const IOS_FIELD_REQUIREMENTS = Object.freeze({
     "ios/Somewhere/Platform/LocationController.swift",
     "ios/Somewhere/Platform/NotificationController.swift",
     "ios/Somewhere/Platform/FeedbackCapabilityStore.swift",
+    "ios/Somewhere/Platform/PhysicalCompassController.swift",
+    "ios/Somewhere/Platform/PhysicalCompassWire.swift",
     "ios/Somewhere/Networking/APIJourneyService.swift",
     "ios/Somewhere/UI/RootView.swift",
     "ios/Somewhere/UI/ConstraintView.swift",
@@ -24,6 +26,7 @@ export const IOS_FIELD_REQUIREMENTS = Object.freeze({
     "ios/Somewhere/UI/ArrivalView.swift",
     "ios/Somewhere/UI/NoFitView.swift",
     "ios/Somewhere/UI/SomewhereCompass.swift",
+    "ios/Somewhere/UI/PhysicalCompassSettingsView.swift",
     "ios/Somewhere/Resources/Info.plist",
     "ios/SomewhereTests/JourneyStoreTests.swift",
     "ios/SomewhereUITests/JourneyFlowUITests.swift",
@@ -43,6 +46,7 @@ export const IOS_FIELD_REQUIREMENTS = Object.freeze({
     "ios/Somewhere/UI/ArrivalView.swift",
     "ios/Somewhere/UI/NoFitView.swift",
     "ios/Somewhere/UI/SomewhereCompass.swift",
+    "ios/Somewhere/UI/PhysicalCompassSettingsView.swift",
   ]),
 });
 
@@ -105,6 +109,20 @@ export async function validateIOSFieldFlow(repositoryRoot) {
   const unitTests = source.get("ios/SomewhereTests/JourneyStoreTests.swift");
   const uiTests = source.get("ios/SomewhereUITests/JourneyFlowUITests.swift");
   const virtualFieldTests = source.get("ios/SomewhereUITests/VirtualFieldFlowUITests.swift");
+  const physicalCompassSettings = source.get("ios/Somewhere/UI/PhysicalCompassSettingsView.swift");
+  for (const token of [
+    "somewhere.physical-compass-host-toggle",
+    "somewhere.physical-compass-status",
+    "주변 iPad 또는 iPhone 한 대에서만 연결을 켜세요.",
+    "case .disconnected: (\"연결 끊김\"",
+  ]) assert(physicalCompassSettings.includes(token), `physical compass settings are missing ${token}`);
+  const physicalCompassController = source.get("ios/Somewhere/Platform/PhysicalCompassController.swift");
+  for (const token of [
+    "PhysicalCompassConnectionEpoch",
+    "PhysicalCompassPeripheralDelegateProxy",
+    "publish(.disconnected)",
+    "await Task.yield()",
+  ]) assert(physicalCompassController.includes(token), `physical compass transport is missing ${token}`);
   const unitScenarioCount = [...unitTests.matchAll(/func test[A-Za-z0-9_]+\(\)/g)].length;
   const uiScenarioCount = [...uiTests.matchAll(/func test[A-Za-z0-9_]+\(\)/g)].length;
   assert(unitScenarioCount >= 12, "JourneyStoreTests must define at least 12 scenarios");

@@ -9,13 +9,28 @@ import {
 const repositoryRoot = resolve(import.meta.dir, "../..");
 
 describe("native iOS field journey gate", () => {
+  test("binds the physical compass settings surface into the field gate", () => {
+    expect(IOS_FIELD_REQUIREMENTS.requiredFiles).toContain(
+      "ios/Somewhere/UI/PhysicalCompassSettingsView.swift",
+    );
+    expect(IOS_FIELD_REQUIREMENTS.uiFiles).toContain(
+      "ios/Somewhere/UI/PhysicalCompassSettingsView.swift",
+    );
+    expect(IOS_FIELD_REQUIREMENTS.requiredFiles).toContain(
+      "ios/Somewhere/Platform/PhysicalCompassController.swift",
+    );
+    expect(IOS_FIELD_REQUIREMENTS.requiredFiles).toContain(
+      "ios/Somewhere/Platform/PhysicalCompassWire.swift",
+    );
+  });
+
   test("contains the complete native field-test surface", async () => {
     expect(await validateIOSFieldFlow(repositoryRoot)).toEqual({
       gate: "PASS",
       requiredFileCount: IOS_FIELD_REQUIREMENTS.requiredFiles.length,
-      uiViewCount: 13,
-      unitScenarioCount: 27,
-      uiScenarioCount: 35,
+      uiViewCount: 14,
+      unitScenarioCount: 28,
+      uiScenarioCount: 36,
       minimumControlPoints: 44,
     });
   });

@@ -102,6 +102,35 @@ final class PhysicalCompassWireTests: XCTestCase {
         XCTAssertNil(queue.nextChunk(maxLength: 20))
     }
 
+    func testConnectionEpochRejectsLateCallbacksWhenTheSamePeripheralReconnects() {
+        var epoch = PhysicalCompassConnectionEpoch()
+        let first = epoch.begin()
+
+        epoch.invalidate()
+        let second = epoch.begin()
+
+        XCTAssertNotEqual(first, second)
+        XCTAssertFalse(epoch.accepts(first))
+        XCTAssertTrue(epoch.accepts(second))
+    }
+
+    func testEveryConnectionStateHasDeterministicKoreanStatusCopy() {
+        let states: [PhysicalCompassConnectionState] = [
+            .disabled, .unavailable, .disconnected, .scanning, .connecting, .stale, .connected,
+        ]
+
+        XCTAssertEqual(states.map { PhysicalCompassStatusPresentation(state: $0).title }, [
+            "꺼짐",
+            "Bluetooth 사용 불가",
+            "연결 끊김",
+            "나침반 찾는 중",
+            "연결 중",
+            "새 안내 동기화 중",
+            "연결됨",
+        ])
+        XCTAssertTrue(states.allSatisfy { !PhysicalCompassStatusPresentation(state: $0).detail.isEmpty })
+    }
+
     func testChunkReassemblyHandlesBLEWrites() throws {
         let frame = try PhysicalCompassWire.encodeEvent(.confirmStop, sequence: 31)
         var buffer = Data()

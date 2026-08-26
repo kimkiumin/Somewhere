@@ -556,6 +556,36 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["주변 iPad 또는 iPhone 한 대에서만 연결을 켜세요."].exists)
     }
 
+    func testPhysicalCompassSettingsRemainOperableAtAccessibilityTextSize() {
+        let app = launchStartSurface(extraArguments: [
+            "--ui-test-board-state", "disconnected",
+            "-UIPreferredContentSizeCategoryName",
+            UIContentSizeCategory.accessibilityExtraExtraExtraLarge.rawValue,
+        ])
+
+        let menu = app.buttons["somewhere.profile-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 3))
+        menu.tap()
+        let boardEntry = app.buttons["물리 나침반 연결"]
+        XCTAssertTrue(boardEntry.waitForExistence(timeout: 2))
+        boardEntry.tap()
+
+        let toggle = app.switches["somewhere.physical-compass-host-toggle"]
+        let warning = app.staticTexts["주변 iPad 또는 iPhone 한 대에서만 연결을 켜세요."]
+        let done = app.buttons["somewhere.physical-compass-done"]
+        let scroll = app.scrollViews["somewhere.physical-compass-settings-scroll"]
+        XCTAssertTrue(app.staticTexts["연결 끊김"].waitForExistence(timeout: 3))
+        XCTAssertTrue(scroll.exists)
+        XCTAssertTrue(toggle.exists)
+        XCTAssertTrue(toggle.isHittable)
+        XCTAssertTrue(warning.exists)
+        if !warning.isHittable { scroll.swipeUp() }
+        if !warning.isHittable { scroll.swipeUp() }
+        XCTAssertTrue(warning.isHittable)
+        XCTAssertTrue(done.exists)
+        XCTAssertTrue(done.isHittable)
+    }
+
     func testHarnessCanShowRevealedDestination() {
         let app = launchHarness("arrived-revealed")
         XCTAssertTrue(app.staticTexts["somewhere.revealed-name"].waitForExistence(timeout: 2))

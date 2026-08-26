@@ -46,13 +46,75 @@ struct PhysicalCompassFrameQueue: Sendable {
     }
 }
 
+struct PhysicalCompassConnectionEpoch: Sendable {
+    private var value: UInt64 = 0
+
+    mutating func begin() -> UInt64 {
+        value &+= 1
+        return value
+    }
+
+    mutating func invalidate() {
+        value &+= 1
+    }
+
+    func accepts(_ candidate: UInt64) -> Bool {
+        candidate == value
+    }
+}
+
 @MainActor
-final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconcurrency CBCentralManagerDelegate, @preconcurrency CBPeripheralDelegate {
+private final class PhysicalCompassPeripheralDelegateProxy: NSObject, @preconcurrency CBPeripheralDelegate {
+    weak var owner: PhysicalCompassController?
+    let epoch: UInt64
+
+    init(owner: PhysicalCompassController, epoch: UInt64) {
+        self.owner = owner
+        self.epoch = epoch
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        owner?.handleDidDiscoverServices(peripheral, error: error, epoch: epoch)
+    }
+
+    func peripheral(
+        _ peripheral: CBPeripheral,
+        didDiscoverCharacteristicsFor service: CBService,
+        error: Error?
+    ) {
+        owner?.handleDidDiscoverCharacteristics(peripheral, service: service, error: error, epoch: epoch)
+    }
+
+    func peripheral(
+        _ peripheral: CBPeripheral,
+        didUpdateNotificationStateFor characteristic: CBCharacteristic,
+        error: Error?
+    ) {
+        owner?.handleDidUpdateNotificationState(peripheral, characteristic: characteristic, error: error, epoch: epoch)
+    }
+
+    func peripheral(
+        _ peripheral: CBPeripheral,
+        didUpdateValueFor characteristic: CBCharacteristic,
+        error: Error?
+    ) {
+        owner?.handleDidUpdateValue(peripheral, characteristic: characteristic, error: error, epoch: epoch)
+    }
+
+    func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
+        owner?.handleReadyToWrite(peripheral, epoch: epoch)
+    }
+}
+
+@MainActor
+final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconcurrency CBCentralManagerDelegate {
     var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
     var onEvent: ((PhysicalCompassEvent) -> Void)?
 
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
+    private var peripheralDelegate: PhysicalCompassPeripheralDelegateProxy?
+    private var connectionEpoch = PhysicalCompassConnectionEpoch()
     private var stateCharacteristic: CBCharacteristic?
     private var eventCharacteristic: CBCharacteristic?
     private var eventBuffer = Data()
@@ -113,9 +175,12 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
     ) {
         guard running else { return }
         self.peripheral = peripheral
+        let epoch = connectionEpoch.begin()
+        let delegate = PhysicalCompassPeripheralDelegateProxy(owner: self, epoch: epoch)
+        peripheralDelegate = delegate
         central.stopScan()
         publish(.connecting)
-        peripheral.delegate = self
+        peripheral.delegate = delegate
         central.connect(peripheral, options: nil)
     }
 
@@ -129,9 +194,8 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         didFailToConnect peripheral: CBPeripheral,
         error: Error?
     ) {
-        guard self.peripheral === peripheral else { return }
-        clearConnection()
-        if running { scan() } else { publish(.disconnected) }
+        guard self.peripheral === peripheral, peripheral.state == .disconnected else { return }
+        handleConnectionLoss()
     }
 
     func centralManager(
@@ -139,27 +203,27 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         didDisconnectPeripheral peripheral: CBPeripheral,
         error: Error?
     ) {
-        guard self.peripheral === peripheral else { return }
-        clearConnection()
-        if running { scan() } else { publish(.disconnected) }
+        guard self.peripheral === peripheral, peripheral.state == .disconnected else { return }
+        handleConnectionLoss()
     }
 
-    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard running, self.peripheral === peripheral,
+    fileprivate func handleDidDiscoverServices(_ peripheral: CBPeripheral, error: Error?, epoch: UInt64) {
+        guard isCurrent(peripheral, epoch: epoch),
               error == nil,
               let service = peripheral.services?.first(where: { $0.uuid == Self.serviceUUID }) else {
-            if self.peripheral === peripheral { disconnectAndRetry(peripheral) }
+            if isCurrent(peripheral, epoch: epoch) { disconnectAndRetry(peripheral) }
             return
         }
         peripheral.discoverCharacteristics([Self.stateUUID, Self.eventUUID], for: service)
     }
 
-    func peripheral(
+    fileprivate func handleDidDiscoverCharacteristics(
         _ peripheral: CBPeripheral,
-        didDiscoverCharacteristicsFor service: CBService,
-        error: Error?
+        service: CBService,
+        error: Error?,
+        epoch: UInt64
     ) {
-        guard running, self.peripheral === peripheral else { return }
+        guard isCurrent(peripheral, epoch: epoch) else { return }
         guard error == nil else {
             disconnectAndRetry(peripheral)
             return
@@ -175,12 +239,13 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         peripheral.setNotifyValue(true, for: eventCharacteristic)
     }
 
-    func peripheral(
+    fileprivate func handleDidUpdateNotificationState(
         _ peripheral: CBPeripheral,
-        didUpdateNotificationStateFor characteristic: CBCharacteristic,
-        error: Error?
+        characteristic: CBCharacteristic,
+        error: Error?,
+        epoch: UInt64
     ) {
-        guard running, self.peripheral === peripheral else { return }
+        guard isCurrent(peripheral, epoch: epoch) else { return }
         guard error == nil, characteristic.uuid == Self.eventUUID,
               characteristic.isNotifying,
               let stateCharacteristic else {
@@ -193,13 +258,13 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         flushWrites(to: peripheral, characteristic: stateCharacteristic)
     }
 
-    func peripheral(
+    fileprivate func handleDidUpdateValue(
         _ peripheral: CBPeripheral,
-        didUpdateValueFor characteristic: CBCharacteristic,
-        error: Error?
+        characteristic: CBCharacteristic,
+        error: Error?,
+        epoch: UInt64
     ) {
-        guard running, self.peripheral === peripheral,
-              transportReady, error == nil,
+        guard isCurrent(peripheral, epoch: epoch), transportReady, error == nil,
               characteristic.uuid == Self.eventUUID,
               let value = characteristic.value else { return }
         for frame in PhysicalCompassWire.appendChunk(value, to: &eventBuffer) {
@@ -208,8 +273,8 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
         }
     }
 
-    func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
-        guard running, self.peripheral === peripheral, let stateCharacteristic else { return }
+    fileprivate func handleReadyToWrite(_ peripheral: CBPeripheral, epoch: UInt64) {
+        guard isCurrent(peripheral, epoch: epoch), let stateCharacteristic else { return }
         flushWrites(to: peripheral, characteristic: stateCharacteristic)
     }
 
@@ -237,17 +302,35 @@ final class PhysicalCompassController: NSObject, PhysicalCompassClient, @preconc
 
     private func disconnectAndRetry(_ peripheral: CBPeripheral) {
         central.cancelPeripheralConnection(peripheral)
+        handleConnectionLoss()
+    }
+
+    private func handleConnectionLoss() {
         clearConnection()
-        if running { scan() }
+        publish(.disconnected)
+        guard running else { return }
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self, self.running, self.peripheral == nil else { return }
+            self.scan()
+        }
     }
 
     private func clearConnection() {
+        peripheral?.delegate = nil
+        peripheralDelegate?.owner = nil
+        peripheralDelegate = nil
+        connectionEpoch.invalidate()
         peripheral = nil
         stateCharacteristic = nil
         eventCharacteristic = nil
         eventBuffer.removeAll(keepingCapacity: false)
         frameQueue.removeAll()
         transportReady = false
+    }
+
+    private func isCurrent(_ candidate: CBPeripheral, epoch: UInt64) -> Bool {
+        running && peripheral === candidate && connectionEpoch.accepts(epoch)
     }
 
     private func publish(_ value: PhysicalCompassConnectionState) {

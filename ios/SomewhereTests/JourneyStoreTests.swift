@@ -365,6 +365,24 @@ final class JourneyStoreTests: XCTestCase {
         XCTAssertEqual(freshCommands, [.requestStop])
     }
 
+    func testBoardActionRequiresBothSnapshotAdvertisementAndCurrentJourneyPermission() {
+        XCTAssertFalse(PhysicalCompassActionAuthority.allows(
+            .stop,
+            advertised: [],
+            journey: [.stop]
+        ))
+        XCTAssertFalse(PhysicalCompassActionAuthority.allows(
+            .stop,
+            advertised: [.stop],
+            journey: []
+        ))
+        XCTAssertTrue(PhysicalCompassActionAuthority.allows(
+            .stop,
+            advertised: [.stop],
+            journey: [.stop]
+        ))
+    }
+
     private func store(phase: String) async throws -> JourneyStore {
         let value = try projection(phase: phase, revealed: phase == "stopped" ? false : nil)
         let store = JourneyStore(service: FakeJourneyService(response: value))

@@ -57,7 +57,7 @@ struct ConstraintView: View {
             SomewhereBoundedSheet {
                 PhysicalCompassSettingsView(store: store)
             }
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
         }
     }
 
