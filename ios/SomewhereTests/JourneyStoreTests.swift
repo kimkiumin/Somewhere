@@ -40,6 +40,25 @@ private actor QueuedJourneyService: JourneyServiceProtocol {
     func capturedCommands() -> [JourneyCommand] { commands }
 }
 
+private actor FailFirstArrivalService: JourneyServiceProtocol {
+    let response: JourneyProjection
+    var arrivalAttempts = 0
+    var commands: [JourneyCommand] = []
+
+    init(response: JourneyProjection) { self.response = response }
+
+    func perform(_ command: JourneyCommand, current: JourneyProjection?) async throws -> JourneyProjection? {
+        commands.append(command)
+        if case .recordArrival = command {
+            arrivalAttempts += 1
+            if arrivalAttempts == 1 { throw JourneyStoreError.unavailable }
+        }
+        return response
+    }
+
+    func capturedCommands() -> [JourneyCommand] { commands }
+}
+
 @MainActor
 private final class RecordingPhysicalCompassClient: PhysicalCompassClient {
     var onConnectionState: ((PhysicalCompassConnectionState) -> Void)?
@@ -239,6 +258,65 @@ final class JourneyStoreTests: XCTestCase {
         withExtendedLifetime(cancellable) {}
     }
 
+    func testFailedAutomaticArrivalCanRetryAfterAFreshQualifyingWindow() async throws {
+        let following = try projection(phase: "following", revealed: false)
+        let arrived = try projection(phase: "arrived", revealed: true)
+        let service = FailFirstArrivalService(response: arrived)
+        let store = JourneyStore(
+            service: service,
+            notificationController: NotificationController(suppressScheduling: true)
+        )
+        store.applyServerProjection(following)
+
+        driveArrivalWindow(store, startingAt: Date(timeIntervalSince1970: 10_000))
+        try await waitForCommandCount(1, from: service)
+        driveArrivalWindow(store, startingAt: Date(timeIntervalSince1970: 10_016))
+        try await waitForCommandCount(2, from: service)
+
+        let commands = await service.capturedCommands()
+        XCTAssertEqual(commands, [.recordArrival, .recordArrival])
+        XCTAssertEqual(store.projection?.phase, .arrived)
+    }
+
+    func testNewJourneyIdGetsAnIndependentAutomaticArrivalGate() async throws {
+        let followingA = try projection(
+            phase: "following",
+            revealed: false,
+            journeyId: "j_v1.AAAAAAAAAAAAAAAAAAAAAA"
+        )
+        let arrivedA = try projection(
+            phase: "arrived",
+            revealed: true,
+            journeyId: "j_v1.AAAAAAAAAAAAAAAAAAAAAA"
+        )
+        let followingB = try projection(
+            phase: "following",
+            revealed: false,
+            journeyId: "j_v1.BBBBBBBBBBBBBBBBBBBBBB"
+        )
+        let arrivedB = try projection(
+            phase: "arrived",
+            revealed: true,
+            journeyId: "j_v1.BBBBBBBBBBBBBBBBBBBBBB"
+        )
+        let service = QueuedJourneyService(responses: [arrivedA, arrivedB])
+        let store = JourneyStore(
+            service: service,
+            notificationController: NotificationController(suppressScheduling: true)
+        )
+
+        store.applyServerProjection(followingA)
+        driveArrivalWindow(store, startingAt: Date(timeIntervalSince1970: 20_000))
+        try await waitForCommandCount(1, from: service)
+        store.applyServerProjection(followingB)
+        driveArrivalWindow(store, startingAt: Date(timeIntervalSince1970: 20_016))
+        try await waitForCommandCount(2, from: service)
+
+        let commands = await service.capturedCommands()
+        XCTAssertEqual(commands, [.recordArrival, .recordArrival])
+        XCTAssertEqual(store.projection?.journeyId, arrivedB.journeyId)
+    }
+
     func testPhysicalCompassProjectionContainsOnlySafeGuidanceFields() throws {
         let following = try projection(phase: "following", revealed: false)
         let compass = RecordingPhysicalCompassClient()
@@ -275,6 +353,39 @@ final class JourneyStoreTests: XCTestCase {
         XCTAssertEqual(snapshot.remainingDistanceM, 420)
         XCTAssertEqual(snapshot.confidence, "credible")
         XCTAssertFalse(snapshot.revealed)
+    }
+
+    func testBackgroundSuppressesStaleGuidanceAndInvalidatesDeliveredBoardAuthority() async throws {
+        let following = try projection(phase: "following", revealed: false)
+        let paused = try projection(phase: "paused", revealed: false)
+        let service = FakeJourneyService(response: paused)
+        let compass = RecordingPhysicalCompassClient()
+        compass.automaticallyConfirmSnapshots = false
+        let store = JourneyStore(
+            service: service,
+            physicalCompass: compass,
+            physicalCompassHostEnabled: true
+        )
+        compass.emitConnection(.connected)
+        store.applyServerProjection(following)
+        store.presentGuidanceForTesting(bearing: 315, remainingM: 420)
+        let delivered = try XCTUnwrap(compass.sentSnapshots.last)
+        compass.confirmDelivery(of: delivered.sequence)
+        guard case .credible = store.guidance else {
+            return XCTFail("expected credible guidance before backgrounding")
+        }
+
+        store.applicationDidEnterBackground()
+
+        XCTAssertEqual(store.guidance, .suppressed(.staleLocation))
+        XCTAssertTrue(store.locationController.requiresFreshSamples)
+        let suppressed = try XCTUnwrap(compass.sentSnapshots.last)
+        XCTAssertGreaterThan(suppressed.sequence, delivered.sequence)
+        XCTAssertNil(suppressed.bearingDegrees)
+        compass.emit(.action(.stop, sequence: delivered.sequence))
+        try await Task.sleep(for: .milliseconds(50))
+        let commands = await service.capturedCommands()
+        XCTAssertEqual(commands, [])
     }
 
     func testPhysicalCompassStopEventDispatchesGuardedJourneyCommand() async throws {
@@ -507,13 +618,81 @@ final class JourneyStoreTests: XCTestCase {
         return store
     }
 
-    private func projection(phase: String, revealed: Bool? = nil, recovery: Bool = false) throws -> JourneyProjection {
+    private func driveArrivalWindow(_ store: JourneyStore, startingAt start: Date) {
+        let route = TrustedRoute(
+            geometry: [
+                Coordinate(latitude: 37.0000, longitude: 127.0000),
+                Coordinate(latitude: 37.0010, longitude: 127.0000),
+            ],
+            routeDigest: "sha256:" + String(repeating: "a", count: 64),
+            routeVersion: "arrival-test-v1",
+            expiresAt: start.addingTimeInterval(600),
+            receivedAt: start
+        )
+        for offset in [0.0, 4.0, 8.0, 12.0] {
+            let capturedAt = start.addingTimeInterval(offset)
+            store.updateGuidance(
+                location: LocationSample(
+                    coordinate: Coordinate(latitude: 37.0009, longitude: 127.0000),
+                    horizontalAccuracyM: 5,
+                    capturedAt: capturedAt
+                ),
+                heading: HeadingSample(
+                    trueHeadingDegrees: 0,
+                    magneticHeadingDegrees: 0,
+                    magneticDeclinationDegreesEast: 0,
+                    accuracyDegrees: 5,
+                    capturedAt: capturedAt
+                ),
+                route: route,
+                now: capturedAt
+            )
+        }
+    }
+
+    private func waitForCommandCount(
+        _ expected: Int,
+        from service: FailFirstArrivalService
+    ) async throws {
+        for _ in 0..<40 {
+            if await service.capturedCommands().count >= expected { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Timed out waiting for \(expected) recorded journey commands")
+    }
+
+    private func waitForCommandCount(
+        _ expected: Int,
+        from service: QueuedJourneyService
+    ) async throws {
+        for _ in 0..<40 {
+            if await service.capturedCommands().count >= expected { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Timed out waiting for \(expected) recorded journey commands")
+    }
+
+    private func projection(
+        phase: String,
+        revealed: Bool? = nil,
+        recovery: Bool = false,
+        journeyId: String? = nil
+    ) throws -> JourneyProjection {
         let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .appending(path: "Fixtures/projection-examples-v1.json")
         let values = try JSONDecoder().decode([JourneyProjection].self, from: Data(contentsOf: fixture))
-        return try XCTUnwrap(values.first {
+        let value = try XCTUnwrap(values.first {
             $0.phase.rawValue == phase && (revealed == nil || $0.revealed == revealed) &&
                 (!recovery || $0.recoveryExpiresAt != nil)
         })
+        guard let journeyId else { return value }
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(value)) as? [String: Any]
+        )
+        object["journeyId"] = journeyId
+        return try JSONDecoder().decode(
+            JourneyProjection.self,
+            from: JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        )
     }
 }

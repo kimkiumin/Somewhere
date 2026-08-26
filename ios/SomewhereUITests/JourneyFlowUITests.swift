@@ -344,7 +344,9 @@ final class JourneyFlowUITests: XCTestCase {
     func testGuidanceContinuesAfterSafetyReveal() {
         let app = launchHarness("following-revealed")
         XCTAssertTrue(app.staticTexts["somewhere.revealed-name"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.buttons["somewhere.stop"].exists)
+        let stop = app.buttons["somewhere.stop"]
+        XCTAssertTrue(stop.isHittable)
+        XCTAssertEqual(app.scrollViews.count, 0)
     }
 
     func testArrivalAutomaticallyShowsDestination() {

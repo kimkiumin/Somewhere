@@ -40,7 +40,7 @@ struct CompassView: View {
                 directionSummary
                 compassDial(size: layout.compassDiameter)
                 distanceCard
-                RevealView(projection: projection)
+                compactRevealSummary
                     .frame(maxWidth: layout.arrivalContentMaxWidth)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -57,10 +57,20 @@ struct CompassView: View {
     }
 
     private var compactJourneyContent: some View {
-        ViewThatFits(in: .vertical) {
-            compactGuidanceStack(compassSize: 250, spacing: 12, verticalPadding: 10)
-            compactGuidanceStack(compassSize: 210, spacing: 8, verticalPadding: 6)
-            compactGuidanceStack(compassSize: 156, spacing: 6, verticalPadding: 2)
+        Group {
+            if projection.revealed == true {
+                ViewThatFits(in: .vertical) {
+                    compactRevealedGuidanceStack(compassSize: 156, spacing: 6, includesSafetyNote: true)
+                    compactRevealedGuidanceStack(compassSize: 128, spacing: 5, includesSafetyNote: false)
+                    compactRevealedGuidanceStack(compassSize: 96, spacing: 4, includesSafetyNote: false)
+                }
+            } else {
+                ViewThatFits(in: .vertical) {
+                    compactGuidanceStack(compassSize: 250, spacing: 12, verticalPadding: 10)
+                    compactGuidanceStack(compassSize: 210, spacing: 8, verticalPadding: 6)
+                    compactGuidanceStack(compassSize: 156, spacing: 6, verticalPadding: 2)
+                }
+            }
         }
         .frame(maxHeight: .infinity)
     }
@@ -93,6 +103,52 @@ struct CompassView: View {
             safetyNote
         }
         .padding(.vertical, verticalPadding)
+    }
+
+    private func compactRevealedGuidanceStack(
+        compassSize: CGFloat,
+        spacing: CGFloat,
+        includesSafetyNote: Bool
+    ) -> some View {
+        VStack(spacing: spacing) {
+            directionSummary
+            compassDial(size: compassSize)
+            distanceCard
+            compactRevealSummary
+            if includesSafetyNote { safetyNote }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var compactRevealSummary: some View {
+        SomewhereCard(padding: 12) {
+            HStack(alignment: .top, spacing: 11) {
+                Image(systemName: "eye.fill")
+                    .font(.headline)
+                    .foregroundStyle(SomewherePalette.success)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("공개된 목적지")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(SomewherePalette.mutedInk)
+                    Text(projection.reveal?.name ?? "목적지를 불러오는 중")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(SomewherePalette.ink)
+                        .lineLimit(2)
+                        .accessibilityIdentifier("somewhere.revealed-name")
+                    if let address = projection.reveal?.address {
+                        Text(address)
+                            .font(.caption)
+                            .foregroundStyle(SomewherePalette.mutedInk)
+                            .lineLimit(2)
+                            .accessibilityIdentifier("somewhere.revealed-address")
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("공개된 목적지 \(projection.reveal?.name ?? "")")
     }
 
     @ViewBuilder
@@ -359,7 +415,6 @@ struct CompassView: View {
     }
 
     private var usesCompactGuidanceLayout: Bool {
-        guard projection.revealed != true else { return false }
         return projection.phase == .following || projection.phase == .near
     }
 

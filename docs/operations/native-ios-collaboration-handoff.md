@@ -26,7 +26,7 @@ isolated wireframe branch as current native authority.
 ## Branch and prototype relationship
 
 - Native baseline: `codex/v2-macos-handoff` at `8fd64d4` before this review work.
-- Current native review branch: `codex/roll-compass-native-app`.
+- Current iPad/iPhone integration branch: `codex/ipad-board-integration`.
 - Collaborator visual prototype: `codex/roll-the-compass-visual`, whose latest
   feedback direction is represented by `8435594` (two primary reactions plus a
   visit exception).

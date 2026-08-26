@@ -62,7 +62,7 @@ struct RootView: View {
                     store.notificationController.refreshFallback()
                     if let projection = store.projection { store.locationController.apply(phase: projection.phase) }
                 } else {
-                    store.locationController.applicationDidEnterBackground()
+                    store.applicationDidEnterBackground()
                 }
             }
             // The V2 surface is intentionally a warm, light canvas. On a device

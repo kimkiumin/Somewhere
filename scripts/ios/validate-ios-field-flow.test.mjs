@@ -29,7 +29,7 @@ describe("native iOS field journey gate", () => {
       gate: "PASS",
       requiredFileCount: IOS_FIELD_REQUIREMENTS.requiredFiles.length,
       uiViewCount: 14,
-      unitScenarioCount: 32,
+      unitScenarioCount: 35,
       uiScenarioCount: 42,
       minimumControlPoints: 44,
     });

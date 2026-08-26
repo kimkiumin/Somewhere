@@ -232,6 +232,15 @@ final class JourneyStore: ObservableObject {
         locationController.requestPermissionInContext()
     }
 
+    func applicationDidEnterBackground() {
+        locationController.applicationDidEnterBackground()
+        guidanceEngine = GuidanceEngine()
+        arrivalGate = ArrivalGate()
+        guidance = .suppressed(.staleLocation)
+        clearPhysicalCompassAuthority()
+        syncPhysicalCompass()
+    }
+
     func commit() async { await execute(.commit) }
     func cancelSelection() async { await execute(.cancelSelection) }
 
@@ -280,7 +289,12 @@ final class JourneyStore: ObservableObject {
     }
     func recoverRoute() async { await execute(.recoverRoute) }
     func recoverRoute(choice: String) async { await execute(.recoverRouteWithChoice(choice)) }
-    func recordArrival() async { await execute(.recordArrival) }
+    func recordArrival() async {
+        let submitted = await execute(.recordArrival)
+        if !submitted, projection?.phase != .arrived {
+            resetArrivalTracking()
+        }
+    }
 
     func requestExternalMap() {
         showsExternalMapWarning = true
@@ -350,8 +364,7 @@ final class JourneyStore: ObservableObject {
         pendingStartConstraints = nil
         waitingForRecoveryLocation = false
         guidanceEngine = GuidanceEngine()
-        arrivalGate = ArrivalGate()
-        arrivalSubmitted = false
+        resetArrivalTracking()
         guidance = .suppressed(.invalidRoute)
         presentedError = nil
         showsRevealReason = false
@@ -405,6 +418,9 @@ final class JourneyStore: ObservableObject {
 
     func applyServerProjection(_ value: JourneyProjection) {
         pollTask?.cancel()
+        if projection?.journeyId != value.journeyId {
+            resetArrivalTracking()
+        }
         projection = value
         isGuidancePaused = value.phase == .paused || value.phase == .stopped || value.phase == .completed || value.phase == .expired
         locationController.apply(phase: value.phase)
@@ -451,7 +467,7 @@ final class JourneyStore: ObservableObject {
             ))
             if arrived {
                 arrivalSubmitted = true
-                Task { await execute(.recordArrival) }
+                Task { await recordArrival() }
             }
         }
         syncPhysicalCompass()
@@ -602,6 +618,11 @@ final class JourneyStore: ObservableObject {
     private func clearPhysicalCompassAuthority() {
         lastPhysicalCompassSnapshot = nil
         pendingPhysicalCompassSnapshots.removeAll(keepingCapacity: true)
+    }
+
+    private func resetArrivalTracking() {
+        arrivalGate = ArrivalGate()
+        arrivalSubmitted = false
     }
 
     private func syncPhysicalCompass() {
