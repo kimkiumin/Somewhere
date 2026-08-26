@@ -456,8 +456,6 @@ struct CompassView: View {
                     if let distanceM = step.distanceM { parts.append("약 \(Int(distanceM))m 뒤") }
                     if let maneuver = maneuverLabel(step.maneuver) {
                         parts.append(maneuver)
-                    } else if let instruction = step.instruction, !instruction.isEmpty {
-                        parts.append(instruction)
                     }
                     return parts.joined(separator: " · ")
                 }

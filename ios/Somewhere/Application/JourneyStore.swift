@@ -184,7 +184,6 @@ final class JourneyStore: ObservableObject {
     }
 
     func requestLocationAccess() {
-        presentedError = nil
         locationController.requestPermissionInContext()
     }
 

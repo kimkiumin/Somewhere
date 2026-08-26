@@ -180,3 +180,114 @@ The harness check found no `launchArguments.append` calls and the only `app.term
 - The final iPad suite retains 3 expected skips: one iPhone-specific compact regression and two VirtualField tests requiring the local Worker/proxy with `SOMEWHERE_RUN_LOCAL_E2E=1`.
 - Xcode/simulator emitted unrelated warnings about the debugger version store, duplicate accessibility runtime classes, CoreBluetooth simulator XPC, and future Info.plist/orientation requirements. They did not fail the suite, and no BLE/controller/firmware code was touched.
 - The earlier full-suite failures were harness lifecycle/argument-delivery failures. The final post-patch result is the authoritative full-suite evidence.
+
+## Task 3 review-fix round (2026-08-26)
+
+The review identified two regressions within Task 3 scope:
+
+1. The unknown/missing-maneuver fallback in `CompassView` rendered arbitrary `step.instruction` text, which could disclose a road name.
+2. A default `--ui-test-error` launch could lose its error after `ConstraintView.onAppear` called `requestLocationAccess()`, leaving the error UI undiscoverable.
+
+### TDD RED
+
+Added the smallest behavior assertions before the production fixes:
+
+- `SomewhereApp.swift` gained a `following-next-step-unknown` fixture with `maneuver=UNKNOWN`, `instruction=테스트로에서 우회전`, `distanceM=180`, and `road=테스트로`.
+- `JourneyFlowUITests/testUnknownNextStepUsesOnlySafeRelativeDetail` requires the safe `다음 동작` and `약 180m 뒤` cues while rejecting `테스트로`, the raw instruction, and `우회전`.
+- `JourneyFlowUITests/testDefaultLaunchSurfaceKeepsErrorBannerAccessible` launches with `--ui-test-error` and `--ui-test-no-notifications` only; it deliberately does not pass `--ui-test-state ready`. It requires independently discoverable/hittable error, message, and dismiss identifiers, with the error inside the window and non-overlapping the default header and primary action.
+- `JourneyStoreTests/testRequestLocationAccessPreservesExistingError` requires an existing `presentedError` to survive `requestLocationAccess()`.
+
+Exact RED invocation:
+
+```sh
+mkdir -p .omo/evidence/task-3-review .local-artifacts/task-3-review-red
+set -o pipefail && xcodebuild test -project ios/Somewhere.xcodeproj -scheme Somewhere -destination 'platform=iOS Simulator,id=5527401E-ADB4-4727-95D7-08F95EB13AC0' -only-testing:SomewhereUITests/JourneyFlowUITests/testUnknownNextStepUsesOnlySafeRelativeDetail -only-testing:SomewhereUITests/JourneyFlowUITests/testDefaultLaunchSurfaceKeepsErrorBannerAccessible -only-testing:SomewhereTests/JourneyStoreTests/testRequestLocationAccessPreservesExistingError -resultBundlePath .local-artifacts/task-3-review-red/review-regressions-red.xcresult CODE_SIGNING_ALLOWED=NO SOMEWHERE_API_ORIGIN=https://example.invalid 2>&1 | tee .omo/evidence/task-3-review/red-review-regressions.log
+```
+
+Observed RED output:
+
+```text
+SomewhereTests: 1 test, 1 failure (presentedError was cleared)
+JourneyFlowUITests: 2 tests, 9 failures (default error identifiers absent; unknown fixture exposed road/raw maneuver text)
+** TEST FAILED **
+```
+
+The RED log is retained at `.omo/evidence/task-3-review/red-review-regressions.log`. During user disk cleanup, the regenerable RED result bundle `.local-artifacts/task-3-review-red/review-regressions-red.xcresult` was removed; it is not used as authority.
+
+### Minimal fixes
+
+- `CompassView.swift` no longer renders `step.instruction` when the maneuver is unknown. The known maneuver label and distance branches remain unchanged, so the existing known next-step coverage continues to assert those cues.
+- `JourneyStore.requestLocationAccess()` now only requests permission and no longer clears an unrelated existing `presentedError`.
+- The default-launch UI regression remains independent of the existing ready-state error test.
+
+### Authoritative focused GREEN evidence
+
+Clean iPad focused invocation:
+
+```sh
+set -o pipefail && xcodebuild test -project ios/Somewhere.xcodeproj -scheme Somewhere -destination 'platform=iOS Simulator,id=5527401E-ADB4-4727-95D7-08F95EB13AC0' -only-testing:SomewhereTests/SomewhereLayoutTests -only-testing:SomewhereTests/JourneyStoreTests/testRequestLocationAccessPreservesExistingError -only-testing:SomewhereUITests/JourneyFlowUITests/testNextStepIsPresentedAsFutureDetailWithoutOverridingCurrentDirection -only-testing:SomewhereUITests/JourneyFlowUITests/testUnknownNextStepUsesOnlySafeRelativeDetail -only-testing:SomewhereUITests/JourneyFlowUITests/testDefaultLaunchSurfaceKeepsErrorBannerAccessible -only-testing:SomewhereUITests/JourneyFlowUITests/testErrorMessageAndDismissStayAccessibleWithoutCoveringGuidanceControls -only-testing:SomewhereUITests/JourneyFlowUITests/testStopReasonKeepsSkipExitAvailable -only-testing:SomewhereUITests/JourneyFlowUITests/testCredibleGuidanceUsesRelativeCueWithoutScrollableCoreContent -only-testing:SomewhereUITests/ExhibitionLayoutUITests/testCaptureErrorUsesIndependentAccessibleBanner -only-testing:SomewhereUITests/ExhibitionLayoutUITests/testCaptureLaunchConditionsSettingsNoFitFeedbackAndError -resultBundlePath .local-artifacts/task-3-review-green/ipad-review-focused-clean.xcresult CODE_SIGNING_ALLOWED=NO SOMEWHERE_API_ORIGIN=https://example.invalid 2>&1 | tee .omo/evidence/task-3-review/green-ipad-review-focused-clean.log
+```
+
+Binary result from `xcrun xcresulttool get test-results summary`:
+
+```text
+device: Somewhere iPad Pro 11 2nd Gen
+passedTests: 13
+failedTests: 0
+skippedTests: 0
+totalTestCount: 13
+result: Passed
+```
+
+The log ends with `SomewhereTests.xctest: Executed 5 tests, with 0 failures`, `JourneyFlowUITests: Executed 6 tests, with 0 failures`, `ExhibitionLayoutUITests: Executed 2 tests, with 0 failures`, and `** TEST SUCCEEDED **`.
+
+Evidence: `.local-artifacts/task-3-review-green/ipad-review-focused-clean.xcresult` and `.omo/evidence/task-3-review/green-ipad-review-focused-clean.log`.
+
+The two capture scenarios also exported non-empty evidence from that result:
+
+- Error capture: `.local-artifacts/task-3-review-green/ipad-review-focused-clean-attachments/error/F655EB06-A010-4DD6-8273-55FA61A9AA3D.png` (1668 x 2388 PNG, 1,377,446 bytes) and `error/manifest.json`.
+- Launch/conditions/settings/no-fit/feedback capture set: `.local-artifacts/task-3-review-green/ipad-review-focused-clean-attachments/captures/manifest.json` plus six non-empty 1668 x 2388 PNGs: `BB6C209A-9492-42F5-911C-7AD7905B84F9.png`, `2FF111CF-B7FD-4DB8-9EF7-FFEC6A55EE2B.png`, `EC38256F-B12D-4CCC-85F9-94B4D9FEA6F7.png`, `C31FA4AC-8B35-40AA-9876-4F5C43069793.png`, `EE726433-6F4B-4380-BBAF-B4A20E764380.png`, and `9BC72516-E9DA-4013-A1B0-6259871F6E79.png`.
+
+Clean iPhone 13 focused invocation:
+
+```sh
+set -o pipefail && xcodebuild test -project ios/Somewhere.xcodeproj -scheme Somewhere -destination 'platform=iOS Simulator,id=165C0E09-2FBA-4E7D-9384-661F78AD8EC7' -only-testing:SomewhereTests/SomewhereLayoutTests -only-testing:SomewhereTests/JourneyStoreTests/testRequestLocationAccessPreservesExistingError -only-testing:SomewhereUITests/JourneyFlowUITests/testIPhone13CompactGuidanceKeepsExistingViewportAndStopBehavior -only-testing:SomewhereUITests/JourneyFlowUITests/testCredibleGuidanceUsesRelativeCueWithoutScrollableCoreContent -only-testing:SomewhereUITests/JourneyFlowUITests/testNextStepIsPresentedAsFutureDetailWithoutOverridingCurrentDirection -only-testing:SomewhereUITests/JourneyFlowUITests/testUnknownNextStepUsesOnlySafeRelativeDetail -only-testing:SomewhereUITests/JourneyFlowUITests/testDefaultLaunchSurfaceKeepsErrorBannerAccessible -only-testing:SomewhereUITests/JourneyFlowUITests/testErrorMessageAndDismissStayAccessibleWithoutCoveringGuidanceControls -only-testing:SomewhereUITests/JourneyFlowUITests/testStopReasonKeepsSkipExitAvailable -resultBundlePath .local-artifacts/task-3-review-green/iphone13-review-focused-clean.xcresult CODE_SIGNING_ALLOWED=NO SOMEWHERE_API_ORIGIN=https://example.invalid 2>&1 | tee .omo/evidence/task-3-review/green-iphone13-review-focused-clean.log
+```
+
+Binary result from `xcrun xcresulttool get test-results summary`:
+
+```text
+device: Somewhere iPhone 13
+passedTests: 12
+failedTests: 0
+skippedTests: 0
+totalTestCount: 12
+result: Passed
+```
+
+The log ends with `SomewhereTests.xctest: Executed 5 tests, with 0 failures`, `JourneyFlowUITests: Executed 7 tests, with 0 failures`, and `** TEST SUCCEEDED **`.
+
+Evidence: `.local-artifacts/task-3-review-green/iphone13-review-focused-clean.xcresult` and `.omo/evidence/task-3-review/green-iphone13-review-focused-clean.log`.
+
+### Environment note and final checks
+
+An earlier iPhone focused attempt at `.local-artifacts/task-3-review-green/iphone13-review-focused.xcresult` was invalidated when the user reclaimed disk by deleting regenerable DerivedData and intermediate xcresults while `xcodebuild` was still active. It emitted `No space left on device`, followed by launch-file-missing failures and result-save failure. That attempt is not authority. After approximately 3.9 GB was reclaimed, the same focused command was rerun to `iphone13-review-focused-clean.xcresult`; only the clean result above is authoritative.
+
+The review-round source gate reported:
+
+```text
+CompassView raw-instruction fallback: absent
+requestLocationAccess error reset: absent
+```
+
+`git diff --check` exited 0 with no output after the source changes. The review-round source files are limited to:
+
+```text
+ios/Somewhere/App/SomewhereApp.swift
+ios/Somewhere/Application/JourneyStore.swift
+ios/Somewhere/UI/CompassView.swift
+ios/SomewhereTests/JourneyStoreTests.swift
+ios/SomewhereUITests/JourneyFlowUITests.swift
+```
+
+The full native iPad suite was not rerun in this review-fix round; the preceding final full-suite evidence in this report remains the 95 passed / 3 skipped / 0 failed run. No Task 4, BLE, controller, or firmware files were touched.

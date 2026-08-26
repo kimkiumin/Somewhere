@@ -96,6 +96,8 @@ private enum UITestProjectionFactory {
             json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":false,\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000},\"actions\":[\"stop\",\"route-recover\",\"arrival\"]}"
         case "following-next-step":
             json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":false,\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000,\"nextStep\":{\"maneuver\":\"TURN_RIGHT\",\"instruction\":\"오른쪽으로 이동\",\"distanceM\":180,\"road\":\"테스트로\"}},\"actions\":[\"stop\",\"route-recover\",\"arrival\"]}"
+        case "following-next-step-unknown":
+            json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":false,\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000,\"nextStep\":{\"maneuver\":\"UNKNOWN\",\"instruction\":\"테스트로에서 우회전\",\"distanceM\":180,\"road\":\"테스트로\"}},\"actions\":[\"stop\",\"route-recover\",\"arrival\"]}"
         case "following-revealed":
             json = "{\(common),\(disclosure),\"phase\":\"following\",\"revealed\":true,\(reveal),\"guidance\":{\"kind\":\"route\",\"encodedPolyline\":\"test\",\"routeDigest\":\"sha256:\(String(repeating: "a", count: 64))\",\"routeVersion\":\"test-v1\",\"expiresAt\":4102444800000},\"actions\":[\"stop\",\"route-recover\",\"arrival\"]}"
         case "near":

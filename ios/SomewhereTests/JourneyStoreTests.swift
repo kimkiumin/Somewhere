@@ -89,6 +89,17 @@ final class JourneyStoreTests: XCTestCase {
         store.requestStop()
         XCTAssertTrue(store.isGuidancePaused)
     }
+    func testRequestLocationAccessPreservesExistingError() {
+        let store = JourneyStore(
+            service: FakeJourneyService(response: try! projection(phase: "following", revealed: false)),
+            notificationController: NotificationController(suppressScheduling: true)
+        )
+        store.presentedError = .invalidTransition
+
+        store.requestLocationAccess()
+
+        XCTAssertEqual(store.presentedError, .invalidTransition)
+    }
     func testCancelStopResumesSameJourney() async throws {
         let store = try await store(phase: "following")
         XCTAssertEqual(store.projection?.phase, .following)

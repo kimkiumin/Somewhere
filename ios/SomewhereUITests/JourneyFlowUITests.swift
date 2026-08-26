@@ -80,6 +80,24 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertFalse(summary.label.contains("테스트로"))
     }
 
+    func testUnknownNextStepUsesOnlySafeRelativeDetail() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-test-state", "following-next-step-unknown",
+            "--ui-test-credible-guidance",
+            "--ui-test-no-notifications",
+        ]
+        app.launch()
+
+        let summary = app.descendants(matching: .any)["somewhere.direction-summary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 2))
+        XCTAssertTrue(summary.label.contains("다음 동작"))
+        XCTAssertTrue(summary.label.contains("약 180m 뒤"))
+        XCTAssertFalse(summary.label.contains("테스트로"))
+        XCTAssertFalse(summary.label.contains("테스트로에서 우회전"))
+        XCTAssertFalse(summary.label.contains("우회전"))
+    }
+
     func testErrorMessageAndDismissStayAccessibleWithoutCoveringGuidanceControls() {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -101,6 +119,42 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertTrue(dismiss.waitForExistence(timeout: 2))
         XCTAssertTrue(header.waitForExistence(timeout: 2))
         XCTAssertTrue(primary.waitForExistence(timeout: 2))
+        XCTAssertTrue(message.isHittable)
+        XCTAssertTrue(dismiss.isHittable)
+        XCTAssertTrue(window.frame.contains(error.frame))
+        XCTAssertFalse(error.frame.intersects(header.frame))
+        XCTAssertFalse(error.frame.intersects(primary.frame))
+    }
+
+    func testDefaultLaunchSurfaceKeepsErrorBannerAccessible() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-test-error",
+            "--ui-test-no-notifications",
+        ]
+        app.launch()
+
+        let onboarding = app.buttons["somewhere.onboarding-continue"]
+        if onboarding.waitForExistence(timeout: 2) {
+            onboarding.tap()
+            let profileSave = app.buttons["somewhere.profile-save"]
+            if profileSave.waitForExistence(timeout: 2) { profileSave.tap() }
+        }
+        let profileSave = app.buttons["somewhere.profile-save"]
+        if profileSave.exists { profileSave.tap() }
+
+        let error = app.descendants(matching: .any)["somewhere.error"]
+        let message = app.descendants(matching: .any)["somewhere.error-message"]
+        let dismiss = app.buttons["somewhere.error-dismiss"]
+        let header = app.buttons["somewhere.profile-menu"]
+        let primary = app.buttons["somewhere.conditions-link"]
+        let window = app.windows.firstMatch
+
+        XCTAssertTrue(error.waitForExistence(timeout: 3))
+        XCTAssertTrue(message.waitForExistence(timeout: 3))
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 3))
+        XCTAssertTrue(header.waitForExistence(timeout: 3))
+        XCTAssertTrue(primary.waitForExistence(timeout: 3))
         XCTAssertTrue(message.isHittable)
         XCTAssertTrue(dismiss.isHittable)
         XCTAssertTrue(window.frame.contains(error.frame))
