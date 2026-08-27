@@ -1,4 +1,4 @@
-# Somewhere Feasibility Validation Design
+# Roll the compass! Feasibility Validation Design
 
 Status: user-approved design, pending execution
 
@@ -6,7 +6,7 @@ Date: 2026-07-22
 
 ## 1. Purpose
 
-Validate that Somewhere can progress from an approved product blueprint to a
+Validate that Roll the compass! can progress from an approved product blueprint to a
 credible restaurant-and-cafe recommendation service, an iPhone field-test app,
 and a physical compass prototype without hiding unresolved provider, legal,
 sensor, BLE, fabrication, or budget dependencies.

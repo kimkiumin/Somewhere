@@ -14,9 +14,9 @@ Status of external gates:
 2. Choose **File > New > Project > iOS > App**.
 3. Set Product Name to `SensorSpike`, Interface to `SwiftUI`, Language to `Swift`, and minimum deployment to iOS 18.
 4. Save the project at `ios/SensorSpike`, creating `ios/SensorSpike/SensorSpike.xcodeproj`, and include a unit-test target named `SensorSpikeTests`.
-5. Select the `SensorSpike` app target, open **Signing & Capabilities**, and set its Bundle Identifier to exactly `com.somewhere.sensorspike`.
+5. Select the `SensorSpike` app target, open **Signing & Capabilities**, and set its Bundle Identifier to exactly `com.rollthecompass.sensorspike`.
 6. Add `SensorSpike/SensorSpikeApp.swift`, `SensorSpike/LocationHeadingModel.swift`, and `SensorSpike/ContentView.swift` to the `SensorSpike` target. Add `SensorSpikeTests/LocationHeadingModelTests.swift` to the `SensorSpikeTests` target.
-7. In the app target's **Info** settings, add `NSLocationWhenInUseUsageDescription` with this exact value: `Somewhere uses location and heading only for this supervised sensor feasibility test.`
+7. In the app target's **Info** settings, add `NSLocationWhenInUseUsageDescription` with this exact value: `Roll the compass! uses location and heading only for this supervised sensor feasibility test.`
 8. Confirm **Signing & Capabilities** has no Background Modes capability. This spike must not request background location.
 
 ## Run on macOS

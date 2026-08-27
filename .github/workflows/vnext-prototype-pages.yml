@@ -1,0 +1,59 @@
+name: Prototype — vNext Sequence
+
+on:
+  push:
+    branches:
+      - codex/vnext-sequence-prototype
+    paths:
+      - prototype/vnext/index.html
+      - prototype/vnext/style.css
+      - prototype/vnext/state.js
+      - prototype/vnext/screens.js
+      - prototype/vnext/controller.js
+      - prototype/vnext/app.js
+      - harness/stage-vnext-pages.ps1
+      - .github/workflows/vnext-prototype-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Verify prototype and artifact boundary
+        shell: pwsh
+        run: |
+          node --test prototype/vnext/*.test.js tests/project_contract.test.js tests/pages_artifact_contract.test.js
+          ./harness/stage-vnext-pages.ps1 -SourceDirectory prototype/vnext -DestinationDirectory _site -PublicSubpath wireframe-sequence
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload isolated prototype artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

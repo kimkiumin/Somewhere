@@ -2,7 +2,7 @@
 
 (function initDisplayState(globalScope) {
   const geometry =
-    globalScope.SomewhereGeometry || require("../navigation/geometry.js");
+    globalScope.RollTheCompassGeometry || require("../navigation/geometry.js");
   const NETWORK_KINDS = new Set(["wifi", "cellular", "offline"]);
 
   function statusChannels(input) {

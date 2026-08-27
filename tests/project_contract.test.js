@@ -8,6 +8,33 @@ const assert = require("node:assert/strict");
 
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const extractTitle = (html) => html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1].trim() ?? null;
+
+test("package metadata uses the Roll the compass technical name", () => {
+  const packageJson = JSON.parse(read("package.json"));
+  assert.equal(packageJson.name, "roll-the-compass-vnext");
+});
+
+test("active project surfaces use the Roll the compass public name", () => {
+  const brandedFiles = [
+    "README.md",
+    "BLUEPRINT.md",
+    "docs/blueprint/app_sequence.md",
+    "docs/blueprint/product_contract.md",
+    "docs/blueprint/validation_plan.md",
+    "docs/sequence/README.md",
+    "docs/sequence/sequence_share.md",
+    "docs/superpowers/specs/2026-07-22-feasibility-validation-design.md",
+    "docs/superpowers/specs/2026-07-26-somewhere-app-sequence-prototype-design.md",
+    "prototype/vnext/README.md",
+    "spikes/web-sensors/index.html",
+    "ios/SensorSpike/README.md",
+  ];
+
+  for (const file of brandedFiles) {
+    assert.match(read(file), /Roll the compass!/, `${file} is missing the public name`);
+  }
+});
 
 test("repository declares the approved vNext source hierarchy", () => {
   const agents = read("AGENTS.md");
@@ -61,4 +88,29 @@ test("verification entry point tracks its historical prototype baseline", () => 
     requiredFiles.filter((file) => !trackedFiles.has(file)),
     [],
   );
+});
+
+test("vNext sequence prototype is isolated from historical v0.1", () => {
+  const required = [
+    "prototype/vnext/README.md",
+    "prototype/vnext/index.html",
+    "prototype/vnext/style.css",
+    "prototype/vnext/state.js",
+    "prototype/vnext/screens.js",
+    "prototype/vnext/controller.js",
+    "prototype/vnext/app.js",
+  ];
+  for (const file of required) {
+    assert.equal(fs.existsSync(path.join(root, file)), true, `${file} is missing`);
+  }
+
+  const vnextHtml = read("prototype/vnext/index.html");
+  const historicalHtml = read("prototype/index.html");
+  assert.equal(extractTitle(vnextHtml), "Roll the compass! vNext 시퀀스 프로토타입");
+  assert.equal(extractTitle(historicalHtml), "Blind Compass Prototype");
+  assert.doesNotMatch(vnextHtml, /prototype\/app\.js/);
+});
+
+test("vNext title extraction rejects a body-only occurrence", () => {
+  assert.equal(extractTitle("<body>Roll the compass! vNext</body>"), null);
 });

@@ -60,6 +60,7 @@ test("true bearing does not substitute a destination for an unusable look-ahead 
 });
 
 test("geometry exposes the CommonJS API as a browser global", () => {
-  assert.equal(globalThis.SomewhereGeometry.bearingDelta, bearingDelta);
-  assert.equal(globalThis.SomewhereGeometry.trueBearing, trueBearing);
+  assert.equal(globalThis.RollTheCompassGeometry.bearingDelta, bearingDelta);
+  assert.equal(globalThis.RollTheCompassGeometry.trueBearing, trueBearing);
+  assert.equal(globalThis.SomewhereGeometry, undefined);
 });

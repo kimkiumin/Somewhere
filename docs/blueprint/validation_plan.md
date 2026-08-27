@@ -6,7 +6,7 @@ Status: approved written blueprint (2026-07-21)
 
 The field study tests separate claims:
 
-1. Somewhere reduces the time and comparison needed to settle on one destination.
+1. Roll the compass! reduces the time and comparison needed to settle on one destination.
 2. Users act on that destination and begin moving.
 3. Users can maintain the choice without preference-driven restart.
 4. The compass guidance can deliver users to the destination with acceptable recovery behavior.
@@ -40,13 +40,13 @@ Outputs:
 
 ### Study B / Roadmap Phase 4: 10-15 Dyads, 20-30 People
 
-Purpose: compare Somewhere with normal map/search behavior.
+Purpose: compare Roll the compass! with normal map/search behavior.
 
 Use a within-dyad, counterbalanced design with the dyad as the primary analysis unit:
 
 - Each dyad completes one matched decision using its normal map/search method.
-- Each dyad completes one matched decision using Somewhere.
-- Half use Somewhere first; half use the baseline first.
+- Each dyad completes one matched decision using Roll the compass!
+- Half use Roll the compass! first; half use the baseline first.
 - Match category, area, budget, time window, and pair composition across conditions.
 - Use non-overlapping eligible venue pools or another frozen carryover control.
 - Record prior familiarity with the area, venue, and product condition.
@@ -55,7 +55,7 @@ Use a within-dyad, counterbalanced design with the dyad as the primary analysis 
 
 The study remains exploratory at this sample size. Report paired differences, distributions, confidence intervals where appropriate, and qualitative failure causes. Do not claim population-wide market validation.
 
-The comparison tests the Somewhere bundle against normal search. It does not identify the isolated causal effect of hidden identity, random selection, the five-minute rule, the compass, or any other single component without a separate experiment.
+The comparison tests the Roll the compass! bundle against normal search. It does not identify the isolated causal effect of hidden identity, random selection, the five-minute rule, the compass, or any other single component without a separate experiment.
 
 ## Operational Definitions
 

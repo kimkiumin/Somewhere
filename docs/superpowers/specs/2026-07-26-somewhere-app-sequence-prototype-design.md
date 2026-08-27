@@ -1,23 +1,27 @@
-# Somewhere vNext App Sequence Prototype Design
+# Roll the compass! vNext App Sequence Prototype Design
 
 Status: approved sequence captured for final written review
 
 Date: 2026-07-26
 
+Constraint-screen amendment: 2026-08-12
+
 ## Purpose
 
-Build a low-fidelity browser prototype that makes the approved Somewhere vNext app sequence tangible before visual styling or native implementation. The prototype demonstrates screen order, disclosure timing, state transitions, and safety/recovery branches. It does not test brand design, recommendation quality, real location, provider data, iOS behavior, or physical hardware.
+Build a low-fidelity browser prototype that makes the approved Roll the compass! vNext app sequence tangible before visual styling or native implementation. The prototype demonstrates screen order, disclosure timing, state transitions, and safety/recovery branches. It does not test brand design, recommendation quality, real location, provider data, iOS behavior, or physical hardware.
 
 ## Authority and Blueprint Amendments
 
 The user approved the sequence represented in the visual companion on 2026-07-26. When this written design receives final approval, it supersedes these earlier blueprint details for the prototype and subsequent vNext reconciliation:
 
 1. `S3 One Place Ready` and `S4 Committed` no longer require a second product button. The constraint-screen action `이 조건으로 바로 출발` is both the selection request and explicit consent to begin guidance when a qualified place and route are ready.
-2. The main compass screen has no directly visible Reveal control and no Reveal item in its ordinary secondary menu. Pre-arrival destination information is reached only after the user presses Stop and guidance pauses.
+2. The main turn-by-turn guidance screen has no directly visible Reveal control and no Reveal item in its ordinary secondary menu. Pre-arrival destination information is reached only after the user presses Stop and guidance pauses.
 3. Selecting `목적지 정보 확인` after Stop does not confirm Stop. The user first selects or skips a Reveal reason, sees exact destination information, and may resume the same journey.
-4. Confirmed arrival automatically reveals source-supported arrival details: venue name, exact address, building, floor/unit, and entrance guidance. Unknown details remain explicitly unavailable and are never inferred.
+4. Confirmed arrival automatically reveals source-supported arrival details: venue name, photo, building, floor/unit, recommendation rationale, and review summary. Street address and precise entrance guidance are intentionally omitted from the arrival surface. Unknown details remain explicitly unavailable and are never inferred.
 
 All other approved vNext rules remain active: one destination, no candidate list, no active Reroll, immediate Stop pause, skippable reasons, guarded recommendation recovery, route-aware guidance, and delayed place reaction.
+
+The 2026-08-12 constraint-screen amendment fixes the category to restaurant for this prototype, adds a 1–5+ party-size selector above walking time, moves walking time and budget into the primary condition area, uses wheel-adjustable numeric sliders, and reserves the final budget value for `상관없음`. The default party size is two; `5` represents `5명 이상`. Party size is passed as a required recommendation input but does not yet calculate menu quantity or group totals. Budget remains per-person. Budget stops start at 4,000 KRW, use 2,000 KRW increments through 20,000 KRW, then 30,000/40,000/50,000 KRW and unlimited. The 4,000 KRW floor is a product hypothesis rounded up from official Seoul reference prices near 3,700–3,800 KRW for a kimbap serving; it is not a guarantee that every area has a qualifying venue. Wheel input is treated as a 1,000 KRW directional intent but settles on even-thousand valid stops, so an odd legacy value such as 11,000 KRW moves to 10,000 KRW when scrolling down and 12,000 KRW when scrolling up. Minimum disclosure (walking time, budget, and main menu) is the default with optional private mode. Dietary and allergy choices are collected during first-use profile setup and edited later through the top-right Profile → Settings search/list multi-select, not in the recurring constraints form. The prototype menu includes a non-functional logout placeholder because authentication is out of scope.
 
 ## Prototype Scope
 
@@ -27,8 +31,8 @@ All other approved vNext rules remain active: one destination, no candidate list
 - compact constraint entry;
 - collapsed advanced conditions;
 - one product action from constraints into automatic selection and guidance;
-- calm finding state without candidates or compass;
-- fixed-size compass shell during following and near states;
+- calm finding state without candidates or guidance surface;
+- fixed-size map-free guidance surface during following and near states;
 - route-confidence suppression and recovery choices;
 - immediate Stop pause;
 - Continue, destination-information, and confirmed-end branches;
@@ -51,29 +55,33 @@ All other approved vNext rules remain active: one destination, no candidate list
 
 ### Constraint Screen
 
-Visible by default:
+The first constraints viewport contains only the Roll the compass! heading, the top-right profile menu, one centered compass Start button, and a `조건 설정` scroll link. The compass button has the visible label `출발` and the accessible name `이 조건으로 바로 출발`.
 
-- category: restaurant or cafe;
-- maximum walking distance or time;
-- primary action: `이 조건으로 바로 출발`.
+Below the initial viewport, in the same constraints form:
+
+- category: restaurant (cafe deferred);
+- party size: 1, 2, 3, 4, or 5+ with arrow controls and repeated pawn silhouettes;
+- maximum walking time on a 5-minute-step slider;
+- budget on a slider starting at 4,000 KRW, using 2,000 KRW steps through 20,000 KRW and ending with coarse stops plus `상관없음`;
 
 Collapsed under `고급 조건`:
 
-- budget range;
-- dietary and allergy constraints;
-- accessibility requirements;
 - destination disclosure preference.
 
-When advanced constraints are active, the collapsed row summarizes their count or types, such as `추가 조건 2개 적용 중`. Safety-relevant conditions are never silently hidden from the user or ignored by selection logic.
+Accessibility-condition input is deferred from this prototype. It can return only after venue and route data support a reliable verification contract.
 
-### Compass Screen
+The default disclosure is minimum information (walking time, budget, and main menu), with an optional private setting. Dietary and allergy values are shown as applied profile conditions but edited only in the searchable multi-select Settings screen opened from the top-right profile menu. The constraints screen keeps one compass-shaped Start CTA and does not show a profile-edit CTA or a second Start control below the settings. When advanced constraints are active, the collapsed row summarizes their count or types, such as `추가 조건 2개 적용 중`. Safety-relevant conditions are never silently hidden from the user or ignored by selection logic.
 
-The compass appears only after a qualified destination and route are prepared. It enters at its final size and never grows between screens.
+### Turn-by-Turn Guidance Screen
+
+The route guidance surface appears only after a qualified destination and route are prepared. It does not show a map or destination identity before reveal.
+
+It always shows current heading, the next maneuver, distance to that maneuver, and total remaining distance. The destination name, exact address, and coordinate remain hidden. When route confidence is low, the surface suppresses the last maneuver claim and shows recalculation status.
 
 The stable content hierarchy is:
 
 ```text
-fixed-size compass
+map-free turn-by-turn guidance
 remaining distance
 representative menu or broad category
 price band
@@ -88,19 +96,21 @@ The exact venue identity, address, building, floor, entrance, photo, review, rat
 Arrival ends directional pointing and automatically reveals every verified arrival-assistance field:
 
 - venue name;
-- exact address;
+- venue photo;
 - building name;
 - floor and unit;
-- entrance or final approach guidance;
+- algorithm recommendation rationale;
+- review summary;
 - external-map action;
 - completion action.
 
-Missing fields display a neutral unavailable state. The prototype fixture includes all fields so the intended hierarchy can be evaluated, while a separate simulation demonstrates one missing field.
+The arrival screen intentionally omits the street address and precise entrance guidance. Missing fields display a neutral unavailable state. The prototype fixture includes all fields so the intended hierarchy can be evaluated, while a separate simulation demonstrates one missing field.
 
 ## Main State Sequence
 
 ```text
 onboarding (first use only)
+→ profile_setup (first use only)
 → constraints
 → finding
 → following
@@ -125,17 +135,17 @@ There is no `한 곳 준비`, `이 장소로 출발`, or equivalent second butto
 
 ### Finding
 
-The screen shows calm progress and no candidates, destination identity, or compass. Success enters `following` automatically. A deterministic no-fit simulation returns to constraints with the affected conditions identified and never substitutes an unqualified place.
+The screen reuses the same compass face, north marker, size, and needle structure as the Start control. The needle rotates continuously to communicate search without claiming a route direction. The screen shows no candidates, destination identity, or guidance instructions. Success turns that same compass into the pointing guidance state and enters `following` automatically. A deterministic no-fit simulation returns to constraints with the affected conditions identified and never substitutes an unqualified place.
 
 ### Following and Near
 
-The fixed compass changes only its needle, confidence treatment, distance, and state label. The transition to `near` does not resize the compass. Arrival is triggered by prototype controls that stand in for repeated accurate samples and route-progress consistency.
+The guidance surface changes only its current step, confidence treatment, distances, and state label. The transition to `near` keeps the same information hierarchy. Arrival is triggered by prototype controls that stand in for repeated accurate samples and route-progress consistency.
 
 ## Stop, Reveal, and End Branches
 
 ### Immediate Pause
 
-Pressing Stop synchronously enters `paused` before any reason, dialog, or simulated network action. The needle becomes stationary or hidden.
+Pressing Stop synchronously enters `paused` before any reason, dialog, or simulated network action. The active maneuver becomes hidden and no directional claim is made.
 
 ```text
 following or near
@@ -173,7 +183,7 @@ Reveal reasons are versioned and separate from Stop reasons:
 
 The reason screen states that continuing will reveal the venue name and exact location. `건너뛰고 확인` is always visible. No free-text reason is collected.
 
-The revealed screen contains exact arrival information and offers:
+The revealed screen contains the approved destination details and offers:
 
 - `나침반 안내 계속`;
 - `외부 지도 열기`;
@@ -208,7 +218,7 @@ following or near
 → following or following_revealed
 ```
 
-The compass remains the same size but emits no directional claim while confidence is low or recomputation is incomplete. External-map handoff warns that the destination may be revealed. A safety Stop never triggers automatic reroute, resume, or external-map launch.
+The guidance surface emits no active maneuver while confidence is low or recomputation is incomplete. External-map handoff warns that the destination may be revealed. A safety Stop never triggers automatic reroute, resume, or external-map launch.
 
 ## Prototype Controls
 
@@ -254,10 +264,10 @@ The prototype uses plain HTML, CSS, and JavaScript with Node's built-in test run
 ## Low-Fidelity Presentation Rules
 
 - monochrome background, borders, and system text;
-- no gradients, shadows, images, logos, decorative icons, material simulation, or branded motion;
+- no gradients, shadows, logos, decorative icons, material simulation, or branded motion; the arrival photo is functional destination content, not decoration;
 - stable phone-sized central canvas with responsive desktop framing;
 - real Korean labels where wording affects sequence comprehension;
-- compass represented by simple circles, ticks, and a needle;
+- guidance represented by text, direction arrows, and distance hierarchy;
 - state changes expressed through structure and text rather than aesthetic polish;
 - prototype controls visually separated from the product canvas.
 
@@ -269,9 +279,9 @@ The prototype uses plain HTML, CSS, and JavaScript with Node's built-in test run
 - keyboard interaction follows DOM order;
 - Stop is reachable without gesture timing;
 - `건너뛰고 확인` and Stop-reason `건너뛰기` are explicit controls;
-- direction is never communicated by the needle alone; state text accompanies it;
+- direction is never communicated by an icon alone; current heading and text accompany it;
 - no interaction depends on color or animation;
-- reduced-motion preferences disable optional needle transition.
+- reduced-motion preferences keep the guidance surface static.
 
 ## Failure and Data Rules
 
@@ -291,10 +301,10 @@ The prototype is acceptable when automated tests and a manual walkthrough demons
 1. advanced conditions are collapsed by default and visibly summarized when active;
 2. one product button proceeds from valid constraints through finding into following;
 3. no second commit/start button exists;
-4. the compass is absent during constraints/finding and fixed in size during following/near;
+4. the guidance surface is absent during constraints/finding and keeps the same hierarchy during following/near;
 5. pre-Reveal HTML contains no destination identity or exact location;
 6. Stop pauses before any sheet choice;
-7. the main compass screen has no Reveal control;
+7. the main guidance screen has no Reveal control;
 8. destination information is reachable only through the paused sheet before arrival;
 9. Reveal requires one reason selection or `건너뛰고 확인`;
 10. Reveal and Stop reasons remain distinct;
@@ -302,7 +312,7 @@ The prototype is acceptable when automated tests and a manual walkthrough demons
 12. confirmed Stop asks a skippable reason only after ending;
 13. no active Reroll appears;
 14. low-confidence and recomputing states do not point;
-15. arrival automatically shows verified name, address, building, floor/unit, and entrance information;
+15. arrival automatically shows verified name, photo, building, floor/unit, recommendation rationale, and review summary while omitting address and entrance information;
 16. simulated feedback appears only after eligibility advances;
 17. all main and branch sequences can be completed using keyboard controls;
 18. the existing v0.1 and repository verification suites remain unchanged and passing.

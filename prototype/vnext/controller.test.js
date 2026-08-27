@@ -1,0 +1,779 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const test = require("node:test");
+const stateApi = require("./state.js");
+const controllerModule = require("./controller.js");
+const {
+  createController,
+  createTestController,
+  mount,
+  mountForTest,
+  MOCK_DESTINATION,
+  MOCK_ROUTE,
+} = controllerModule;
+const createInspectableController = createTestController ?? createController;
+const mountInspectable = mountForTest ?? mount;
+
+function validConstraints(overrides = {}) {
+  return {
+    category: "restaurant",
+    partySize: 2,
+    maxWalkMinutes: 20,
+    budget: null,
+    dietary: [],
+    allergies: [],
+    disclosure: "standard",
+    ...overrides,
+  };
+}
+
+function createScheduler() {
+  const scheduled = [];
+  const cancelled = [];
+  return {
+    scheduled,
+    cancelled,
+    schedule(callback) {
+      const effect = { id: scheduled.length + 1, callback };
+      scheduled.push(effect);
+      return effect.id;
+    },
+    cancel(id) {
+      cancelled.push(id);
+    },
+  };
+}
+
+test("start schedules one automatic finding completion and no second commit", () => {
+  const timer = createScheduler();
+  const controller = createInspectableController({
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    render: () => {},
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+    now: () => 1000,
+  });
+
+  controller.start(validConstraints());
+  controller.start(validConstraints());
+
+  assert.equal(controller.getState().phase, "finding");
+  assert.equal(timer.scheduled.length, 1);
+  timer.scheduled[0].callback();
+  assert.equal(controller.getState().phase, "following");
+});
+
+test("finding exits cancel the pending completion and stale callbacks stay inert", () => {
+  const exits = [
+    {
+      action: {
+        type: "FIND_NO_FIT",
+        affectedConditions: [{ field: "maxWalkMinutes", label: "최대 도보 시간" }],
+      },
+      expectedError: "finding",
+    },
+    { action: { type: "PERMISSION_DENIED", context: "finding" }, expectedError: "locationPermission" },
+    { action: { type: "RESET" }, expectedError: null },
+  ];
+
+  for (const { action, expectedError } of exits) {
+    const timer = createScheduler();
+    const controller = createInspectableController({
+      initialState: stateApi.createInitialState({ firstUse: false }),
+      render: () => {},
+      schedule: timer.schedule,
+      cancel: timer.cancel,
+      now: () => 1000,
+    });
+    controller.start(validConstraints());
+    controller.dispatch(action);
+
+    assert.deepEqual(timer.cancelled, [1], action.type);
+    assert.equal(controller.getState().phase, "constraints", action.type);
+    if (expectedError) assert.ok(controller.getState().errors[expectedError], action.type);
+    timer.scheduled[0].callback();
+    assert.equal(controller.getState().phase, "constraints", `${action.type} stale callback`);
+  }
+});
+
+test("destroy cancels a pending finding completion", () => {
+  const cancelled = [];
+  const controller = createInspectableController({
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    render: () => {},
+    schedule: () => 91,
+    cancel: (id) => cancelled.push(id),
+    now: () => 1000,
+  });
+  controller.start(validConstraints({ category: "restaurant", maxWalkMinutes: 15 }));
+  controller.destroy();
+  assert.deepEqual(cancelled, [91]);
+});
+
+test("mock destination is complete for arrival but is not exposed on the browser API", () => {
+  assert.equal(typeof MOCK_DESTINATION.name, "string");
+  assert.equal(typeof MOCK_DESTINATION.floorUnit, "string");
+  assert.match(MOCK_DESTINATION.photoUrl, /^data:image\//);
+  assert.equal(typeof MOCK_DESTINATION.recommendationReason, "string");
+  assert.equal(typeof MOCK_DESTINATION.reviewSummary, "string");
+  assert.equal(Number.isFinite(MOCK_ROUTE.distanceM), true);
+  assert.equal(globalThis.RollTheCompassVNextController.MOCK_DESTINATION, undefined);
+  assert.equal(globalThis.RollTheCompassVNextController.MOCK_ROUTE, undefined);
+});
+
+test("mock route contains ordered turn steps for the navigation prototype", () => {
+  assert.equal(Array.isArray(MOCK_ROUTE.steps), true);
+  assert.equal(MOCK_ROUTE.steps.length, 4);
+  assert.equal(
+    MOCK_ROUTE.steps.reduce((total, step) => total + step.distanceM, 0),
+    MOCK_ROUTE.distanceM,
+  );
+  assert.equal(MOCK_ROUTE.steps[1].maneuver, "TURN_RIGHT");
+});
+
+test("render receives only public views and getState returns a deep copy", () => {
+  const rendered = [];
+  const timer = createScheduler();
+  const controller = createInspectableController({
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    render: (view) => rendered.push(view),
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+    now: () => 1000,
+  });
+  controller.start(validConstraints());
+  timer.scheduled[0].callback();
+
+  assert.equal(rendered.at(-1).phase, "following");
+  assert.equal(rendered.at(-1).destination, null);
+  assert.equal(JSON.stringify(rendered.at(-1)).includes(MOCK_DESTINATION.name), false);
+
+  const copy = controller.getState();
+  copy.destination.name = "changed outside";
+  assert.equal(controller.getState().destination.name, MOCK_DESTINATION.name);
+});
+
+test("no-fit simulation reports the active advanced conditions without changing them", () => {
+  const timer = createScheduler();
+  const rendered = [];
+  const controller = createInspectableController({
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    render: (publicView) => rendered.push(publicView),
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+    now: () => 1_000,
+  });
+  const constraints = validConstraints({
+    budget: "20,000원 이하",
+    dietary: ["채식"],
+    allergies: ["견과류"],
+    disclosure: "private",
+  });
+
+  controller.start(constraints);
+  controller.simulate("no-fit");
+
+  assert.equal(controller.getState().phase, "constraints");
+  assert.deepEqual(controller.getState().constraints, constraints);
+  assert.deepEqual(controller.getState().affectedConditions, [
+    { field: "budget", label: "예산" },
+    { field: "dietary", label: "식이 조건" },
+    { field: "allergies", label: "알레르기" },
+    { field: "disclosure", label: "목적지 공개 수준" },
+  ]);
+  assert.deepEqual(rendered.at(-1).affectedConditions, controller.getState().affectedConditions);
+});
+
+function createEventRoot() {
+  const listeners = new Map();
+  const focusCalls = [];
+  const focusTarget = {
+    focus(options) {
+      focusCalls.push(options);
+    },
+  };
+  return {
+    innerHTML: "",
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(listener);
+    },
+    removeEventListener(type, listener) {
+      listeners.get(type)?.delete(listener);
+    },
+    contains() {
+      return true;
+    },
+    querySelector(selector) {
+      return selector === "[data-screen-heading]" ? focusTarget : null;
+    },
+    click(target) {
+      for (const listener of listeners.get("click") || []) {
+        listener({ target, preventDefault() {} });
+      }
+    },
+    wheel(target, deltaY) {
+      for (const listener of listeners.get("wheel") || []) {
+        listener({ target, deltaY, preventDefault() {} });
+      }
+    },
+    input(target) {
+      for (const listener of listeners.get("input") || []) listener({ target });
+    },
+    change(target) {
+      for (const listener of listeners.get("change") || []) listener({ target });
+    },
+    listenerCount(type = "click") {
+      return listeners.get(type)?.size ?? 0;
+    },
+    focusCount() {
+      return focusCalls.length;
+    },
+  };
+}
+
+function productButton(action, { reason, reaction, form } = {}) {
+  return {
+    dataset: { action, ...(reason ? { reason } : {}), ...(reaction ? { reaction } : {}) },
+    closest(selector) {
+      if (selector === "[data-action]") return this;
+      if ([ '[data-form="constraints"]', '[data-form="profile"]' ].includes(selector)) return form ?? null;
+      return null;
+    },
+  };
+}
+
+function simulationButton(simulation) {
+  return {
+    dataset: { simulate: simulation },
+    closest(selector) {
+      return selector === "[data-simulate]" ? this : null;
+    },
+  };
+}
+
+class FixtureFormData {
+  constructor(form) {
+    this.values = form.values;
+  }
+
+  get(name) {
+    return this.values[name] ?? null;
+  }
+}
+
+test("mount delegates product and prototype controls through the reducer", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const timer = createScheduler();
+  const dispatchedActions = [];
+  let currentNow = 10_000;
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+    now: () => currentNow,
+    FormData: FixtureFormData,
+    stateApi: {
+      ...stateApi,
+      reduce(state, action) {
+        dispatchedActions.push(action.type);
+        return stateApi.reduce(state, action);
+      },
+    },
+  });
+  const form = {
+    values: {
+      category: "cafe",
+      partySize: "2",
+      maxWalkMinutes: "15",
+      budget: "10000",
+      dietary: "vegan, shellfish-free",
+      allergies: "peanut, sesame",
+      disclosure: "minimal",
+    },
+  };
+
+  root.click(productButton("start", { form }));
+  assert.equal(mounted.controller.getState().phase, "finding");
+  assert.deepEqual(mounted.controller.getState().constraints.dietary, []);
+  assert.deepEqual(mounted.controller.getState().constraints.allergies, []);
+  assert.equal(mounted.controller.getState().constraints.disclosure, "minimal");
+  timer.scheduled[0].callback();
+  assert.equal(mounted.controller.getState().phase, "following");
+
+  controlsRoot.click(simulationButton("walk"));
+  assert.equal(mounted.controller.getState().distanceM, 710);
+  controlsRoot.click(simulationButton("near"));
+  assert.equal(mounted.controller.getState().phase, "near");
+  controlsRoot.click(simulationButton("low-confidence"));
+  assert.equal(mounted.controller.getState().phase, "route_recovery");
+  controlsRoot.click(simulationButton("restore-confidence"));
+  assert.equal(mounted.controller.getState().phase, "following");
+  controlsRoot.click(simulationButton("missing-arrival-field"));
+  assert.equal(mounted.controller.getState().phase, "arrived");
+  assert.equal(mounted.controller.getState().destination.floorUnit, null);
+  assert.equal(dispatchedActions.at(-1), "ARRIVE_WITH_MISSING_FIELD");
+
+  root.click(productButton("finish-arrival"));
+  assert.equal(mounted.controller.getState().phase, "feedback_pending");
+  currentNow = mounted.controller.getState().feedbackEligibleAtMs;
+  controlsRoot.click(simulationButton("feedback-ready"));
+  assert.equal(mounted.controller.getState().phase, "place_reaction");
+  root.click(productButton("react", { reaction: "love" }));
+  assert.equal(mounted.controller.getState().phase, "complete");
+
+  assert.equal(root.listenerCount(), 1);
+  assert.equal(controlsRoot.listenerCount(), 1);
+  mounted.destroy();
+  assert.equal(root.listenerCount(), 0);
+  assert.equal(controlsRoot.listenerCount(), 0);
+});
+
+test("profile actions save searchable multi-select values without putting them in constraints form", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    FormData: class extends FixtureFormData {
+      getAll(name) {
+        return name === "dietary" ? ["vegetarian", "vegan"] : name === "allergies" ? ["peanut"] : [];
+      }
+    },
+  });
+  root.click(productButton("open-profile"));
+  assert.equal(mounted.controller.getState().phase, "profile");
+  const form = {
+    values: {},
+    querySelector() { return null; },
+  };
+  root.click(productButton("save-profile", { form }));
+  assert.equal(mounted.controller.getState().phase, "constraints");
+  assert.deepEqual(mounted.controller.getState().profile, {
+    dietary: ["vegetarian", "vegan"],
+    allergies: ["peanut"],
+  });
+  mounted.destroy();
+});
+
+test("profile none choices save as empty condition arrays", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    FormData: class extends FixtureFormData {
+      getAll() {
+        return ["none"];
+      }
+    },
+  });
+  root.click(productButton("open-profile-menu"));
+  root.click(productButton("open-profile-settings"));
+  root.click(productButton("save-profile", { form: { values: {} } }));
+  assert.deepEqual(mounted.controller.getState().profile, { dietary: [], allergies: [] });
+  assert.deepEqual(mounted.controller.getState().constraints.dietary, []);
+  assert.deepEqual(mounted.controller.getState().constraints.allergies, []);
+  mounted.destroy();
+});
+
+test("profile none choice is mutually exclusive with a selected condition", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+  });
+  const picker = {
+    querySelectorAll() { return [none, vegan]; },
+    querySelector() { return none; },
+  };
+  const none = {
+    checked: true,
+    name: "dietary",
+    dataset: { profileNone: "dietary" },
+    closest(selector) {
+      if (selector.includes("checkbox")) return this;
+      if (selector === "[data-profile-picker]") return picker;
+      return null;
+    },
+  };
+  const vegan = {
+    checked: false,
+    name: "dietary",
+    dataset: {},
+    closest(selector) {
+      if (selector.includes("checkbox")) return this;
+      if (selector === "[data-profile-picker]") return picker;
+      return null;
+    },
+  };
+  vegan.checked = true;
+  root.change(vegan);
+  assert.equal(none.checked, false);
+  vegan.checked = false;
+  none.checked = true;
+  vegan.checked = true;
+  root.change(none);
+  assert.equal(vegan.checked, false);
+  mounted.destroy();
+});
+
+test("party arrow buttons update party size and stop at both boundaries", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+  });
+
+  root.click(productButton("party-increment"));
+  assert.equal(mounted.controller.getState().constraints.partySize, 3);
+  root.click(productButton("party-decrement"));
+  assert.equal(mounted.controller.getState().constraints.partySize, 2);
+  for (let index = 0; index < 5; index += 1) root.click(productButton("party-decrement"));
+  assert.equal(mounted.controller.getState().constraints.partySize, 1);
+  for (let index = 0; index < 8; index += 1) root.click(productButton("party-increment"));
+  assert.equal(mounted.controller.getState().constraints.partySize, 5);
+  mounted.destroy();
+});
+
+test("profile menu opens settings and profile save returns to constraints", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    FormData: class extends FixtureFormData {
+      getAll(name) {
+        return name === "dietary" ? ["vegetarian"] : name === "allergies" ? ["peanut"] : [];
+      }
+    },
+  });
+
+  root.click(productButton("open-profile-menu"));
+  assert.equal(mounted.controller.getState().profileMenuOpen, true);
+  root.click(productButton("open-profile-settings"));
+  assert.equal(mounted.controller.getState().phase, "profile");
+  assert.equal(mounted.controller.getState().profileMenuOpen, false);
+  root.click(productButton("save-profile", { form: { values: {} } }));
+  assert.equal(mounted.controller.getState().phase, "constraints");
+  assert.deepEqual(mounted.controller.getState().profile, {
+    dietary: ["vegetarian"],
+    allergies: ["peanut"],
+  });
+  mounted.destroy();
+});
+
+test("start forwards party size with the other constraints", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const timer = createScheduler();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+    FormData: FixtureFormData,
+  });
+  const form = {
+    values: {
+      category: "restaurant",
+      partySize: "3",
+      maxWalkMinutes: "20",
+      budget: "12",
+      disclosure: "minimal",
+    },
+  };
+
+  root.click(productButton("start", { form }));
+  assert.equal(mounted.controller.getState().constraints.partySize, 3);
+  assert.equal(mounted.controller.getState().phase, "finding");
+  mounted.destroy();
+});
+
+test("wheel over sliders changes their values by their configured step", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+  });
+  const timeSlider = { value: "20", min: "5", max: "60", step: "5", dataset: { slider: "walk" }, closest(selector) { return selector.includes("range") ? this : null; } };
+  const budgetSlider = { value: "12", min: "0", max: "12", step: "1", dataset: { slider: "budget" }, closest(selector) { return selector.includes("range") ? this : null; } };
+  root.wheel(timeSlider, -1);
+  root.wheel(budgetSlider, 1);
+  assert.equal(timeSlider.value, "25");
+  assert.equal(budgetSlider.value, "11");
+  mounted.destroy();
+});
+
+test("budget wheel snaps odd thousands to even-thousand stops", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+  });
+  const budgetSlider = {
+    value: "4",
+    min: "0",
+    max: "12",
+    step: "1",
+    dataset: { slider: "budget", budgetAmount: "11000" },
+    closest(selector) { return selector.includes("range") ? this : null; },
+  };
+
+  root.wheel(budgetSlider, 1);
+  assert.equal(budgetSlider.dataset.budgetAmount, "10000");
+  root.wheel(budgetSlider, -1);
+  assert.equal(budgetSlider.dataset.budgetAmount, "12000");
+  mounted.destroy();
+});
+
+test("mount renders guarded review and restarts with one acknowledged Start", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const timer = createScheduler();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+    now: () => 1000,
+    FormData: FixtureFormData,
+  });
+  const form = {
+    values: { category: "restaurant", partySize: "2", maxWalkMinutes: "20" },
+    reviewVisible: false,
+    querySelector(selector) {
+      if (selector !== '[name="recoveryReviewed"]' || !this.reviewVisible) return null;
+      return {
+        checked: this.values.recoveryReviewed === "yes",
+        reportValidity() {},
+        focus() {},
+      };
+    },
+  };
+  root.click(productButton("start", { form }));
+  timer.scheduled[0].callback();
+
+  root.click(productButton("stop"));
+  root.click(productButton("open-destination-info"));
+  root.click(productButton("reveal-destination", { reason: "skipped" }));
+  root.click(productButton("continue-after-reveal"));
+  controlsRoot.click(simulationButton("restore-confidence"));
+  assert.equal(mounted.controller.getState().phase, "following_revealed");
+
+  root.click(productButton("stop"));
+  root.click(productButton("request-end"));
+  root.click(productButton("confirm-end"));
+  root.click(productButton("submit-stop-reason", { reason: "safety" }));
+  root.click(productButton("new-recommendation"));
+  assert.equal(mounted.controller.getState().guardedRecovery, true);
+  assert.match(root.innerHTML, /최근 안내 종료 이유/);
+  assert.match(root.innerHTML, /안전 문제/);
+  form.reviewVisible = true;
+  root.click(productButton("start", { form }));
+  assert.equal(mounted.controller.getState().phase, "constraints");
+  assert.equal(mounted.controller.getState().errors.recoveryReview, undefined);
+  form.values.recoveryReviewed = "yes";
+  root.click(productButton("start", { form }));
+  assert.equal(mounted.controller.getState().phase, "finding");
+});
+
+function stoppedState(reason) {
+  const finding = stateApi.reduce(
+    stateApi.createInitialState({ firstUse: false }),
+    { type: "START", constraints: validConstraints() },
+  );
+  const following = stateApi.reduce(finding, {
+    type: "FIND_SUCCESS",
+    destination: MOCK_DESTINATION,
+    route: MOCK_ROUTE,
+  });
+  const paused = stateApi.reduce(following, { type: "STOP" });
+  const confirm = stateApi.reduce(paused, { type: "REQUEST_END" });
+  const reasonScreen = stateApi.reduce(confirm, { type: "CONFIRM_END", nowMs: 1_000 });
+  return stateApi.reduce(reasonScreen, { type: "SUBMIT_STOP_REASON", reason });
+}
+
+test("mount dispatches every Stop reason into its guarded new-start review", () => {
+  const cases = [
+    ["safety", /안전 관련 조건/],
+    ["route_sensor", /재보정/],
+    ["condition_mismatch", /맞지 않았던 필수 조건/],
+    ["venue_problem", /현장에서 문제가 된 사항/],
+    ["change_of_mind", /모든 조건/],
+    ["schedule_change", /이전 여정은 종료되었어요/],
+    ["skipped", /종료 이유를 건너뛰었어요/],
+  ];
+
+  for (const [reason, expectedPrompt] of cases) {
+    const root = createEventRoot();
+    const controlsRoot = createEventRoot();
+    const timer = createScheduler();
+    const mounted = mountInspectable(root, controlsRoot, {
+      initialState: stoppedState(reason),
+      schedule: timer.schedule,
+      cancel: timer.cancel,
+      now: () => 301_000,
+      FormData: FixtureFormData,
+    });
+
+    root.click(productButton("new-recommendation"));
+    assert.equal(mounted.controller.getState().guardedRecovery, true, reason);
+    assert.equal(mounted.controller.getState().recoveryReason, reason, reason);
+    assert.match(root.innerHTML, expectedPrompt, reason);
+    assert.equal((root.innerHTML.match(/name="recoveryReviewed"/g) || []).length, 1, reason);
+    assert.equal((root.innerHTML.match(/data-action="start"/g) || []).length, 1, reason);
+
+    const form = {
+      values: {
+        category: "restaurant",
+        partySize: "2",
+        maxWalkMinutes: "20",
+        disclosure: "standard",
+        recoveryReviewed: "yes",
+      },
+      querySelector(selector) {
+        if (selector !== '[name="recoveryReviewed"]') return null;
+        return { checked: true, reportValidity() {}, focus() {} };
+      },
+    };
+    root.click(productButton("start", { form }));
+    assert.equal(mounted.controller.getState().phase, "finding", reason);
+    assert.equal(timer.scheduled.length, 1, reason);
+    mounted.destroy();
+  }
+});
+
+test("mount focuses accepted screen renders but not rejected duplicate actions", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const timer = createScheduler();
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    schedule: timer.schedule,
+    cancel: timer.cancel,
+    FormData: FixtureFormData,
+  });
+  const form = {
+    values: {
+      category: "restaurant",
+      partySize: "2",
+      maxWalkMinutes: "20",
+      disclosure: "standard",
+    },
+  };
+  const startButton = productButton("start", { form });
+
+  assert.equal(root.focusCount(), 1);
+  root.click(startButton);
+  assert.equal(root.focusCount(), 2);
+  root.click(startButton);
+  assert.equal(root.focusCount(), 2);
+
+  mounted.destroy();
+});
+
+test("advanced input updates its collapsed summary without rerendering or moving focus", () => {
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const summary = { textContent: "추가 조건 1개 적용 중 — 목적지 공개 수준" };
+  const details = {
+    querySelector(selector) {
+      return selector === "summary" ? summary : null;
+    },
+  };
+  const form = {
+    values: {
+      category: "restaurant",
+      partySize: "2",
+      maxWalkMinutes: "20",
+      budget: "20000",
+      disclosure: "private",
+    },
+  };
+  const input = {
+    closest(selector) {
+      if (selector === '[data-form="constraints"]') return form;
+      if (selector === "[data-advanced-conditions]") return details;
+      return null;
+    },
+  };
+  const mounted = mountInspectable(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    FormData: FixtureFormData,
+  });
+  const focusBeforeInput = root.focusCount();
+
+  root.input(input);
+
+  assert.equal(
+    summary.textContent,
+    "추가 조건 1개 적용 중 — 목적지 공개 수준",
+  );
+  assert.equal(root.focusCount(), focusBeforeInput);
+  mounted.destroy();
+});
+
+test("CommonJS test inspection is separate from browser and mounted production APIs", () => {
+  assert.equal(typeof createTestController, "function");
+  assert.equal(typeof mountForTest, "function");
+
+  const rendered = [];
+  const scheduled = [];
+  let interceptedDestination = null;
+  const browserController = globalThis.RollTheCompassVNextController.createController({
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    render: (publicView) => rendered.push(publicView),
+    schedule: (callback) => { scheduled.push(callback); return scheduled.length; },
+    stateApi: {
+      ...stateApi,
+      reduce(state, action) {
+        if (action.destination) interceptedDestination = action.destination;
+        return stateApi.reduce(state, action);
+      },
+    },
+  });
+  assert.equal(browserController.getState, undefined);
+  browserController.start(validConstraints());
+  scheduled[0]();
+  assert.equal(interceptedDestination, null);
+  assert.equal(rendered.at(-1).destination, null);
+
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  const mounted = globalThis.RollTheCompassVNextController.mount(root, controlsRoot, {
+    initialState: stateApi.createInitialState({ firstUse: false }),
+  });
+  assert.equal(mounted.controller.getState, undefined);
+
+  const inspected = createTestController({
+    initialState: stateApi.createInitialState({ firstUse: false }),
+    render: () => {},
+  });
+  assert.equal(typeof inspected.getState, "function");
+  mounted.destroy();
+  browserController.destroy();
+});
+
+test("app boot return value cannot inspect private controller state", () => {
+  const previousDocument = globalThis.document;
+  const root = createEventRoot();
+  const controlsRoot = createEventRoot();
+  try {
+    delete globalThis.document;
+    delete require.cache[require.resolve("./app.js")];
+    const { boot } = require("./app.js");
+    assert.equal(globalThis.RollTheCompassVNextApp.boot, boot);
+    assert.equal(globalThis.SomewhereVNextApp, undefined);
+    globalThis.document = {
+      querySelector(selector) {
+        if (selector === "#app") return root;
+        if (selector === "#prototype-controls") return controlsRoot;
+        return null;
+      },
+    };
+    const mounted = boot();
+    assert.equal(mounted.controller.getState, undefined);
+    mounted.destroy();
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});

@@ -2,13 +2,13 @@
 
 Status: approved written blueprint (2026-07-21)
 
-Owner: Somewhere project
+Owner: Roll the compass! project
 
 ## Problem
 
 People do not struggle with place selection only because information is missing. Candidate comparison, companion coordination, and responsibility for the final choice can keep the decision open even after many acceptable places have been found.
 
-Existing map and recommendation products commonly return multiple candidates and leave the final comparison to the user. Somewhere tests a different promise: choose one evidence-qualified place within agreed constraints and move directly to departure.
+Existing map and recommendation products commonly return multiple candidates and leave the final comparison to the user. Roll the compass! tests a different promise: choose one evidence-qualified place within agreed constraints and move directly to departure.
 
 ## Solution
 
@@ -42,7 +42,7 @@ Opening status and route feasibility are system checks, not badges the user must
 
 | Layer | Question | Primary measures |
 |---|---|---|
-| Selection efficiency | Did Somewhere help the user choose one place faster? | time to commit, number of candidates inspected |
+| Selection efficiency | Did Roll the compass! help the user choose one place faster? | time to commit, number of candidates inspected |
 | Action transition | Did the user act on the choice? | departure rate, time from commit to movement |
 | Selection maintenance | Did the user reopen comparison? | preference-driven stop and recommendation restart |
 | Navigation reliability | Could the user reach the destination? | arrival, route recovery, technical or safety interruption |

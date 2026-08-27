@@ -131,7 +131,7 @@ An external map is a safety fallback, not the primary interface.
 - Tell the user that handoff can reveal the destination.
 - Use the selected provider's supported link or SDK contract.
 - Record handoff as route recovery, not preference-driven recommendation failure.
-- Let the user return to Somewhere when technically possible.
+- Let the user return to Roll the compass! when technically possible.
 
 ## Notifications
 
