@@ -39,9 +39,9 @@ CoreBluetooth, 알림, 카메라, 성능, 화면 밝기, 터치 감각은 Mac과
   `3022401c02e92204d2751f569b19745024724c80`
 - 앱 기준: 항상 `origin/codex/ipad-board-integration`의 정확한 40자 SHA
 - 보드 기준 SHA:
-  `249ac2fe76818495bd7213058cd1efa6c5bf7d66`
+  `c60d9982f8e274648370513bdf253b8cba7fbef7`
 - 보드용 Windows 명령과 역할별 안내:
-  [해당 SHA의 Windows collaboration handoff](https://github.com/kimkiumin/Somewhere/blob/249ac2fe76818495bd7213058cd1efa6c5bf7d66/docs/operations/windows-collaboration-handoff.md)
+  [해당 SHA의 Windows collaboration handoff](https://github.com/kimkiumin/Somewhere/blob/c60d9982f8e274648370513bdf253b8cba7fbef7/docs/operations/windows-collaboration-handoff.md)
 
 시안 파일명, 이슈, Appetize 링크에는 반드시 앱 또는 보드 SHA를 적는다.
 “최신 버전”만 적으면 같은 화면인지 재현할 수 없다.
@@ -281,7 +281,7 @@ checkout, 고정 Bun 설치, source gate, XcodeGen, ARM64 Simulator build, manif
 통과했고 manifest의 `finalSha`가 위 앱 SHA와 일치하며, ZIP SHA-256은
 `a4401ea857ba312f10e95eb49434fd3eb6558bdd83971a10b89e33fb26ec0c35`다.
 
-보드 브랜치 SHA `249ac2fe76818495bd7213058cd1efa6c5bf7d66`도
+보드 브랜치 SHA `c60d9982f8e274648370513bdf253b8cba7fbef7`도
 별도로 확인했다.
 
 - BOOT 즉시 화면 토글 커밋: `0ee5774`
@@ -289,11 +289,12 @@ checkout, 고정 Bun 설치, source gate, XcodeGen, ARM64 Simulator build, manif
 - generated asset 전체 선검증·linked/reparse 거부·원자 복원 보정: `d9258cf`
 - PowerShell Bun 버전 명령의 실제 성공 상태 보정: `426784f`
 - Git for Windows 체크아웃의 LF 계약 고정: `249ac2f`
-- Windows command-plan·asset restore 단위 테스트: 13 통과, 0 실패
+- 협업자 원형 instrument 소스 포팅: `c60d998`
+- Windows command-plan·asset restore·visual instrument 단위 테스트: 17 통과, 0 실패
 - `verify:windows`: 계약 15, 타입검사, 린트, 웹 build, 플랫폼 중립 iOS
   source gate 통과
-- Waveshare ESP32-S3-Touch-LCD-2.1 firmware compile 성공: flash 56%,
-  global RAM 9%
+- Waveshare ESP32-S3-Touch-LCD-2.1 firmware compile 성공: flash 32%,
+  global RAM 10%
 
 실제 GitHub Windows runner 실행
 [`32988860540`](https://github.com/kimkiumin/Somewhere/actions/runs/32988860540)은
