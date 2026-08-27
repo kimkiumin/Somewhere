@@ -19,16 +19,14 @@ LV_FONT_DECLARE(roll_compass_korean_20)
 namespace {
 
 constexpr int16_t kScreenSize = somewhere_artwork::SCREEN_SIZE;
-constexpr int16_t kDisplayCenter = roll_compass::kInstrumentFaceCenter;
 constexpr uint32_t kNeedleStepMs = 25;
 constexpr uint8_t kMaximumCatchUpSteps = 4;
 constexpr uint8_t kStopAction = 1U << 0;
 constexpr uint8_t kContinueAction = 1U << 1;
 constexpr uint8_t kConfirmStopAction = 1U << 2;
 constexpr uint8_t kRevealAction = 1U << 3;
-// Keep the source-derived green hierarchy, but make the three fixed readout
-// labels fully legible on the small, high-contrast circular panel.
-constexpr lv_opa_t kReadoutLabelOpacity = LV_OPA_COVER;
+// Match the collaborator smoke test's muted-label/full-value hierarchy.
+constexpr lv_opa_t kReadoutLabelOpacity = 168;
 constexpr lv_opa_t kReadoutValueOpacity = LV_OPA_COVER;
 
 // These values are the collaborator's source SVG palette, expressed at the
@@ -43,7 +41,6 @@ lv_obj_t *faceBackground = nullptr;
 lv_obj_t *tickObjects[somewhere_artwork::TICK_COUNT] = {};
 lv_point_t tickPoints[somewhere_artwork::TICK_COUNT][2] = {};
 lv_obj_t *compassNeedle = nullptr;
-lv_obj_t *needleHub = nullptr;
 lv_point_t needlePoints[2] = {};
 lv_obj_t *northLabel = nullptr;
 lv_obj_t *southLabel = nullptr;
@@ -66,7 +63,7 @@ lv_obj_t *pausedEndLabel = nullptr;
 roll_compass::CompassRenderModel currentModel;
 roll_compass::NeedleSpring needleSpring;
 PhysicalCompassEventCallback eventCallback = nullptr;
-float targetNeedleAngleDegrees = 0.0f;
+float targetNeedleAngleDegrees = 35.0f;
 uint32_t lastTickMs = 0;
 uint32_t accumulatedNeedleMs = 0;
 uint32_t stateEnteredMs = 0;
@@ -260,7 +257,6 @@ void renderModel() {
     );
 
     setHidden(compassNeedle, !currentModel.showNeedle);
-    setHidden(needleHub, !currentModel.showNeedle);
 
     const bool showStop =
         (currentModel.state == roll_compass::CompassOsState::Guiding ||
@@ -398,23 +394,6 @@ void displayUiBegin() {
     lv_obj_set_style_line_rounded(compassNeedle, true, LV_PART_MAIN);
     lv_obj_clear_flag(compassNeedle, LV_OBJ_FLAG_CLICKABLE);
 
-    needleHub = lv_obj_create(screen);
-    lv_obj_remove_style_all(needleHub);
-    lv_obj_set_size(
-        needleHub,
-        roll_compass::kInstrumentNeedleHubDiameter,
-        roll_compass::kInstrumentNeedleHubDiameter
-    );
-    lv_obj_set_pos(
-        needleHub,
-        kDisplayCenter - roll_compass::kInstrumentNeedleHubDiameter / 2,
-        kDisplayCenter - roll_compass::kInstrumentNeedleHubDiameter / 2
-    );
-    lv_obj_set_style_radius(needleHub, LV_RADIUS_CIRCLE, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(needleHub, kPink, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(needleHub, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_clear_flag(needleHub, LV_OBJ_FLAG_CLICKABLE);
-
     northLabel = makeLabel(
         screen,
         roll_compass::kInstrumentNorthBounds,
@@ -530,7 +509,7 @@ void displayUiBegin() {
     );
     lv_obj_add_event_cb(pausedEndButton, pausedEndClicked, LV_EVENT_CLICKED, nullptr);
 
-    needleSpring.reset(0.0f);
+    needleSpring.reset(35.0f);
     applyInstrumentLayout();
     renderModel();
 }

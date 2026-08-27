@@ -9,8 +9,7 @@ constexpr int16_t kInstrumentFaceCenter = 240;
 constexpr int16_t kInstrumentFaceRadius = 240;
 constexpr int16_t kInstrumentNeedleLength = 139;
 constexpr int16_t kInstrumentNeedleSafeRadius = 230;
-constexpr int16_t kInstrumentNeedleStrokeWidth = 3;
-constexpr int16_t kInstrumentNeedleHubDiameter = 8;
+constexpr int16_t kInstrumentNeedleStrokeWidth = 2;
 
 static_assert(kInstrumentNeedleLength <= kInstrumentNeedleSafeRadius);
 

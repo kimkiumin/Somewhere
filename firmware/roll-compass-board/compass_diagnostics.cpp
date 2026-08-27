@@ -202,7 +202,7 @@ void DiagnosticState::resetSimulation() {
     sensorHealth_ = SensorHealth::Ready;
     calibrationHealth_ = CalibrationHealth::Valid;
     phase_ = JourneyPhase::Following;
-    targetTrueBearingDegrees_ = 0.0f;
+    targetTrueBearingDegrees_ = 35.0f;
     magneticDeclinationDegreesEast_ = 0.0f;
     boardMagneticHeadingDegrees_ = 0.0f;
     sweepDirection_ = 1;
@@ -249,7 +249,7 @@ void DiagnosticState::applyTo(RuntimeInput &input, uint32_t nowMs) {
     input.distanceM = visualDemo_ ? 320.0f : 0.0f;
     input.menu = visualDemo_ ? "TONKATSU" : nullptr;
     input.priceBand = visualDemo_ ? "-" : nullptr;
-    input.actionMask = actionMaskForPhase(phase_);
+    input.actionMask = visualDemo_ ? 0 : actionMaskForPhase(phase_);
 }
 
 }  // namespace roll_compass

@@ -41,13 +41,17 @@ test("uses the circular instrument palette and three source readouts", () => {
   expect(renderer).not.toContain("0xF8F3E8");
 });
 
-test("keeps the instrument fixed and gives the live needle a visible pivot", () => {
+test("matches the source needle and readout hierarchy without extra demo chrome", () => {
   const renderer = readFirmwareFile("display_ui.cpp");
+  const layout = readFirmwareFile("compass_layout.h");
+  const diagnostics = readFirmwareFile("compass_diagnostics.cpp");
   expect(renderer).not.toContain("mountRotationDegrees");
   expect(renderer).not.toContain("displayTapped");
   expect(renderer).not.toContain("lv_obj_add_event_cb(screen");
-  expect(renderer).toContain("needleHub");
+  expect(renderer).not.toContain("needleHub");
   expect(renderer).toContain("kInstrumentNeedleStrokeWidth");
+  expect(layout).toContain("kInstrumentNeedleStrokeWidth = 2");
+  expect(renderer).toContain("kReadoutLabelOpacity = 168");
   expect(renderer).toContain(
     "kReadoutValueOpacity = LV_OPA_COVER",
   );
@@ -63,6 +67,8 @@ test("keeps the instrument fixed and gives the live needle a visible pivot", () 
   expect(renderer).toContain(
     "lv_obj_set_style_line_rounded(compassNeedle, true",
   );
+  expect(renderer).toContain("needleSpring.reset(35.0f)");
+  expect(diagnostics).toContain("visualDemo_ ? 0 : actionMaskForPhase(phase_)");
 });
 
 test("keeps v2 projected fields flowing into the board render model", () => {

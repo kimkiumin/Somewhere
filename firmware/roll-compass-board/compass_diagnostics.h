@@ -46,7 +46,7 @@ private:
     SensorHealth sensorHealth_ = SensorHealth::Ready;
     CalibrationHealth calibrationHealth_ = CalibrationHealth::Valid;
     JourneyPhase phase_ = JourneyPhase::Following;
-    float targetTrueBearingDegrees_ = 0.0f;
+    float targetTrueBearingDegrees_ = 35.0f;
     float magneticDeclinationDegreesEast_ = 0.0f;
     float boardMagneticHeadingDegrees_ = 0.0f;
     int8_t sweepDirection_ = 1;

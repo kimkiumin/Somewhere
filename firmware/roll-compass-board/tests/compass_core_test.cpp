@@ -467,23 +467,25 @@ static void assertVisualDemoStartsAutomatically() {
     assert(input.calibrationHealth == roll_compass::CalibrationHealth::Valid);
     assert(input.phase == roll_compass::JourneyPhase::Following);
     assert(input.hasCredibleTarget);
-    assertNear(input.targetTrueBearingDegrees, 0.0f);
+    assertNear(input.targetTrueBearingDegrees, 35.0f);
     assertNear(input.boardMagneticHeadingDegrees, 0.0f);
     assert(input.hasDistance);
     assertNear(input.distanceM, 320.0f);
     assert(strcmp(input.menu, "TONKATSU") == 0);
     assert(strcmp(input.priceBand, "-") == 0);
+    assert(input.actionMask == 0);
 
     const auto initialModel = roll_compass::reduceRuntime(input);
     assert(initialModel.state == roll_compass::CompassOsState::Guiding);
     assert(initialModel.showNeedle);
-    assertNear(initialModel.targetNeedleAngleDegrees, 0.0f);
+    assertNear(initialModel.targetNeedleAngleDegrees, 35.0f);
+    assert(initialModel.actionMask == 0);
 
     diagnostic.applyTo(input, 2000);
     assertNear(input.boardMagneticHeadingDegrees, 18.0f);
     const auto movingModel = roll_compass::reduceRuntime(input);
     assert(movingModel.showNeedle);
-    assertNear(movingModel.targetNeedleAngleDegrees, -18.0f);
+    assertNear(movingModel.targetNeedleAngleDegrees, 17.0f);
 }
 
 static void assertDiagnosticSweep() {
