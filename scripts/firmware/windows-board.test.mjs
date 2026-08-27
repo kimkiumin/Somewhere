@@ -66,9 +66,12 @@ test("Windows setup pins the board core and every firmware library", () => {
 
 test("Windows upload compiles first and flashes only the requested COM port", () => {
   const plan = planFor("upload", "--port", "COM7");
+  const usbSerialFqbn =
+    "esp32:esp32:waveshare_esp32_s3_touch_lcd_21:CDCOnBoot=cdc";
 
   expect(plan.steps.map((step) => step.id)).toEqual(["cli-version", "compile", "upload"]);
-  expect(plan.steps[1].args).toContain("esp32:esp32:waveshare_esp32_s3_touch_lcd_21");
+  expect(plan.steps[1].args).toContain(usbSerialFqbn);
+  expect(plan.steps[2].args).toContain(usbSerialFqbn);
   expect(plan.steps[2].args).toContain("COM7");
   expect(plan.steps[2].args).toContain("--input-dir");
 });

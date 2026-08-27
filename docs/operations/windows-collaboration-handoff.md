@@ -224,7 +224,9 @@ startup log, leave it open and press RST once.
 The setup pins Arduino-ESP32 `3.3.11`, ESP32 Display Panel `1.0.4`, ESP32 IO
 Expander `1.1.0`, esp-lib-utils `0.2.0`, LVGL `8.4.0`, and ArduinoJson `7.4.3`.
 The exact FQBN is
-`esp32:esp32:waveshare_esp32_s3_touch_lcd_21`. Generated compass assets are
+`esp32:esp32:waveshare_esp32_s3_touch_lcd_21:CDCOnBoot=cdc`. The explicit CDC
+option keeps firmware diagnostics on the same USB port used for flashing.
+Generated compass assets are
 stored in the checked-in `generated-assets-v1.br` build bundle; the wrapper
 validates every embedded digest before writing, refuses linked/reparse output
 paths, and atomically restores the ignored C/C++ inputs before setup, compile,
@@ -232,7 +234,9 @@ or upload. Ordinary firmware changes therefore do not require a Windows image
 or font generation toolchain, and a stale linked file cannot redirect the
 restore outside the firmware directory.
 
-Useful serial commands for a phone-free visual check are `sim on`,
+The current development firmware boots directly into a phone-free visual demo
+showing `320m`, `TONKATSU`, `PRICE -`, and an 18-degrees-per-second needle
+sweep. Useful serial commands for overriding or restarting it are `sim on`,
 `target 315`, `heading 0`, `sweep cw`, `state near`, `sweep stop`, and
 `sim off`. Simulation cannot send real BLE actions.
 

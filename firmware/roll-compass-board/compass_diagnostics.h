@@ -41,14 +41,16 @@ private:
     void resetSimulation();
     void setOperationalState(JourneyPhase phase);
 
-    bool enabled_ = false;
+    bool enabled_ = true;
+    bool visualDemo_ = true;
     SensorHealth sensorHealth_ = SensorHealth::Ready;
     CalibrationHealth calibrationHealth_ = CalibrationHealth::Valid;
     JourneyPhase phase_ = JourneyPhase::Following;
     float targetTrueBearingDegrees_ = 0.0f;
     float magneticDeclinationDegreesEast_ = 0.0f;
     float boardMagneticHeadingDegrees_ = 0.0f;
-    int8_t sweepDirection_ = 0;
+    int8_t sweepDirection_ = 1;
+    float sweepDegreesPerSecond_ = 18.0f;
     bool sweepClockInitialized_ = false;
     uint32_t lastSweepMs_ = 0;
 };

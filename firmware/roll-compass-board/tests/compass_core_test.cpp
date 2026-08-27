@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <string>
@@ -15,7 +16,16 @@
 #include "screen_power_button.h"
 
 static void assertNear(float actual, float expected, float tolerance = 0.01f) {
-    assert(fabsf(actual - expected) <= tolerance);
+    if (fabsf(actual - expected) > tolerance) {
+        fprintf(
+            stderr,
+            "assertNear failed: actual=%f expected=%f tolerance=%f\n",
+            actual,
+            expected,
+            tolerance
+        );
+        assert(false);
+    }
 }
 
 static void assertSpringSettles(float deltaSeconds, int stepCount) {
@@ -358,6 +368,11 @@ static void assertDiagnosticParsing() {
 static void assertDiagnosticStateInjection() {
     using roll_compass::DiagnosticCommandType;
     roll_compass::DiagnosticState diagnostic;
+    assert(roll_compass::applyDiagnosticCommand(
+        roll_compass::parseDiagnosticCommand("sim off"),
+        diagnostic
+    ));
+    assert(!diagnostic.enabled());
     auto realInput = credibleGuidanceInput();
     realInput.protocolMismatch = true;
     const auto untouched = realInput;
@@ -437,6 +452,38 @@ static void assertDiagnosticStateInjection() {
         roll_compass::DiagnosticCommand{DiagnosticCommandType::Invalid, 0.0f},
         diagnostic
     ));
+}
+
+static void assertVisualDemoStartsAutomatically() {
+    roll_compass::DiagnosticState diagnostic;
+    assert(diagnostic.enabled());
+
+    roll_compass::RuntimeInput input{};
+    diagnostic.applyTo(input, 1000);
+    assert(input.bootComplete);
+    assert(input.bleConnected);
+    assert(input.snapshotFresh);
+    assert(input.sensorHealth == roll_compass::SensorHealth::Ready);
+    assert(input.calibrationHealth == roll_compass::CalibrationHealth::Valid);
+    assert(input.phase == roll_compass::JourneyPhase::Following);
+    assert(input.hasCredibleTarget);
+    assertNear(input.targetTrueBearingDegrees, 0.0f);
+    assertNear(input.boardMagneticHeadingDegrees, 0.0f);
+    assert(input.hasDistance);
+    assertNear(input.distanceM, 320.0f);
+    assert(strcmp(input.menu, "TONKATSU") == 0);
+    assert(strcmp(input.priceBand, "-") == 0);
+
+    const auto initialModel = roll_compass::reduceRuntime(input);
+    assert(initialModel.state == roll_compass::CompassOsState::Guiding);
+    assert(initialModel.showNeedle);
+    assertNear(initialModel.targetNeedleAngleDegrees, 0.0f);
+
+    diagnostic.applyTo(input, 2000);
+    assertNear(input.boardMagneticHeadingDegrees, 18.0f);
+    const auto movingModel = roll_compass::reduceRuntime(input);
+    assert(movingModel.showNeedle);
+    assertNear(movingModel.targetNeedleAngleDegrees, -18.0f);
 }
 
 static void assertDiagnosticSweep() {
@@ -665,6 +712,7 @@ int main() {
     assertWirePhaseMapping();
     assertStrictBleV2Parsing();
     assertDiagnosticParsing();
+    assertVisualDemoStartsAutomatically();
     assertDiagnosticStateInjection();
     assertDiagnosticSweep();
     assertCircularLayoutContainment();

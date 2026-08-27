@@ -31,7 +31,7 @@ board is a low-screen BLE display and touch companion.
 | LVGL | 8.4.0 |
 | ArduinoJson | 7.4.3 |
 | XcodeGen | 2.46.0 |
-| Board FQBN | `esp32:esp32:waveshare_esp32_s3_touch_lcd_21` |
+| Board FQBN | `esp32:esp32:waveshare_esp32_s3_touch_lcd_21:CDCOnBoot=cdc` |
 
 Arduino CLI's prototype preprocessor requires the Arduino Ctags output format.
 The setup script builds the official Arduino `ctags` `5.8-arduino11` source for
@@ -72,8 +72,9 @@ A physical serial boot check should show `Roll Compass board boot`, a
 `BLE advertising: Roll Compass`, and
 `Ready: connect from the Somewhere iPhone app`.
 
-For a phone-free visual check, send these newline-delimited commands in the
-monitor:
+The current development firmware starts in a phone-free visual demo and shows
+`320m`, `TONKATSU`, `PRICE -`, and an 18-degrees-per-second needle sweep. Send
+these newline-delimited commands in the monitor to override or restart it:
 
 ```text
 sim on

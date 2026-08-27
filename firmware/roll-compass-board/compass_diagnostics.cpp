@@ -126,6 +126,7 @@ bool applyDiagnosticCommand(const DiagnosticCommand &commandValue, DiagnosticSta
             return true;
         case DiagnosticCommandType::SimOff:
             state.enabled_ = false;
+            state.visualDemo_ = false;
             state.sweepDirection_ = 0;
             state.sweepClockInitialized_ = false;
             return true;
@@ -174,11 +175,13 @@ bool applyDiagnosticCommand(const DiagnosticCommand &commandValue, DiagnosticSta
         case DiagnosticCommandType::SweepClockwise:
             state.enabled_ = true;
             state.sweepDirection_ = 1;
+            state.sweepDegreesPerSecond_ = 45.0f;
             state.sweepClockInitialized_ = false;
             return true;
         case DiagnosticCommandType::SweepCounterClockwise:
             state.enabled_ = true;
             state.sweepDirection_ = -1;
+            state.sweepDegreesPerSecond_ = 45.0f;
             state.sweepClockInitialized_ = false;
             return true;
         case DiagnosticCommandType::SweepStop:
@@ -195,13 +198,15 @@ bool DiagnosticState::enabled() const {
 
 void DiagnosticState::resetSimulation() {
     enabled_ = true;
+    visualDemo_ = true;
     sensorHealth_ = SensorHealth::Ready;
     calibrationHealth_ = CalibrationHealth::Valid;
     phase_ = JourneyPhase::Following;
     targetTrueBearingDegrees_ = 0.0f;
     magneticDeclinationDegreesEast_ = 0.0f;
     boardMagneticHeadingDegrees_ = 0.0f;
-    sweepDirection_ = 0;
+    sweepDirection_ = 1;
+    sweepDegreesPerSecond_ = 18.0f;
     sweepClockInitialized_ = false;
     lastSweepMs_ = 0;
 }
@@ -219,7 +224,8 @@ void DiagnosticState::applyTo(RuntimeInput &input, uint32_t nowMs) {
         if (sweepClockInitialized_) {
             const uint32_t elapsedMs = nowMs - lastSweepMs_;
             const float deltaDegrees =
-                static_cast<float>(sweepDirection_) * 45.0f * static_cast<float>(elapsedMs) / 1000.0f;
+                static_cast<float>(sweepDirection_) * sweepDegreesPerSecond_ *
+                static_cast<float>(elapsedMs) / 1000.0f;
             boardMagneticHeadingDegrees_ = normalizeDegrees(
                 boardMagneticHeadingDegrees_ + deltaDegrees
             );
@@ -239,8 +245,10 @@ void DiagnosticState::applyTo(RuntimeInput &input, uint32_t nowMs) {
     input.targetTrueBearingDegrees = targetTrueBearingDegrees_;
     input.magneticDeclinationDegreesEast = magneticDeclinationDegreesEast_;
     input.boardMagneticHeadingDegrees = boardMagneticHeadingDegrees_;
-    input.hasDistance = false;
-    input.distanceM = 0.0f;
+    input.hasDistance = visualDemo_;
+    input.distanceM = visualDemo_ ? 320.0f : 0.0f;
+    input.menu = visualDemo_ ? "TONKATSU" : nullptr;
+    input.priceBand = visualDemo_ ? "-" : nullptr;
     input.actionMask = actionMaskForPhase(phase_);
 }
 

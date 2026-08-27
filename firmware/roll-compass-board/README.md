@@ -20,7 +20,7 @@ under `.tools/`, with Arduino data under `.local-artifacts/`. Homebrew is not
 required. The supported board FQBN is:
 
 ```text
-esp32:esp32:waveshare_esp32_s3_touch_lcd_21
+esp32:esp32:waveshare_esp32_s3_touch_lcd_21:CDCOnBoot=cdc
 ```
 
 On Windows, use the WSL-free PowerShell wrapper instead of these macOS-oriented
@@ -70,7 +70,9 @@ RTS disabled. If macOS still interrupts boot while opening the native
 USB-Serial/JTAG port, leave the monitor connected and press the physical RST
 button once; subsequent logs and commands then use the already-open port.
 
-The serial console also drives a deterministic visual preview. Start with
+This development build starts in a deterministic visual demo without a phone
+or magnetometer: it shows `320m`, `TONKATSU`, `PRICE -`, and sweeps the needle
+at 18 degrees per second. The serial console can restart that preview with
 `sim on`, then use `target 0..359`, `heading 0..359`, `declination -180..180`,
 `sweep cw`, `sweep ccw`, `sweep stop`, and `state guiding|near|paused|arrived|calibrating|sensor-missing|anomaly`.
 `sim off` returns control to the live runtime. Simulated buttons never emit BLE

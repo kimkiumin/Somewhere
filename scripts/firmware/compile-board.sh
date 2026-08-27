@@ -12,3 +12,5 @@ arduino_cli compile \
     --jobs 1 \
     --warnings all \
     "$FIRMWARE_ROOT"
+
+rg -q '"-DARDUINO_USB_CDC_ON_BOOT=1"' "$FIRMWARE_BUILD_ROOT/compile_commands.json"

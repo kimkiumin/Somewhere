@@ -10,7 +10,8 @@ import { brotliDecompressSync } from "node:zlib";
 const ARDUINO_CLI_VERSION = "1.5.1";
 const ESP32_CORE_VERSION = "3.3.11";
 const ESP32_INDEX_URL = "https://espressif.github.io/arduino-esp32/package_esp32_index.json";
-const FIRMWARE_FQBN = "esp32:esp32:waveshare_esp32_s3_touch_lcd_21";
+const FIRMWARE_FQBN =
+  "esp32:esp32:waveshare_esp32_s3_touch_lcd_21:CDCOnBoot=cdc";
 const LIBRARIES = Object.freeze([
   "ESP32_Display_Panel@1.0.4",
   "ESP32_IO_Expander@1.1.0",

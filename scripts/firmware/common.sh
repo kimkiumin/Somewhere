@@ -11,7 +11,7 @@ ARDUINO_CONFIG_FILE="$ARDUINO_CONFIG_ROOT/arduino-cli.yaml"
 ARDUINO_DATA_ROOT="$ARDUINO_CONFIG_ROOT/data"
 FIRMWARE_ROOT="$PROJECT_ROOT/firmware/roll-compass-board"
 FIRMWARE_BUILD_ROOT="$PROJECT_ROOT/.local-artifacts/firmware-build"
-FIRMWARE_FQBN="esp32:esp32:waveshare_esp32_s3_touch_lcd_21"
+FIRMWARE_FQBN="esp32:esp32:waveshare_esp32_s3_touch_lcd_21:CDCOnBoot=cdc"
 
 arduino_cli() {
     "$ARDUINO_CLI" --config-file "$ARDUINO_CONFIG_FILE" "$@"
