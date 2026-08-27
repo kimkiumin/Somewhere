@@ -220,6 +220,13 @@ bool DiagnosticState::enabled() const {
     return enabled_;
 }
 
+void DiagnosticState::applyForRuntime(RuntimeInput &input, uint32_t nowMs) {
+    if (enabled_ && input.bleConnected && input.snapshotFresh) {
+        enabled_ = false;
+    }
+    applyTo(input, nowMs);
+}
+
 void DiagnosticState::resetSimulation() {
     enabled_ = true;
     visualDemo_ = true;

@@ -501,6 +501,20 @@ static void assertVisualDemoStartsAutomatically() {
     assertNear(counterClockwiseModel.targetNeedleAngleDegrees, 47.0f);
 }
 
+static void assertFreshBleSnapshotTakesOverFromAutomaticVisualDemo() {
+    roll_compass::DiagnosticState diagnostic;
+    auto liveInput = credibleGuidanceInput();
+    liveInput.distanceM = 1650.0f;
+    liveInput.menu = "WARM KOREAN";
+    liveInput.priceBand = "medium";
+    const auto expected = liveInput;
+
+    diagnostic.applyForRuntime(liveInput, 1000);
+
+    assert(!diagnostic.enabled());
+    assertRuntimeInputEquals(liveInput, expected);
+}
+
 static void assertDiagnosticSweep() {
     roll_compass::DiagnosticState diagnostic;
     assert(roll_compass::applyDiagnosticCommand(
@@ -859,6 +873,7 @@ int main() {
     assertStrictBleV2Parsing();
     assertDiagnosticParsing();
     assertVisualDemoStartsAutomatically();
+    assertFreshBleSnapshotTakesOverFromAutomaticVisualDemo();
     assertDiagnosticStateInjection();
     assertDiagnosticSweep();
     assertCircularLayoutContainment();

@@ -246,7 +246,10 @@ starts at 35 degrees and moves back and forth from 23 to 47 degrees on an
 eight-second loop. Demo status and action controls are hidden. Useful serial
 commands for overriding or restarting it are `sim on`,
 `target 315`, `heading 0`, `sweep cw`, `state near`, `sweep stop`, and
-`sim off`. Simulation cannot send real BLE actions.
+`sim off`. The first fresh, valid BLE v2 snapshot automatically hands display
+control to the app, including its distance, first menu, and price values; the
+`320m / TONKATSU / PRICE -` scene remains the phone-free source preview only.
+Simulation cannot send real BLE actions.
 
 ## Working on iOS source from Windows
 

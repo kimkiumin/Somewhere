@@ -102,9 +102,9 @@ roll_compass::RuntimeInput buildRuntimeInput(uint32_t nowMs) {
 
 void renderRuntime(uint32_t nowMs) {
     roll_compass::RuntimeInput input = buildRuntimeInput(nowMs);
+    diagnosticState.applyForRuntime(input, nowMs);
     const bool simulationEnabled = diagnosticState.enabled();
     bleEventTransportEnabled = !simulationEnabled;
-    diagnosticState.applyTo(input, nowMs);
     displayUiSetModel(
         roll_compass::reduceRuntime(input),
         currentState.sequence,

@@ -33,6 +33,7 @@ struct DiagnosticCommand {
 class DiagnosticState {
 public:
     bool enabled() const;
+    void applyForRuntime(RuntimeInput &input, uint32_t nowMs);
     void applyTo(RuntimeInput &input, uint32_t nowMs);
 
 private:
