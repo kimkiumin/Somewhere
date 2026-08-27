@@ -97,10 +97,23 @@ When disconnected or when the last state is stale, the board hides the arrow
 and disables touch actions. The phone's existing safety controls remain the
 authority.
 
-The board display follows the Roll Compass moodboard: a warm circular compass
-face, antique-brass shell, oxblood needle, pulsing treasure signal, and rounded
-touch actions. The iPhone remains the source of truth for the needle bearing;
-the board does not calculate its own heading.
+The current board visual source is collaborator commit
+`3022401c02e92204d2751f569b19745024724c80` on
+`codex/full-blueprint`. It replaces the earlier warm antique board concept with
+a black 480-by-480 instrument, off-white ticks, neon-green remaining/price/menu
+readouts, and a pink-red needle. The exact source artwork is
+`prototype/compass-ui/artboard-3-2.svg`; the standalone
+`SomewhereDisplaySmokeTest` is panel evidence, not a replacement for the
+validated BLE renderer and state machine. The iPhone remains the source of
+truth for the needle bearing and display data; the board does not calculate its
+own heading.
+
+The phone already sends distance (`d`), a credible phone-computed bearing
+(`b`), up to two broad menu strings (`m`), and the price-band token (`p`). The
+board renders the first menu. Suppressed, paused, recovering, disconnected, or
+stale states must hide the precise needle. The collaborator smoke-test font is
+ASCII-only, so final board integration must add the required Korean glyphs or a
+documented display fallback without changing the app/backend source strings.
 
 ## First connection flow
 

@@ -34,6 +34,9 @@ CoreBluetooth, 알림, 카메라, 성능, 화면 밝기, 터치 감각은 Mac과
 
 - 앱 통합 브랜치: `codex/ipad-board-integration`
 - 보드 통합 브랜치: `codex/roll-compass-native-app`
+- 협업자 원형 LCD 원본 브랜치: `codex/full-blueprint`
+- 협업자 원형 LCD 원본 SHA:
+  `3022401c02e92204d2751f569b19745024724c80`
 - 앱 기준: 항상 `origin/codex/ipad-board-integration`의 정확한 40자 SHA
 - 보드 기준 SHA:
   `249ac2fe76818495bd7213058cd1efa6c5bf7d66`
@@ -42,6 +45,41 @@ CoreBluetooth, 알림, 카메라, 성능, 화면 밝기, 터치 감각은 Mac과
 
 시안 파일명, 이슈, Appetize 링크에는 반드시 앱 또는 보드 SHA를 적는다.
 “최신 버전”만 적으면 같은 화면인지 재현할 수 없다.
+
+### 2026-08-27 협업자 원형 LCD 원본 영수증
+
+협업자 SHA `3022401c02e92204d2751f569b19745024724c80`의
+`feat: add ESP32 compass display firmware`가 현재 원형 LCD 시각 원본이다.
+이 커밋은 독립 브라우저 프로토타입과 ESP32 화면 smoke test를 추가했으며,
+운영 SwiftUI 앱·V2 백엔드·BLE v1 계약을 교체하지 않았다.
+
+두 브랜치는 서로 다른 Git root를 가지므로 브랜치 전체 merge 또는 commit
+cherry-pick을 하지 않는다. 보드 통합 담당자는 다음 원본을 정확한 SHA에서
+읽고, 검증된 `firmware/roll-compass-board`의 renderer에 시각 자산과 표시
+규칙만 선택적으로 포팅한다.
+
+- `prototype/compass-ui/artboard-3-2.svg`
+- `prototype/compass-ui/firmware-preview.png`
+- `prototype/compass-ui/compass-ui.js`
+- `prototype/compass-ui/compass-ui.test.js`
+- `hardware/esp32-s3-touch-lcd-2.1/SomewhereDisplaySmokeTest/`
+
+원본은 검정 `#050706` 계기판, 얇은 미색 눈금, 초록 `#4dff76` 정보,
+분홍-빨강 `#ff3850` 바늘로 구성된다. 상단은 `REMAINING`, 좌하단은
+`PRICE`, 우하단은 `MENU`다. 앱이 BLE v1로 이미 보내는 값은 다음처럼
+그대로 연결한다.
+
+| LCD 표시 | BLE v1 값 | 앱 측 규칙 |
+| --- | --- | --- |
+| `REMAINING` | `d` | 신뢰 가능한 안내는 현재 거리, 억제 상태는 안전한 근사 거리 |
+| 분홍 바늘 | `b` | `c=credible`일 때만 표시; stale·paused·recovery에서는 숨김 |
+| `MENU` | `m[0]` | 최대 두 개 중 첫 대표 메뉴, 목적지 이름·주소는 전송하지 않음 |
+| `PRICE` | `p` | 백엔드 공개 계약의 price band token |
+
+smoke-test 폰트는 영문·숫자만 포함해 한국어 메뉴가 `?`로 대체될 수 있다.
+이 제약 때문에 앱이나 백엔드의 한국어 원본을 몰래 영문으로 바꾸지 않는다.
+최종 보드 통합은 필요한 한국어 glyph 또는 명시적으로 문서화한 표시 fallback을
+추가해야 하며, `?` 표시는 전시 최종 PASS가 아니다.
 
 ## Windows에서 앱을 직접 보는 가장 짧은 경로
 
@@ -161,12 +199,17 @@ YYYY-MM-DD_surface_state_device_short-name.ext
 - 캔버스 `480×480`, 좌상단 원점
 - 회전 중심 `(240,240)`
 - 주요 텍스트·터치·바늘의 critical safe radius `214 px`
-- 앤티크 shell과 빨간 needle은 별도 투명 에셋
-- 바늘은 중심 허브에서 회전하고 shell 밖으로 보이지 않음
+- 협업자 SHA `3022401c`의 `artboard-3-2.svg`를 시각 정본으로 사용
+- 검정 계기판 위에 초록 `REMAINING / PRICE / MENU`와 분홍 바늘을 표시
+- 바늘은 중심 허브에서 회전하고 원형 화면의 critical radius 밖으로 보이지 않음
 - 상태별 `Boot`, `Pairing`, `Sensor missing`, `Calibrating`, `Ready`,
   `Guiding`, `Near`, `Paused`, `Arrived`, `Stale`, `Magnetic anomaly`,
   `Update required`를 구분
 - BOOT 짧은 누름과 RST의 기대 결과를 시안에 명시
+
+협업자 `SomewhereDisplaySmokeTest`는 패널·백라이트·터치·정적 화면을 확인하는
+독립 firmware evidence다. BLE, 상태머신, stale 억제, action authority가 있는
+현재 보드 firmware를 통째로 대체하지 않는다.
 
 현재 보드 구현이 움직이는 동안 Windows LVGL 미리보기를 따로 복제하면 실제
 펌웨어와 갈라질 위험이 있다. 보드 브랜치의 Windows 도구 작업이 안정 SHA로
