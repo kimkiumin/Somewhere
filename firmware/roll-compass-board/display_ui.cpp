@@ -30,7 +30,9 @@ constexpr uint8_t kStopAction = 1U << 0;
 constexpr uint8_t kContinueAction = 1U << 1;
 constexpr uint8_t kConfirmStopAction = 1U << 2;
 constexpr uint8_t kRevealAction = 1U << 3;
-constexpr lv_opa_t kReadoutLabelOpacity = 168;
+// Keep the source-derived green hierarchy, but make the three fixed readout
+// labels fully legible on the small, high-contrast circular panel.
+constexpr lv_opa_t kReadoutLabelOpacity = LV_OPA_COVER;
 
 // These values are the collaborator's source SVG palette, expressed at the
 // RGB565 display boundary. The geometry is kept in compass_artwork.h.
