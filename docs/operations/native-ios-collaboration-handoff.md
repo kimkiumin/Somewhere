@@ -381,9 +381,17 @@ Final evidence from this review:
   the real Worker E2E is 5 passed and 0 failed. The Worker run also verifies
   the guarded replacement `no_fit` screen and confirms its process, port, and
   temporary state cleanup receipts on macOS.
-- JavaScript regression: app 183 passed, server 238 passed, contracts 15
+- JavaScript regression: app 183 passed, server 240 passed, contracts 15
   passed; all three workspaces typecheck successfully, lint has no errors, and
   `bun audit` reports no vulnerabilities.
+- On 2026-08-27 the reviewed route snapshots reached their declared
+  2026-08-26 expiry, so production correctly began returning `no_fit`. Local
+  historical regression now pins only provider-fixture evaluation to
+  2026-08-01 and projects the reviewed remaining route lifetime onto the live
+  runtime clock. The test-only control remains unavailable outside `local`; it
+  does not renew production rights or evidence. Curl and real-Worker browser
+  flows also bind the current Stop-first Reveal rule and the truthful
+  one-restaurant guarded-recovery `no_fit` result.
 - Final 368 × 800 visual captures are in the ignored local directory
   `.local-artifacts/audit-2026-08-21-final/`: launch, following, paused,
   route-recovery, arrived-rich, feedback, and credible-guidance heading.
@@ -412,7 +420,8 @@ SOMEWHERE_PROXY_LOG=1 SOMEWHERE_UPSTREAM_PROTOCOL=https \
 ```
 
 This evidence does not close the external gates: Apple signing/TestFlight,
-physical walking accuracy, provider rights and dietary/allergen review, legal
+physical walking accuracy, renewed provider route/rights evidence and
+dietary/allergen review, legal
 review, Cloudflare secrets/domains, and the Linux-only release authority gate
 still require their respective owners. On macOS, `bun run verify:v2` reaches
 the existing operations process tests but cannot finish their Linux-oriented

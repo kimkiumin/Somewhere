@@ -5,6 +5,7 @@ import { type BrowserContext, expect, type Page } from "@playwright/test";
 const BASE_URL = process.env.SOMEWHERE_PREPARED_BASE_URL ?? "https://127.0.0.1:8787/";
 const CONTROL_URL = new URL("/api/test/v2-control", BASE_URL).href;
 const CONTROL_KEY = "somewhere-v2-local-qa";
+const FIXTURE_VALID_NOW_MS = Date.parse("2026-08-01T00:00:00Z");
 const EVIDENCE_DIR = process.env.V2_EVIDENCE_DIR ?? "../.omo/evidence/task-19";
 const LOCAL_SENSOR_CONTROL = "__somewhereV2LocalSensorControl";
 
@@ -164,6 +165,7 @@ export async function driveCredibleArrival(page: Page): Promise<void> {
 }
 
 export async function ready(page: Page): Promise<void> {
+  expect(await control(page, 0, false, FIXTURE_VALID_NOW_MS)).toMatchObject({ status: 200 });
   await page.goto(".");
   await expect(page.getByRole("heading", { name: "어딘가로 떠나볼까요?" })).toBeVisible();
   await page.getByRole("button", { name: "시작하기" }).click();
@@ -192,16 +194,19 @@ export async function verifyOfflineShell(page: Page): Promise<readonly string[]>
   });
 }
 
-export function control(page: Page, clockOffsetMs: number, grantFeedbackConsent: boolean) {
-  return page.evaluate(
-    async ({ clockOffsetMs: offset, grantFeedbackConsent: grant, key, url }) => {
-      const response = await fetch(url, {
-        body: JSON.stringify({ clockOffsetMs: offset, grantFeedbackConsent: grant }),
-        headers: { "content-type": "application/json", "x-somewhere-v2-control": key },
-        method: "PUT",
-      });
-      return { body: await response.text(), status: response.status };
+export async function control(
+  page: Page,
+  clockOffsetMs: number,
+  grantFeedbackConsent: boolean,
+  fixtureNowMs?: number,
+) {
+  const response = await page.request.put(CONTROL_URL, {
+    data: {
+      clockOffsetMs,
+      grantFeedbackConsent,
+      ...(fixtureNowMs === undefined ? {} : { fixtureNowMs }),
     },
-    { clockOffsetMs, grantFeedbackConsent, key: CONTROL_KEY, url: CONTROL_URL },
-  );
+    headers: { "x-somewhere-v2-control": CONTROL_KEY },
+  });
+  return { body: await response.text(), status: response.status() };
 }

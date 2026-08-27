@@ -11,12 +11,14 @@ const controlBodySchema = z
       .int()
       .min(0)
       .max(7 * 24 * 60 * 60 * 1_000),
+    fixtureNowMs: z.number().int().min(0).nullable().optional(),
     grantFeedbackConsent: z.boolean().default(false),
   })
   .strict()
   .readonly();
 
 let clockOffsetMs = 0;
+let fixtureNowMs: number | undefined;
 
 export async function handleV2LocalControl(
   request: Request,
@@ -37,10 +39,16 @@ export async function handleV2LocalControl(
     return jsonResponse({ contractVersion: 1, error: { code: "schema_invalid" } }, 400);
   }
   clockOffsetMs = parsed.data.clockOffsetMs;
+  if (parsed.data.fixtureNowMs !== undefined) {
+    fixtureNowMs = parsed.data.fixtureNowMs ?? undefined;
+  }
   const consentRows = parsed.data.grantFeedbackConsent
     ? await grantFeedbackConsent(database, v2RuntimeNow(environment))
     : 0;
-  return jsonResponse({ clockOffsetMs, consentRows, contractVersion: 1 }, 200);
+  return jsonResponse(
+    { clockOffsetMs, consentRows, contractVersion: 1, fixtureNowMs: fixtureNowMs ?? null },
+    200,
+  );
 }
 
 export function v2RuntimeNow(
@@ -50,8 +58,13 @@ export function v2RuntimeNow(
   return wallClock() + (environment === "local" ? clockOffsetMs : 0);
 }
 
+export function v2FixtureNow(environment: DeploymentEnvironment, runtimeNow: number): number {
+  return environment === "local" ? (fixtureNowMs ?? runtimeNow) + clockOffsetMs : runtimeNow;
+}
+
 export function resetV2LocalControl(): void {
   clockOffsetMs = 0;
+  fixtureNowMs = undefined;
 }
 
 async function grantFeedbackConsent(

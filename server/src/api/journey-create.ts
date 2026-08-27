@@ -3,6 +3,7 @@ import { JourneyCreateBodyV1Schema } from "../../../contracts/src/journey";
 
 import type { JourneyDurableObject } from "../journey/durable-object";
 import { hmacDigest, isCanonicalToken, randomBase64Url } from "../security/tokens";
+import { v2FixtureNow } from "../testing/v2-local-control";
 import { jsonResponse, publicError } from "./http-response";
 import { buildJourneyPreparation } from "./journey-composition";
 import { consumeRecoveryDigest, findGuard, persistPreparation } from "./journey-persistence";
@@ -82,7 +83,7 @@ export async function createJourney(
       guard?.previous_candidate_digest === null ||
       guard?.previous_candidate_digest === undefined
     ) {
-      return publicError("recovery_review_required");
+      return publicError("capability_invalid");
     }
     previousMemberDigest = await resolvePreviousMemberDigest(
       env.DB,
@@ -182,7 +183,8 @@ async function createReservedJourney(
   const prepared = await buildJourneyPreparation({
     body: input.body,
     journeyId: input.journeyId,
-    now: new Date(input.now),
+    now: new Date(v2FixtureNow(input.env.ENVIRONMENT, input.now)),
+    runtimeNow: new Date(input.now),
     ...(input.previousMemberDigest === undefined
       ? {}
       : { previousMemberDigest: input.previousMemberDigest }),
