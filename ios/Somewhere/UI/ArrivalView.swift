@@ -9,7 +9,7 @@ struct ArrivalView: View {
         Group {
             if layout.isExhibition {
                 adaptiveContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
                 ScrollView(showsIndicators: false) {
                     adaptiveContent
@@ -35,7 +35,7 @@ struct ArrivalView: View {
                 }
             }
             .frame(maxWidth: layout.arrivalContentMaxWidth)
-            .frame(maxWidth: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity, alignment: .center)
         } else {
             VStack(spacing: 16) {
                 primaryPane

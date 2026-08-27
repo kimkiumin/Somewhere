@@ -113,6 +113,32 @@ final class JourneyStoreTests: XCTestCase {
         let value = try projection(phase: "paused", revealed: false)
         XCTAssertTrue(value.actions.contains(.reveal))
     }
+    func testSafetyRevealReturnsToPausedDecisionControls() async throws {
+        let service = ExhibitionJourneyService()
+        let origin = LocationSample(
+            coordinate: Coordinate(latitude: 37.54385, longitude: 127.03695),
+            horizontalAccuracyM: 5,
+            capturedAt: Date()
+        )
+        let readyResponse = try await service.perform(
+            .create(category: "restaurant", maxWalkMinutes: 25, budgetBand: "medium", origin: origin),
+            current: nil
+        )
+        let ready = try XCTUnwrap(readyResponse)
+        let followingResponse = try await service.perform(.commit, current: ready)
+        let following = try XCTUnwrap(followingResponse)
+        let pausedResponse = try await service.perform(.requestStop, current: following)
+        let paused = try XCTUnwrap(pausedResponse)
+        let store = JourneyStore(service: service)
+        store.applyServerProjection(paused)
+        store.showsStopConfirmation = false
+
+        await store.submitRevealReason("safety")
+
+        XCTAssertEqual(store.projection?.phase, .paused)
+        XCTAssertEqual(store.projection?.revealed, true)
+        XCTAssertTrue(store.showsStopConfirmation)
+    }
     func testNearPreservesHiddenIdentity() throws { XCTAssertNil(try projection(phase: "near", revealed: false).reveal) }
     func testArrivedProjectionIsAlreadyRevealed() throws {
         let value = try projection(phase: "arrived", revealed: true)

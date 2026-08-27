@@ -1,6 +1,6 @@
 # 비-Mac 협업자용 iOS 인수인계
 
-상태: 2026-08-26 기준 `Roll the compass!` 네이티브 앱 협업 진입점
+상태: 2026-08-28 기준 `Roll the compass!` 네이티브 앱 협업 진입점
 
 이 문서는 Windows, ChromeOS, GitHub 웹처럼 Xcode를 실행할 수 없는
 환경의 사람과 AI 협업자를 위한 문서다. 이 문서만으로 제품 의도, 최신
@@ -89,6 +89,24 @@ Core Location을 사용한다. Debug 기본값만 전시장에서 안정적으�
 아니다. 네트워크 응답과 실내 GPS 입력만 Debug 전용 결정적 데이터로
 대체한다.
 
+### 발표 직전 60초 시연 순서
+
+Debug 전시 앱은 인터넷과 실내 GPS 없이도 Home Screen에서 바로 실행된다.
+
+1. 앱 아이콘으로 실행하고 중앙 나침반을 누른다.
+2. 빨간 바늘이 움직이고 남은 거리가 약 1.4km부터 자동으로 줄어드는 것을
+   보여 준다.
+3. `멈춤`을 눌러 즉시 일시정지한 뒤 `계속하기`로 같은 여정을 이어 간다.
+4. 필요하면 다시 `멈춤` → `목적지 정보 확인` → 공개 사유 하나를 누른다.
+   공개 후에도 `계속하기`, `외부 지도 열기`, `여정 끝내기`가 남아 다음
+   조작을 선택할 수 있다.
+5. 조작하지 않고 기다리면 가까움·도착 판정과 목적지 공개까지 자동으로
+   이어진다.
+
+세로 iPad의 목적지 공개 사유는 2열 한 화면에 모두 표시된다. 핵심 시연
+흐름에서 내용을 보기 위해 위아래로 스크롤하지 않는다. Release에는 이
+결정적 이동 재생이 포함되지 않는다.
+
 ## 런타임 데이터 흐름
 
 ```text
@@ -125,6 +143,8 @@ UI 테스트는 기존 테스트 의미가 바뀌지 않도록 `--ui-test-*` 인
 | 안내·도착 계산 | `ios/Somewhere/Domain/GuidanceEngine.swift`, `ArrivalGate.swift` |
 | 화면 라우팅 | `ios/Somewhere/UI/RootView.swift` |
 | 진행 화면과 나침반 | `ios/Somewhere/UI/CompassView.swift`, `SomewhereCompass.swift` |
+| iPad 비율·시트 폭 | `ios/Somewhere/UI/SomewhereLayout.swift`, `RootView.swift` |
+| 중단·목적지 공개 사유 | `ios/Somewhere/UI/StopConfirmationView.swift`, `JourneyReasonViews.swift` |
 | 색·간격·버튼 토큰 | `ios/Somewhere/UI/SomewhereStyle.swift` |
 | 나침반·폰트·아이콘 | `ios/Somewhere/Resources/` |
 | 빌드 설정·타깃·파일 포함 | `ios/project.yml` |

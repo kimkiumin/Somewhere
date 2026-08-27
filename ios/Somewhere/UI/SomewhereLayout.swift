@@ -39,7 +39,7 @@ struct SomewhereLayoutMetrics: Equatable, Sendable {
             contentMaxWidth: contentWidth,
             horizontalPadding: padding,
             compassDiameter: compassDiameter,
-            arrivalContentMaxWidth: contentWidth * 0.80,
+            arrivalContentMaxWidth: contentWidth * 0.88,
             sheetMaxWidth: 620,
             columnSpacing: 28
         )

@@ -34,21 +34,25 @@ struct RootView: View {
                 SomewhereBoundedSheet {
                     StopConfirmationView(store: store)
                 }
+                .environment(\.somewhereLayout, layout)
             }
             .sheet(isPresented: $store.showsFeedback) {
                 SomewhereBoundedSheet {
                     FeedbackView(store: store)
                 }
+                .environment(\.somewhereLayout, layout)
             }
             .sheet(isPresented: $store.showsRevealReason) {
                 SomewhereBoundedSheet {
                     RevealReasonView(store: store)
                 }
+                .environment(\.somewhereLayout, layout)
             }
             .sheet(isPresented: $store.showsExternalMapWarning) {
                 SomewhereBoundedSheet {
                     ExternalMapWarningView(store: store)
                 }
+                .environment(\.somewhereLayout, layout)
             }
             .sheet(isPresented: $store.showsProfileSetup) {
                 SomewhereBoundedSheet {
@@ -56,6 +60,7 @@ struct RootView: View {
                         store.saveProfile(dietary: dietary, allergies: allergies)
                     }
                 }
+                .environment(\.somewhereLayout, layout)
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {

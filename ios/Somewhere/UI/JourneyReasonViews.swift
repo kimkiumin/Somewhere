@@ -51,46 +51,78 @@ struct RevealReasonView: View {
             Text("목적지 이름과 주소가 공개돼요. 안내는 계속할 수 있어요.")
                 .font(.subheadline)
                 .foregroundStyle(SomewherePalette.mutedInk)
-            VStack(spacing: 10) {
-                ForEach(reasons, id: \.0) { reason in
-                    Button {
-                        SomewhereHaptics.impact()
-                        Task { await store.submitRevealReason(reason.0) }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "arrow.up.right.circle")
-                                .foregroundStyle(SomewherePalette.accent)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(reason.1).font(.subheadline.weight(.semibold))
-                                Text(reason.2).font(.caption).foregroundStyle(SomewherePalette.mutedInk)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(SomewherePalette.mutedInk)
+            if layout.isExhibition {
+                VStack(spacing: 10) {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 10),
+                            GridItem(.flexible(), spacing: 10),
+                        ],
+                        spacing: 10
+                    ) {
+                        ForEach(reasons, id: \.0) { reason in
+                            reasonButton(reason, compact: true)
                         }
-                        .padding(15)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(SomewherePalette.cardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(SomewherePalette.border, lineWidth: 1) }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("공개 사유 \(reason.1)")
-                    .accessibilityIdentifier("somewhere.reveal-reason.\(reason.0)")
+                    skipReasonButton
                 }
-                Button {
-                    SomewhereHaptics.impact()
-                    Task { await store.submitRevealReason("skipped") }
-                } label: {
-                    Text("사유를 건너뛰고 확인")
-                        .frame(maxWidth: .infinity, minHeight: 44)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(reasons, id: \.0) { reason in
+                        reasonButton(reason, compact: false)
+                    }
+                    skipReasonButton
                 }
-                .buttonStyle(SomewhereSecondaryButtonStyle())
-                .accessibilityLabel("공개 사유를 건너뛰고 목적지 확인")
-                .accessibilityIdentifier("somewhere.reveal-reason-skipped")
             }
         }
         .padding(20)
+    }
+
+    private func reasonButton(_ reason: (String, String, String), compact: Bool) -> some View {
+        Button {
+            SomewhereHaptics.impact()
+            Task { await store.submitRevealReason(reason.0) }
+        } label: {
+            HStack(spacing: compact ? 9 : 12) {
+                Image(systemName: "arrow.up.right.circle")
+                    .foregroundStyle(SomewherePalette.accent)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(reason.1)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                    Text(reason.2)
+                        .font(.caption)
+                        .foregroundStyle(SomewherePalette.mutedInk)
+                        .lineLimit(compact ? 1 : 2)
+                        .minimumScaleFactor(0.82)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(SomewherePalette.mutedInk)
+            }
+            .padding(compact ? 12 : 15)
+            .frame(maxWidth: .infinity, minHeight: compact ? 68 : nil, alignment: .leading)
+            .background(SomewherePalette.cardStrong, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(SomewherePalette.border, lineWidth: 1) }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("공개 사유 \(reason.1)")
+        .accessibilityIdentifier("somewhere.reveal-reason.\(reason.0)")
+    }
+
+    private var skipReasonButton: some View {
+        Button {
+            SomewhereHaptics.impact()
+            Task { await store.submitRevealReason("skipped") }
+        } label: {
+            Text("사유를 건너뛰고 확인")
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(SomewhereSecondaryButtonStyle())
+        .accessibilityLabel("공개 사유를 건너뛰고 목적지 확인")
+        .accessibilityIdentifier("somewhere.reveal-reason-skipped")
     }
 }
 

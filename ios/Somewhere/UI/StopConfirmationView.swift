@@ -18,7 +18,7 @@ struct StopConfirmationView: View {
             Image(systemName: "figure.walk.motion")
                 .font(.system(size: 42))
                 .foregroundStyle(SomewherePalette.accent)
-            Text("정말 중단할까요?")
+            Text(store.projection?.revealed == true ? "안내를 어떻게 이어갈까요?" : "정말 중단할까요?")
                 .font(.title2.weight(.bold))
             Text("계속하면 같은 여정을 이어가고, 끝내면 방향 안내가 즉시 종료돼요.")
                 .foregroundStyle(SomewherePalette.mutedInk)
@@ -30,13 +30,15 @@ struct StopConfirmationView: View {
                 .buttonStyle(SomewherePrimaryButtonStyle())
                 .accessibilityLabel("같은 여정 계속하기")
                 .accessibilityIdentifier("somewhere.continue-journey")
-            Button("목적지 정보 확인") {
-                store.showsStopConfirmation = false
-                store.requestReveal()
+            if store.projection?.revealed != true {
+                Button("목적지 정보 확인") {
+                    store.showsStopConfirmation = false
+                    store.requestReveal()
+                }
+                .buttonStyle(SomewhereSecondaryButtonStyle())
+                .accessibilityLabel("중단 화면에서 목적지 정보 확인")
+                .accessibilityIdentifier("somewhere.paused-reveal")
             }
-            .buttonStyle(SomewhereSecondaryButtonStyle())
-            .accessibilityLabel("중단 화면에서 목적지 정보 확인")
-            .accessibilityIdentifier("somewhere.paused-reveal")
             if store.isGuidancePaused || store.projection?.phase == .paused {
                 Button("외부 지도 열기") {
                     store.showsStopConfirmation = false

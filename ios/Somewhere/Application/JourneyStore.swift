@@ -282,6 +282,9 @@ final class JourneyStore: ObservableObject {
         showsRevealReason = false
         lastRevealReason = reason
         await execute(.reveal)
+        if projection?.phase == .paused {
+            showsStopConfirmation = true
+        }
     }
 
     func skipStopReason() async {

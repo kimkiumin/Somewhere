@@ -13,20 +13,19 @@ final class JourneyFlowUITests: XCTestCase {
         app.launch()
 
         let onboarding = app.buttons["somewhere.onboarding-continue"]
-        if onboarding.waitForExistence(timeout: 3) {
-            onboarding.tap()
+        if onboarding.waitForExistence(timeout: 10) {
             let profileSave = app.buttons["somewhere.profile-save"]
-            if profileSave.waitForExistence(timeout: 3) { profileSave.tap() }
+            XCTAssertTrue(tap(onboarding, until: profileSave, timeout: 5))
         }
         let profileSave = app.buttons["somewhere.profile-save"]
-        if profileSave.exists { profileSave.tap() }
-
         let start = app.buttons["somewhere.start-journey"]
-        XCTAssertTrue(start.waitForExistence(timeout: 3))
-        start.tap()
+        if profileSave.exists {
+            XCTAssertTrue(tap(profileSave, until: start, timeout: 5))
+        }
 
+        XCTAssertTrue(start.waitForExistence(timeout: 8))
         let stop = app.buttons["somewhere.stop"]
-        XCTAssertTrue(stop.waitForExistence(timeout: 8))
+        XCTAssertTrue(tap(start, until: stop, timeout: 8))
         XCTAssertTrue(app.otherElements["somewhere.guidance-compass"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.descendants(matching: .any)["somewhere.error"].exists)
 
@@ -35,6 +34,45 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertTrue(resume.waitForExistence(timeout: 3))
         resume.tap()
         XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["somewhere.error"].exists)
+    }
+
+    func testExhibitionDemoSafetyRevealReturnsToPausedControls() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--exhibition-demo",
+            "--ui-test-no-notifications",
+            "--ui-test-reset-preferences",
+        ]
+        app.launch()
+
+        let onboarding = app.buttons["somewhere.onboarding-continue"]
+        if onboarding.waitForExistence(timeout: 10) {
+            let profileSave = app.buttons["somewhere.profile-save"]
+            XCTAssertTrue(tap(onboarding, until: profileSave, timeout: 5))
+        }
+        let profileSave = app.buttons["somewhere.profile-save"]
+        let start = app.buttons["somewhere.start-journey"]
+        if profileSave.exists {
+            XCTAssertTrue(tap(profileSave, until: start, timeout: 5))
+        }
+
+        XCTAssertTrue(start.waitForExistence(timeout: 8))
+        let stop = app.buttons["somewhere.stop"]
+        XCTAssertTrue(tap(start, until: stop, timeout: 8))
+        stop.tap()
+
+        let reveal = app.buttons["somewhere.paused-reveal"]
+        XCTAssertTrue(reveal.waitForExistence(timeout: 3))
+        reveal.tap()
+        let safety = app.buttons["somewhere.reveal-reason.safety"]
+        XCTAssertTrue(safety.waitForExistence(timeout: 3))
+        safety.tap()
+
+        XCTAssertTrue(app.staticTexts["somewhere.revealed-name"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["somewhere.continue-journey"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["somewhere.confirm-stop"].exists)
+        XCTAssertFalse(app.buttons["somewhere.paused-reveal"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["somewhere.error"].exists)
     }
 
@@ -251,7 +289,7 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertLessThanOrEqual(compassWidthRatio, 0.70)
     }
 
-    func testIPadArrivalUsesVerticalRevealAtApproximateEightyPercentWidth() throws {
+    func testIPadArrivalUsesCenteredRevealAtPresentationWidth() throws {
         guard UIDevice.current.userInterfaceIdiom == .pad else {
             throw XCTSkip("The proportional arrival composition is iPad-specific")
         }
@@ -271,8 +309,12 @@ final class JourneyFlowUITests: XCTestCase {
 
         let availableWidth = window.frame.width - (36 * 2)
         let revealWidthRatio = reveal.frame.width / availableWidth
-        XCTAssertGreaterThanOrEqual(revealWidthRatio, 0.75)
-        XCTAssertLessThanOrEqual(revealWidthRatio, 0.85)
+        XCTAssertGreaterThanOrEqual(revealWidthRatio, 0.84)
+        XCTAssertLessThanOrEqual(revealWidthRatio, 0.90)
+
+        let revealCenterRatio = reveal.frame.midY / window.frame.height
+        XCTAssertGreaterThanOrEqual(revealCenterRatio, 0.35)
+        XCTAssertLessThanOrEqual(revealCenterRatio, 0.65)
     }
 
     func testIPadConditionsUsePortraitWidthAndExplicitBackWithoutScrollNavigation() throws {
@@ -493,6 +535,36 @@ final class JourneyFlowUITests: XCTestCase {
             XCTAssertTrue(app.buttons["somewhere.stop-reason.\(identifier)"].isHittable, identifier)
         }
         XCTAssertTrue(app.buttons["somewhere.skip-stop-reason"].isHittable)
+    }
+
+    func testIPadRevealReasonsFitWithoutScrolling() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("The no-scroll reveal-reason composition is iPad-specific")
+        }
+
+        let app = launchHarness("following")
+        app.buttons["somewhere.stop"].tap()
+        let pausedReveal = app.buttons["somewhere.paused-reveal"]
+        XCTAssertTrue(pausedReveal.waitForExistence(timeout: 3))
+        pausedReveal.tap()
+
+        let identifiers = [
+            "safety",
+            "route_difficulty",
+            "sensor_problem",
+            "condition_check",
+            "companion_check",
+            "curiosity",
+        ]
+
+        XCTAssertTrue(app.buttons["somewhere.reveal-reason.safety"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.scrollViews.count, 0)
+        for identifier in identifiers {
+            XCTAssertTrue(app.buttons["somewhere.reveal-reason.\(identifier)"].isHittable, identifier)
+        }
+        let skip = app.buttons["somewhere.reveal-reason-skipped"]
+        XCTAssertTrue(skip.isHittable)
+        XCTAssertGreaterThan(skip.frame.width, app.buttons["somewhere.reveal-reason.safety"].frame.width * 1.8)
     }
 
     func testRichArrivalHierarchyIsRendered() {
@@ -722,5 +794,24 @@ final class JourneyFlowUITests: XCTestCase {
         let profileSave = app.buttons["somewhere.profile-save"]
         if profileSave.exists { profileSave.tap() }
         return app
+    }
+
+    private func tap(
+        _ source: XCUIElement,
+        until target: XCUIElement,
+        timeout: TimeInterval,
+        attempts: Int = 3
+    ) -> Bool {
+        for _ in 0..<attempts {
+            if target.exists, target.isHittable { return true }
+            guard source.waitForExistence(timeout: timeout), source.isHittable else { continue }
+            source.tap()
+            let expectation = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == true AND hittable == true"),
+                object: target
+            )
+            if XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed { return true }
+        }
+        return target.exists && target.isHittable
     }
 }
