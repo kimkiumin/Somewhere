@@ -133,6 +133,7 @@ export async function buildJourneyPreparation(
     previousMemberDigest?: string;
     requestId: string;
     randomUint32?: RandomUint32;
+    runtimeNow?: Date;
   }>,
 ): Promise<JourneyPreparation> {
   const evidence = qualifyCandidates({ ...FIXTURE, candidates: CANDIDATES, now: input.now });
@@ -209,6 +210,9 @@ export async function buildJourneyPreparation(
   const receiptJson = JSON.stringify(selected.receipt);
   const receiptDigest = await sha256(receiptJson);
   const selectedMemberDigest = digestMember(selected.member).slice(7);
+  const routeExpiresAt =
+    Date.parse(reviewedRoute.route.expiresAt) +
+    ((input.runtimeNow ?? input.now).getTime() - input.now.getTime());
   return {
     disclosure: {
       policyVersion: pool.evidencePolicyVersion,
@@ -229,7 +233,7 @@ export async function buildJourneyPreparation(
     },
     route: {
       encodedPolyline: Buffer.from(JSON.stringify(geometry)).toString("base64url"),
-      expiresAt: Date.parse(reviewedRoute.route.expiresAt),
+      expiresAt: routeExpiresAt,
       geometry,
       originZoneRef,
       routeDigest: reviewedRoute.route.endpointDigest,

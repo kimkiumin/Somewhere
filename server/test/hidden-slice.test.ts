@@ -88,6 +88,25 @@ describe("hidden journey composition", () => {
     expect(replay).toBe(original);
   });
 
+  it("projects historical local route validity onto the live runtime clock", async () => {
+    // Given: a fixture replayed while its reviewed route is valid and a later runtime clock.
+    const prepared = await buildJourneyPreparation({
+      body: CREATE_INPUT,
+      journeyId: "j_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      now: new Date("2026-08-01T00:00:00Z"),
+      runtimeNow: new Date("2026-08-27T00:00:00Z"),
+      randomUint32: () => 0,
+      requestId: "req_v1.AAAAAAAAAAAAAAAAAAAAAA",
+    });
+
+    // Then: the reviewed remaining lifetime is preserved instead of returning an expired route.
+    expect(prepared.kind).toBe("ready");
+    if (prepared.kind !== "ready") {
+      throw new TypeError("reviewed fixture unexpectedly failed");
+    }
+    expect(prepared.route.expiresAt).toBe(Date.parse("2026-09-21T06:00:00Z"));
+  });
+
   it("releases route only after Commit and Reveal preserves phase", async () => {
     // Given: a ready journey produced by the reviewed fixture.
     const prepared = await buildJourneyPreparation({
