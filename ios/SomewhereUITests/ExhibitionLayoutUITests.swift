@@ -158,7 +158,12 @@ final class ExhibitionLayoutUITests: XCTestCase {
         noFit.terminate()
 
         let stopped = launchHarness("following")
-        stopped.buttons["somewhere.stop"].tap()
+        let stopConfirmation = stopped.descendants(matching: .any)["somewhere.stop-confirmation-surface"]
+        XCTAssertTrue(tap(
+            stopped.buttons["somewhere.stop"],
+            until: stopConfirmation,
+            timeout: 8
+        ))
         assertBoundedSurface(
             stopped,
             identifier: "somewhere.stop-confirmation-surface",
@@ -168,8 +173,14 @@ final class ExhibitionLayoutUITests: XCTestCase {
         stopped.terminate()
 
         let revealReason = launchHarness("following")
-        revealReason.buttons["somewhere.stop"].tap()
-        revealReason.buttons["somewhere.paused-reveal"].tap()
+        let pausedReveal = revealReason.buttons["somewhere.paused-reveal"]
+        XCTAssertTrue(tap(
+            revealReason.buttons["somewhere.stop"],
+            until: pausedReveal,
+            timeout: 8
+        ))
+        let revealReasonSurface = revealReason.descendants(matching: .any)["somewhere.reveal-reason-surface"]
+        XCTAssertTrue(tap(pausedReveal, until: revealReasonSurface, timeout: 8))
         assertBoundedSurface(
             revealReason,
             identifier: "somewhere.reveal-reason-surface",
@@ -179,8 +190,14 @@ final class ExhibitionLayoutUITests: XCTestCase {
         revealReason.terminate()
 
         let externalMap = launchHarness("following")
-        externalMap.buttons["somewhere.stop"].tap()
-        externalMap.buttons["somewhere.paused-external-map"].tap()
+        let pausedExternalMap = externalMap.buttons["somewhere.paused-external-map"]
+        XCTAssertTrue(tap(
+            externalMap.buttons["somewhere.stop"],
+            until: pausedExternalMap,
+            timeout: 8
+        ))
+        let externalMapSurface = externalMap.descendants(matching: .any)["somewhere.external-map-warning-surface"]
+        XCTAssertTrue(tap(pausedExternalMap, until: externalMapSurface, timeout: 8))
         assertBoundedSurface(
             externalMap,
             identifier: "somewhere.external-map-warning-surface",
