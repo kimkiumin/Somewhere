@@ -155,10 +155,14 @@ final class LocationController: NSObject, ObservableObject, @preconcurrency CLLo
             heading = nil
             return
         }
+        let trueHeading = value.trueHeading >= 0 ? value.trueHeading : nil
+        let declination = trueHeading.map {
+            CompassAngles.signedDelta(from: value.magneticHeading, to: $0)
+        }
         heading = HeadingSample(
-            trueHeadingDegrees: value.trueHeading >= 0 ? value.trueHeading : nil,
+            trueHeadingDegrees: trueHeading,
             magneticHeadingDegrees: value.magneticHeading,
-            magneticDeclinationDegreesEast: nil,
+            magneticDeclinationDegreesEast: declination,
             accuracyDegrees: value.headingAccuracy,
             capturedAt: value.timestamp
         )

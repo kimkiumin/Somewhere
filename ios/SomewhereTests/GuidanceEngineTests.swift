@@ -2,6 +2,12 @@ import XCTest
 @testable import Somewhere
 
 final class GuidanceEngineTests: XCTestCase {
+    func testSignedAngleDeltaWrapsAcrossNorth() {
+        XCTAssertEqual(CompassAngles.normalize(-1), 359, accuracy: 0.0001)
+        XCTAssertEqual(CompassAngles.signedDelta(from: 359, to: 1), 2, accuracy: 0.0001)
+        XCTAssertEqual(CompassAngles.signedDelta(from: 1, to: 359), -2, accuracy: 0.0001)
+    }
+
     func testCompassPulseStartsOnlyWhenEnteringPointingMode() {
         XCTAssertTrue(SomewhereCompassMotionPolicy.shouldStartPulse(from: .ready, to: .pointing(15)))
         XCTAssertFalse(SomewhereCompassMotionPolicy.shouldStartPulse(from: .pointing(15), to: .pointing(20)))
@@ -28,8 +34,8 @@ final class GuidanceEngineTests: XCTestCase {
             capturedAt: now
         )
         let heading = HeadingSample(
-            trueHeadingDegrees: 0,
-            magneticHeadingDegrees: 0,
+            trueHeadingDegrees: 90,
+            magneticHeadingDegrees: 90,
             magneticDeclinationDegreesEast: nil,
             accuracyDegrees: 5,
             capturedAt: now
@@ -37,7 +43,8 @@ final class GuidanceEngineTests: XCTestCase {
         guard case .credible(let reading) = engine.update(location: location, heading: heading, route: route, now: now) else {
             return XCTFail("expected credible route guidance")
         }
-        XCTAssertLessThan(reading.arrowDegrees, 10)
+        XCTAssertEqual(reading.arrowDegrees, 270, accuracy: 1)
+        XCTAssertEqual(reading.targetTrueBearingDegrees, 0, accuracy: 1)
 
         let poor = LocationSample(
             coordinate: location.coordinate,

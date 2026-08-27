@@ -79,6 +79,7 @@ final class JourneyStore: ObservableObject {
     let physicalCompass: any PhysicalCompassClient
     private let service: any JourneyServiceProtocol
     private let physicalCompassDefaults: UserDefaults
+    private let nowProvider: () -> Date
     private var guidanceEngine = GuidanceEngine()
     private var arrivalGate = ArrivalGate()
     private var trustedRoute: TrustedRoute?
@@ -92,6 +93,8 @@ final class JourneyStore: ObservableObject {
     private var physicalCompassSequence = 0
     private var lastPhysicalCompassSnapshot: PhysicalCompassSnapshot?
     private var pendingPhysicalCompassSnapshots: [Int: PhysicalCompassSnapshot] = [:]
+    private var latestMagneticDeclinationDegreesEast: Double?
+    private var latestHeadingCapturedAt: Date?
 
     init(
         service: any JourneyServiceProtocol,
@@ -99,7 +102,8 @@ final class JourneyStore: ObservableObject {
         notificationController: NotificationController = NotificationController(),
         physicalCompass: any PhysicalCompassClient = InertPhysicalCompassClient(),
         physicalCompassDefaults: UserDefaults = .standard,
-        physicalCompassHostEnabled: Bool? = nil
+        physicalCompassHostEnabled: Bool? = nil,
+        now: @escaping () -> Date = Date.init
     ) {
         self.service = service
         self.locationController = locationController
@@ -108,6 +112,7 @@ final class JourneyStore: ObservableObject {
         self.physicalCompassDefaults = physicalCompassDefaults
         self.isPhysicalCompassHostEnabled = physicalCompassHostEnabled
             ?? PhysicalCompassHostPersistence.load(defaults: physicalCompassDefaults)
+        nowProvider = now
         self.preferences = SomewherePreferencesPersistence.loadPreferences()
         self.profile = SomewherePreferencesPersistence.loadProfile()
         self.isOnboardingRequired = !SomewherePreferencesPersistence.hasCompletedOnboarding()
@@ -374,6 +379,8 @@ final class JourneyStore: ObservableObject {
         noFitConditions = []
         lastRevealReason = nil
         lastStopReason = nil
+        latestMagneticDeclinationDegreesEast = nil
+        latestHeadingCapturedAt = nil
         syncPhysicalCompass()
     }
 
@@ -403,10 +410,17 @@ final class JourneyStore: ObservableObject {
         presentedError = .unavailable
     }
 
-    func presentGuidanceForTesting(bearing: Double = 315, remainingM: Double = 420) {
+    func presentGuidanceForTesting(
+        bearing: Double = 315,
+        remainingM: Double = 420,
+        magneticDeclinationDegreesEast: Double? = 0
+    ) {
         isGuidancePaused = false
+        latestMagneticDeclinationDegreesEast = magneticDeclinationDegreesEast
+        latestHeadingCapturedAt = nowProvider()
         guidance = .credible(GuidanceReading(
             arrowDegrees: bearing,
+            targetTrueBearingDegrees: bearing,
             remainingM: remainingM,
             endpointDistanceM: remainingM,
             finalCorridorDeviationM: 0,
@@ -444,6 +458,8 @@ final class JourneyStore: ObservableObject {
     }
 
     func updateGuidance(location: LocationSample, heading: HeadingSample, route: TrustedRoute, now: Date) {
+        latestMagneticDeclinationDegreesEast = heading.magneticDeclinationDegreesEast
+        latestHeadingCapturedAt = heading.capturedAt
         guard !isGuidancePaused else {
             let pausedGuidance = GuidanceResult.suppressed(.routeRecovering)
             if guidance != pausedGuidance {
@@ -630,18 +646,33 @@ final class JourneyStore: ObservableObject {
             clearPhysicalCompassAuthority()
             return
         }
+        let now = nowProvider()
         let nextSequence = physicalCompassSequence + 1
         let remainingDistanceM: Double?
-        let bearingDegrees: Double?
+        let targetTrueBearingDegrees: Double?
+        let magneticDeclinationDegreesEast: Double?
         let confidence: String
         switch guidance {
         case .credible(let reading):
             remainingDistanceM = reading.remainingM
-            bearingDegrees = reading.arrowDegrees
-            confidence = "credible"
+            if let declination = latestMagneticDeclinationDegreesEast,
+               let headingCapturedAt = latestHeadingCapturedAt,
+               now >= headingCapturedAt,
+               now.timeIntervalSince(headingCapturedAt) * 1_000 <= Double(NavigationPolicy.headingMaxAgeMs),
+               declination.isFinite,
+               (-180...180).contains(declination) {
+                targetTrueBearingDegrees = reading.targetTrueBearingDegrees
+                magneticDeclinationDegreesEast = declination
+                confidence = "credible"
+            } else {
+                targetTrueBearingDegrees = nil
+                magneticDeclinationDegreesEast = nil
+                confidence = GuidanceSuppression.invalidHeading.rawValue
+            }
         case .suppressed(let reason):
             remainingDistanceM = projection?.disclosure?.routeDistanceM
-            bearingDegrees = nil
+            targetTrueBearingDegrees = nil
+            magneticDeclinationDegreesEast = nil
             confidence = reason.rawValue
         }
 
@@ -666,13 +697,14 @@ final class JourneyStore: ObservableObject {
             sequence: nextSequence,
             phase: projection?.phase.rawValue ?? "idle",
             remainingDistanceM: remainingDistanceM,
-            bearingDegrees: bearingDegrees,
+            targetTrueBearingDegrees: targetTrueBearingDegrees,
+            magneticDeclinationDegreesEast: magneticDeclinationDegreesEast,
             confidence: confidence,
             menus: menus,
             priceBand: priceBand,
             actions: actions,
             revealed: projection?.revealed == true,
-            timestampMs: Int64(Date().timeIntervalSince1970 * 1000)
+            timestampMs: Int64(now.timeIntervalSince1970 * 1_000)
         ) else { return }
         physicalCompassSequence = nextSequence
         if let inFlightSequence = pendingPhysicalCompassSnapshots.keys.min(),

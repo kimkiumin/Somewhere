@@ -37,6 +37,18 @@ describe("native iOS source gate", () => {
     expect(start).toContain("activateCentralIfNeeded()");
   });
 
+  test("pins the physical compass transport to the north-referenced V2 envelope", async () => {
+    const wire = await readFile(
+      resolve(repositoryRoot, "ios/Somewhere/Platform/PhysicalCompassWire.swift"),
+      "utf8",
+    );
+
+    expect(wire).toContain("static let contractVersion = 2");
+    expect(wire).toContain('case targetTrueBearingDegrees = "tb"');
+    expect(wire).toContain('case magneticDeclinationDegreesEast = "md"');
+    expect(wire).not.toContain('case bearing = "b"');
+  });
+
   test("retires the central across reconnects and rejects callbacks from an old manager", async () => {
     const controller = await readFile(
       resolve(repositoryRoot, "ios/Somewhere/Platform/PhysicalCompassController.swift"),

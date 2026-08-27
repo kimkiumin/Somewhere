@@ -5,7 +5,8 @@ final class PhysicalCompassWireTests: XCTestCase {
     func testCredibleStateIsCompactAndFramed() throws {
         let snapshot = try makeSnapshot(
             remainingDistanceM: 420,
-            bearingDegrees: 315,
+            targetTrueBearingDegrees: 315,
+            magneticDeclinationDegreesEast: -8.2,
             confidence: "credible",
             actions: [.stop]
         )
@@ -14,13 +15,18 @@ final class PhysicalCompassWireTests: XCTestCase {
         XCTAssertEqual(frame.last, 0x0A)
         XCTAssertLessThanOrEqual(frame.count, PhysicalCompassBLE.maxFrameBytes)
         XCTAssertTrue(String(decoding: frame, as: UTF8.self).contains("\"d\":420"))
+        XCTAssertTrue(String(decoding: frame, as: UTF8.self).contains("\"v\":2"))
+        XCTAssertTrue(String(decoding: frame, as: UTF8.self).contains("\"tb\":315"))
+        XCTAssertTrue(String(decoding: frame, as: UTF8.self).contains("\"md\":-8.2"))
+        XCTAssertFalse(String(decoding: frame, as: UTF8.self).contains("\"b\":"))
         XCTAssertFalse(String(decoding: frame, as: UTF8.self).contains("name"))
     }
 
     func testSuppressedStateOmitsUnsafeDirection() throws {
         let snapshot = try makeSnapshot(
             remainingDistanceM: nil,
-            bearingDegrees: nil,
+            targetTrueBearingDegrees: nil,
+            magneticDeclinationDegreesEast: nil,
             confidence: GuidanceSuppression.offRoute.rawValue,
             menus: ["한식 국물 요리", "조용한 식사"],
             priceBand: "medium",
@@ -29,7 +35,8 @@ final class PhysicalCompassWireTests: XCTestCase {
 
         let frame = try PhysicalCompassWire.encodeState(snapshot)
         let json = String(decoding: frame, as: UTF8.self)
-        XCTAssertFalse(json.contains("\"b\""))
+        XCTAssertFalse(json.contains("\"tb\""))
+        XCTAssertFalse(json.contains("\"md\""))
         XCTAssertTrue(json.contains("offRoute"))
         XCTAssertLessThanOrEqual(frame.count, PhysicalCompassBLE.maxFrameBytes)
     }
@@ -46,7 +53,7 @@ final class PhysicalCompassWireTests: XCTestCase {
         XCTAssertThrowsError(try PhysicalCompassWire.encodeEvent(.stop, sequence: 0)) { error in
             XCTAssertEqual(error as? PhysicalCompassWireError, .invalidSequence)
         }
-        let zero = Data("{\"v\":1,\"type\":\"event\",\"action\":\"stop\",\"seq\":0}\n".utf8)
+        let zero = Data("{\"v\":2,\"type\":\"event\",\"action\":\"stop\",\"seq\":0}\n".utf8)
         XCTAssertThrowsError(try PhysicalCompassWire.decodeEvent(zero)) { error in
             XCTAssertEqual(error as? PhysicalCompassWireError, .invalidSequence)
         }
@@ -176,12 +183,14 @@ final class PhysicalCompassWireTests: XCTestCase {
     }
 
     func testRejectsUnknownVersionActionAndInvalidNumbers() throws {
-        let unknownVersion = Data("{\"v\":2,\"type\":\"event\",\"action\":\"stop\",\"seq\":1}\n".utf8)
-        XCTAssertThrowsError(try PhysicalCompassWire.decodeEvent(unknownVersion)) { error in
-            XCTAssertEqual(error as? PhysicalCompassWireError, .invalidVersion)
+        for version in [1, 3] {
+            let unknownVersion = Data("{\"v\":\(version),\"type\":\"event\",\"action\":\"stop\",\"seq\":1}\n".utf8)
+            XCTAssertThrowsError(try PhysicalCompassWire.decodeEvent(unknownVersion)) { error in
+                XCTAssertEqual(error as? PhysicalCompassWireError, .invalidVersion)
+            }
         }
 
-        let unknownAction = Data("{\"v\":1,\"type\":\"event\",\"action\":\"erase\",\"seq\":1}\n".utf8)
+        let unknownAction = Data("{\"v\":2,\"type\":\"event\",\"action\":\"erase\",\"seq\":1}\n".utf8)
         XCTAssertThrowsError(try PhysicalCompassWire.decodeEvent(unknownAction)) { error in
             XCTAssertEqual(error as? PhysicalCompassWireError, .invalidAction)
         }
@@ -189,8 +198,23 @@ final class PhysicalCompassWireTests: XCTestCase {
         XCTAssertThrowsError(try makeSnapshot(remainingDistanceM: -.ulpOfOne)) { error in
             XCTAssertEqual(error as? PhysicalCompassWireError, .invalidNumber)
         }
-        XCTAssertThrowsError(try makeSnapshot(bearingDegrees: .infinity)) { error in
+        XCTAssertThrowsError(try makeSnapshot(targetTrueBearingDegrees: .infinity)) { error in
             XCTAssertEqual(error as? PhysicalCompassWireError, .invalidNumber)
+        }
+    }
+
+    func testDirectionFieldsMustAppearTogether() {
+        XCTAssertThrowsError(try makeSnapshot(
+            targetTrueBearingDegrees: 315,
+            magneticDeclinationDegreesEast: nil
+        )) { error in
+            XCTAssertEqual(error as? PhysicalCompassWireError, .invalidPayload)
+        }
+        XCTAssertThrowsError(try makeSnapshot(
+            targetTrueBearingDegrees: nil,
+            magneticDeclinationDegreesEast: -8.2
+        )) { error in
+            XCTAssertEqual(error as? PhysicalCompassWireError, .invalidPayload)
         }
     }
 
@@ -205,7 +229,8 @@ final class PhysicalCompassWireTests: XCTestCase {
 
     private func makeSnapshot(
         remainingDistanceM: Double? = 420,
-        bearingDegrees: Double? = 315,
+        targetTrueBearingDegrees: Double? = 315,
+        magneticDeclinationDegreesEast: Double? = 0,
         confidence: String = "credible",
         menus: [String] = ["한식 국물 요리"],
         priceBand: String? = "medium",
@@ -215,7 +240,8 @@ final class PhysicalCompassWireTests: XCTestCase {
             sequence: 14,
             phase: "following",
             remainingDistanceM: remainingDistanceM,
-            bearingDegrees: bearingDegrees,
+            targetTrueBearingDegrees: targetTrueBearingDegrees,
+            magneticDeclinationDegreesEast: magneticDeclinationDegreesEast,
             confidence: confidence,
             menus: menus,
             priceBand: priceBand,

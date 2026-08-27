@@ -72,15 +72,18 @@ The board advertises as `Roll Compass` and exposes:
 | Phone → board state write | `C1F8A101-35D1-4C53-9A03-7A1B3E620001` |
 | Board → phone event notify | `C1F8A102-35D1-4C53-9A03-7A1B3E620001` |
 
-Messages are compact UTF-8 JSON terminated by `\n`, with a 512-byte logical
+Messages use strict contract v2 compact UTF-8 JSON terminated by `\n`, with a 512-byte logical
 frame limit. iOS chunks state writes to the negotiated BLE write size; the
 board reassembles them before validation. The board rejects unknown versions,
 unknown actions, invalid numbers, oversized frames, and malformed state.
 
 Phone-to-board state contains only phase, approximate distance, phone-computed
-bearing when credible, confidence, at most two broad categories, price band,
+true-north target bearing and magnetic declination when credible, confidence,
+at most two broad categories, price band,
 reveal boolean, and currently advertised guarded actions. Destination identity
-is never sent to the board.
+is never sent to the board. The target (`tb`) and declination (`md`) fields are
+present or absent together, so invalid or stale phone heading data cannot leave
+a plausible-looking old needle.
 
 Touch intents are accepted only when the action is present in the latest phone
 projection. The iPhone maps them through `JourneyStore`:
@@ -105,15 +108,18 @@ readouts, and a pink-red needle. The exact source artwork is
 `prototype/compass-ui/artboard-3-2.svg`; the standalone
 `SomewhereDisplaySmokeTest` is panel evidence, not a replacement for the
 validated BLE renderer and state machine. The iPhone remains the source of
-truth for the needle bearing and display data; the board does not calculate its
-own heading.
+truth for route target and display data. The board derives a relative needle
+only when it also has a valid board magnetic heading; the current QMI8658 is
+not a magnetometer, so live hardware without an external heading sensor must
+show a safe sensor-missing state.
 
-The phone already sends distance (`d`), a credible phone-computed bearing
-(`b`), up to two broad menu strings (`m`), and the price-band token (`p`). The
-board renders the first menu. Suppressed, paused, recovering, disconnected, or
-stale states must hide the precise needle. The collaborator smoke-test font is
-ASCII-only, so final board integration must add the required Korean glyphs or a
-documented display fallback without changing the app/backend source strings.
+The phone sends distance (`d`), the all-or-nothing true-bearing/declination pair
+(`tb` + `md`), up to two broad menu strings (`m`), and the price-band token
+(`p`). The board renders the first menu. Suppressed, paused, recovering,
+disconnected, stale, or sensor-missing states must hide the precise needle.
+The collaborator smoke-test font is ASCII-only, so final board integration must
+add the required Korean glyphs or a documented display fallback without
+changing the app/backend source strings.
 
 ## First connection flow
 
