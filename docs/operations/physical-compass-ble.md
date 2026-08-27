@@ -137,12 +137,20 @@ black `#050706` face, off-white ticks/cardinals, green `#4DFF76` readouts, and
 pink-red `#FF3850` needle. The iPhone remains the source of truth for the needle
 bearing; the board does not calculate its own heading.
 
+The renderer offers five needle presentations without changing that source of
+truth: source 2 px line, precision spear, dual rail, balanced mechanical, and
+curved cutlass. Tap empty instrument space to advance through them. The selected
+style is board-local presentation state: it is not sent over BLE, and active
+journey action buttons take touch priority. Every style uses the same credible
+relative bearing and is hidden by the same stale/paused/recovery/sensor safety
+conditions.
+
 The display prefers two full RGB565 framebuffers in PSRAM and LVGL direct mode
 to prevent visible tearing during the needle sweep. It automatically falls
 back to partial 20-row buffers when memory or initialization is insufficient.
-The source artwork is fixed at `0°`; touching outside an active action has no
-display effect, so the readouts, ticks, cardinals, and needle remain aligned to
-the physical circular face.
+The source artwork is fixed at `0°`; tapping outside an active action changes
+only the needle presentation, so the readouts, ticks, cardinals, and bearing
+remain aligned to the physical circular face.
 
 The physical BOOT button is also the screen button after normal startup. One
 short press turns the backlight off and locks touch input; the next press wakes

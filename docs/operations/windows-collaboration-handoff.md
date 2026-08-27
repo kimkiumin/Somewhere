@@ -85,6 +85,10 @@ renderer/state integration:
 - `display_content.*` formats `d`/`p` values and truncates menu text on UTF-8
   codepoint boundaries. `display_ui.cpp` owns the circular layers, baselines,
   fixed orientation, needle animation, and guarded existing action buttons.
+- `needle_styles.*` defines five bounded vector presentations for the same
+  credible bearing: source 2 px line, precision spear, dual rail, balanced
+  mechanical, and curved cutlass. Their geometry stays inside the source
+  needle radius and does not replace the source artwork or BLE contract.
 
 The BLE v2 projection is unchanged:
 
@@ -135,8 +139,10 @@ or its panel/touch drivers into the production sketch.
 
 The target is the flat Waveshare `ESP32-S3-Touch-LCD-2.1`, not the 2.1B. Its
 480×480 circular face is filled by the compass UI at a fixed `0°` orientation.
-Touching outside an active action has no display effect; only the explicit
-journey action controls handle touch events.
+Touching empty instrument space cycles the five needle presentations and wraps
+back to the source line. This gesture changes only board-local rendering and
+does not emit a BLE event. Explicit journey action controls keep touch priority,
+and stale/paused/recovery/non-credible states hide every needle style alike.
 
 A normal short press of BOOT now toggles the backlight immediately. While dark,
 touch is locked but BLE, journey state, and firmware remain alive; the next

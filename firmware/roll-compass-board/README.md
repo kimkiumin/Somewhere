@@ -41,6 +41,12 @@ Condensed` in `univers_next_pro_thin_condensed_font.h`. It draws a black
 readout baselines and bounds are tested against the circular face; there is no
 scrolling or square card layer.
 
+The needle has five local presentation styles: the exact 2 px source line,
+precision spear, dual rail, balanced mechanical, and curved cutlass. A tap on
+empty instrument space advances to the next style and wraps back to the source
+line. Journey action buttons keep touch priority, and changing a needle style
+never emits a BLE action or changes the contract-v2 bearing/safety rules.
+
 `firmware:assets` still regenerates the Korean fallback fonts and the legacy
 asset bundle used by the Windows restore path. It is not a regeneration step
 for the collaborator's source artwork. Refresh that artwork only from the
@@ -109,9 +115,10 @@ mode. If the PSRAM reserve or panel/LVGL initialization is insufficient, it
 falls back to two 20-row internal-RAM draw buffers. Boot logs identify the
 selected `display_mode` and current PSRAM/free-heap values.
 
-The circular UI uses the source artwork at a fixed `0°` orientation. Touches
-outside active actions do not change the artwork, so the physical USB-port
-mount cannot shift the source ticks, cardinals, needle, readouts, or controls.
+The circular UI uses the source artwork at a fixed `0°` orientation. Touching
+empty instrument space cycles only the five needle presentations; it cannot
+shift the source ticks, cardinals, readouts, controls, or the underlying
+bearing. Active journey actions keep priority over this local style gesture.
 
 A short press of the physical BOOT button toggles the LCD backlight like a
 phone power button. BLE, the current journey state, and the firmware remain

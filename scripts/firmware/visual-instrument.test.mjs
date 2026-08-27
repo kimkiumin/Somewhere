@@ -44,12 +44,13 @@ test("uses the circular instrument palette and three source readouts", () => {
 test("matches the source needle and readout hierarchy without extra demo chrome", () => {
   const renderer = readFirmwareFile("display_ui.cpp");
   const layout = readFirmwareFile("compass_layout.h");
+  const needleStyles = readFirmwareFile("needle_styles.cpp");
   const diagnostics = readFirmwareFile("compass_diagnostics.cpp");
   expect(renderer).not.toContain("mountRotationDegrees");
   expect(renderer).not.toContain("displayTapped");
   expect(renderer).not.toContain("lv_obj_add_event_cb(screen");
   expect(renderer).not.toContain("needleHub");
-  expect(renderer).toContain("kInstrumentNeedleStrokeWidth");
+  expect(needleStyles).toContain("kInstrumentNeedleStrokeWidth");
   expect(layout).toContain("kInstrumentNeedleStrokeWidth = 2");
   expect(renderer).toContain("kReadoutLabelOpacity = 168");
   expect(renderer).toContain(
@@ -64,9 +65,8 @@ test("matches the source needle and readout hierarchy without extra demo chrome"
   expect(renderer).toContain(
     "lv_obj_set_style_text_opa(menuValue, kReadoutValueOpacity",
   );
-  expect(renderer).toContain(
-    "lv_obj_set_style_line_rounded(compassNeedle, true",
-  );
+  expect(renderer).toContain("nextNeedleStyle(activeNeedleStyle)");
+  expect(renderer).toContain("needleStyleClicked");
   expect(renderer).toContain("needleSpring.reset(35.0f)");
   expect(diagnostics).toContain("visualDemo_ ? 0 : actionMaskForPhase(phase_)");
 });

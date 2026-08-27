@@ -12,6 +12,7 @@
 #include "display_content.h"
 #include "display_buffer_policy.h"
 #include "needle_spring.h"
+#include "needle_styles.h"
 #include "physical_compass_wire.h"
 #include "screen_power_button.h"
 
@@ -687,6 +688,137 @@ static void assertScreenPowerButtonRespondsOnPressEdge() {
     assert(button.update(true, 10U) == ScreenPowerButtonEvent::Pressed);
 }
 
+static size_t visibleStrokeCount(const roll_compass::NeedleVisual &visual) {
+    size_t count = 0;
+    for (const auto &stroke : visual.strokes) {
+        if (stroke.visible) ++count;
+    }
+    return count;
+}
+
+static void assertNeedleStyleTouchCycle() {
+    bool seen[roll_compass::kNeedleStyleCount] = {};
+    roll_compass::NeedleStyle style = roll_compass::NeedleStyle::Source;
+    for (size_t index = 0; index < roll_compass::kNeedleStyleCount; ++index) {
+        const size_t styleIndex = static_cast<size_t>(style);
+        assert(styleIndex < roll_compass::kNeedleStyleCount);
+        assert(!seen[styleIndex]);
+        seen[styleIndex] = true;
+        style = roll_compass::nextNeedleStyle(style);
+    }
+    assert(style == roll_compass::NeedleStyle::Source);
+}
+
+static void assertNeedleStyleGeometry() {
+    const auto source = roll_compass::buildNeedleVisual(
+        roll_compass::NeedleStyle::Source,
+        0.0f
+    );
+    assert(visibleStrokeCount(source) == 1);
+    assert(source.strokes[0].pointCount == 2);
+    assert(source.strokes[0].width == 2);
+    assert(source.strokes[0].tone == roll_compass::NeedleTone::Pink);
+    assert(source.strokes[0].points[0].x == 240);
+    assert(source.strokes[0].points[0].y == 240);
+    assert(source.strokes[0].points[1].x == 240);
+    assert(source.strokes[0].points[1].y == 101);
+
+    const auto spear = roll_compass::buildNeedleVisual(
+        roll_compass::NeedleStyle::PrecisionSpear,
+        0.0f
+    );
+    bool hasFineTip = false;
+    bool hasMediumBody = false;
+    bool hasWideBase = false;
+    for (const auto &stroke : spear.strokes) {
+        if (!stroke.visible) continue;
+        assert(stroke.tone == roll_compass::NeedleTone::Pink);
+        hasFineTip = hasFineTip || stroke.width == 2;
+        hasMediumBody = hasMediumBody || stroke.width == 4;
+        hasWideBase = hasWideBase || stroke.width == 6;
+    }
+    assert(hasFineTip && hasMediumBody && hasWideBase);
+
+    const auto rail = roll_compass::buildNeedleVisual(
+        roll_compass::NeedleStyle::DualRail,
+        0.0f
+    );
+    assert(visibleStrokeCount(rail) == 2);
+    assert(rail.strokes[0].points[0].x != rail.strokes[1].points[0].x);
+    assert(rail.strokes[0].points[1].x == rail.strokes[1].points[1].x);
+    assert(rail.strokes[0].points[1].y == rail.strokes[1].points[1].y);
+
+    const auto balanced = roll_compass::buildNeedleVisual(
+        roll_compass::NeedleStyle::Balanced,
+        0.0f
+    );
+    bool hasCounterweight = false;
+    for (const auto &stroke : balanced.strokes) {
+        if (!stroke.visible || stroke.tone != roll_compass::NeedleTone::OffWhite) {
+            continue;
+        }
+        hasCounterweight = stroke.points[stroke.pointCount - 1].y > 240;
+    }
+    assert(hasCounterweight);
+
+    const auto cutlass = roll_compass::buildNeedleVisual(
+        roll_compass::NeedleStyle::Cutlass,
+        0.0f
+    );
+    assert(cutlass.strokes[0].pointCount >= 7);
+    assert(cutlass.strokes[0].tone == roll_compass::NeedleTone::OffWhite);
+    assert(cutlass.strokes[1].tone == roll_compass::NeedleTone::Pink);
+    assert(cutlass.strokes[0].points[cutlass.strokes[0].pointCount / 2].x > 240);
+    bool hasGuard = false;
+    bool hasPommel = false;
+    for (const auto &stroke : cutlass.strokes) {
+        hasGuard = hasGuard ||
+            (stroke.visible && stroke.tone == roll_compass::NeedleTone::OffWhite &&
+             stroke.pointCount == 2 && stroke.points[0].x < 240 &&
+             stroke.points[1].x > 240);
+    }
+    for (const auto &disc : cutlass.discs) {
+        hasPommel = hasPommel ||
+            (disc.visible && disc.tone == roll_compass::NeedleTone::OffWhite &&
+             disc.center.y > 240);
+    }
+    assert(hasGuard);
+    assert(hasPommel);
+}
+
+static void assertNeedleStylesStayInsideSourceRadius() {
+    const float angles[] = {0.0f, 35.0f, 90.0f, 180.0f, 270.0f};
+    for (size_t styleIndex = 0; styleIndex < roll_compass::kNeedleStyleCount;
+         ++styleIndex) {
+        for (float angle : angles) {
+            const auto visual = roll_compass::buildNeedleVisual(
+                static_cast<roll_compass::NeedleStyle>(styleIndex),
+                angle
+            );
+            for (const auto &stroke : visual.strokes) {
+                if (!stroke.visible) continue;
+                assert(stroke.pointCount >= 2);
+                assert(stroke.pointCount <= roll_compass::kNeedleMaximumPoints);
+                for (size_t pointIndex = 0; pointIndex < stroke.pointCount;
+                     ++pointIndex) {
+                    const int32_t deltaX = stroke.points[pointIndex].x - 240;
+                    const int32_t deltaY = stroke.points[pointIndex].y - 240;
+                    assert(deltaX * deltaX + deltaY * deltaY <= 139 * 139);
+                }
+            }
+            for (const auto &disc : visual.discs) {
+                if (!disc.visible) continue;
+                const int32_t deltaX = disc.center.x - 240;
+                const int32_t deltaY = disc.center.y - 240;
+                const float radius = static_cast<float>(disc.diameter) * 0.5f;
+                assert(sqrtf(static_cast<float>(deltaX * deltaX + deltaY * deltaY)) +
+                        radius <=
+                    139.0f);
+            }
+        }
+    }
+}
+
 int main() {
     assertNear(roll_compass::normalizeDegrees(-1.0f), 359.0f);
     assertNear(roll_compass::shortestDeltaDegrees(359.0f, 1.0f), 2.0f);
@@ -735,5 +867,8 @@ int main() {
     assertDisplayBufferPreference();
     assertDisplayContentFormatting();
     assertScreenPowerButtonRespondsOnPressEdge();
+    assertNeedleStyleTouchCycle();
+    assertNeedleStyleGeometry();
+    assertNeedleStylesStayInsideSourceRadius();
     return 0;
 }
