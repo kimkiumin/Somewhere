@@ -49,10 +49,13 @@ private:
     float targetTrueBearingDegrees_ = 35.0f;
     float magneticDeclinationDegreesEast_ = 0.0f;
     float boardMagneticHeadingDegrees_ = 0.0f;
-    int8_t sweepDirection_ = 1;
+    int8_t sweepDirection_ = 0;
     float sweepDegreesPerSecond_ = 18.0f;
     bool sweepClockInitialized_ = false;
     uint32_t lastSweepMs_ = 0;
+    bool previewMotion_ = true;
+    bool previewClockInitialized_ = false;
+    uint32_t previewStartedMs_ = 0;
 };
 
 DiagnosticCommand parseDiagnosticCommand(const char *line);

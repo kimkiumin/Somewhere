@@ -72,9 +72,10 @@ button once; subsequent logs and commands then use the already-open port.
 
 This development build starts in a deterministic visual demo without a phone
 or magnetometer: it shows `320m`, `TONKATSU`, `PRICE -`, starts the source-style
-2 px needle at 35 degrees, and sweeps it at 18 degrees per second. Demo mode
-keeps status and action controls hidden so the face matches the collaborator
-preview. The serial console can restart that preview with
+2 px needle at 35 degrees, and moves it back and forth from 23 to 47 degrees on
+an eight-second loop. This keeps the motion visible without letting the default
+demo drift away from the collaborator preview's composition. Demo mode keeps
+status and action controls hidden. The serial console can restart that preview with
 `sim on`, then use `target 0..359`, `heading 0..359`, `declination -180..180`,
 `sweep cw`, `sweep ccw`, `sweep stop`, and `state guiding|near|paused|arrived|calibrating|sensor-missing|anomaly`.
 `sim off` returns control to the live runtime. Simulated buttons never emit BLE

@@ -72,6 +72,25 @@ uint8_t actionMaskForPhase(JourneyPhase phase) {
     }
 }
 
+float previewHeadingDegrees(uint32_t elapsedMs) {
+    constexpr uint32_t kQuarterPeriodMs = 2000U;
+    constexpr uint32_t kPeriodMs = kQuarterPeriodMs * 4U;
+    constexpr float kAmplitudeDegrees = 12.0f;
+    const uint32_t phaseMs = elapsedMs % kPeriodMs;
+    if (phaseMs < kQuarterPeriodMs) {
+        return kAmplitudeDegrees * static_cast<float>(phaseMs) /
+            static_cast<float>(kQuarterPeriodMs);
+    }
+    if (phaseMs < kQuarterPeriodMs * 3U) {
+        return kAmplitudeDegrees - 2.0f * kAmplitudeDegrees *
+            static_cast<float>(phaseMs - kQuarterPeriodMs) /
+            static_cast<float>(kQuarterPeriodMs * 2U);
+    }
+    return -kAmplitudeDegrees + kAmplitudeDegrees *
+        static_cast<float>(phaseMs - kQuarterPeriodMs * 3U) /
+        static_cast<float>(kQuarterPeriodMs);
+}
+
 }  // namespace
 
 DiagnosticCommand parseDiagnosticCommand(const char *line) {
@@ -127,6 +146,7 @@ bool applyDiagnosticCommand(const DiagnosticCommand &commandValue, DiagnosticSta
         case DiagnosticCommandType::SimOff:
             state.enabled_ = false;
             state.visualDemo_ = false;
+            state.previewMotion_ = false;
             state.sweepDirection_ = 0;
             state.sweepClockInitialized_ = false;
             return true;
@@ -169,22 +189,26 @@ bool applyDiagnosticCommand(const DiagnosticCommand &commandValue, DiagnosticSta
         case DiagnosticCommandType::Heading:
             state.enabled_ = true;
             state.boardMagneticHeadingDegrees_ = commandValue.valueDegrees;
+            state.previewMotion_ = false;
             state.sweepDirection_ = 0;
             state.sweepClockInitialized_ = false;
             return true;
         case DiagnosticCommandType::SweepClockwise:
             state.enabled_ = true;
+            state.previewMotion_ = false;
             state.sweepDirection_ = 1;
             state.sweepDegreesPerSecond_ = 45.0f;
             state.sweepClockInitialized_ = false;
             return true;
         case DiagnosticCommandType::SweepCounterClockwise:
             state.enabled_ = true;
+            state.previewMotion_ = false;
             state.sweepDirection_ = -1;
             state.sweepDegreesPerSecond_ = 45.0f;
             state.sweepClockInitialized_ = false;
             return true;
         case DiagnosticCommandType::SweepStop:
+            state.previewMotion_ = false;
             state.sweepDirection_ = 0;
             state.sweepClockInitialized_ = false;
             return true;
@@ -205,7 +229,10 @@ void DiagnosticState::resetSimulation() {
     targetTrueBearingDegrees_ = 35.0f;
     magneticDeclinationDegreesEast_ = 0.0f;
     boardMagneticHeadingDegrees_ = 0.0f;
-    sweepDirection_ = 1;
+    previewMotion_ = true;
+    previewClockInitialized_ = false;
+    previewStartedMs_ = 0;
+    sweepDirection_ = 0;
     sweepDegreesPerSecond_ = 18.0f;
     sweepClockInitialized_ = false;
     lastSweepMs_ = 0;
@@ -220,7 +247,15 @@ void DiagnosticState::setOperationalState(JourneyPhase phase) {
 
 void DiagnosticState::applyTo(RuntimeInput &input, uint32_t nowMs) {
     if (!enabled_) return;
-    if (sweepDirection_ != 0) {
+    if (previewMotion_) {
+        if (!previewClockInitialized_) {
+            previewStartedMs_ = nowMs;
+            previewClockInitialized_ = true;
+        }
+        boardMagneticHeadingDegrees_ = normalizeDegrees(
+            previewHeadingDegrees(nowMs - previewStartedMs_)
+        );
+    } else if (sweepDirection_ != 0) {
         if (sweepClockInitialized_) {
             const uint32_t elapsedMs = nowMs - lastSweepMs_;
             const float deltaDegrees =

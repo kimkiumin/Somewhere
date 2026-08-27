@@ -236,8 +236,9 @@ restore outside the firmware directory.
 
 The current development firmware boots directly into a phone-free visual demo
 showing `320m`, `TONKATSU`, `PRICE -`, and a source-style 2 px needle that
-starts at 35 degrees and sweeps at 18 degrees per second. Demo status and
-action controls are hidden. Useful serial commands for overriding or restarting it are `sim on`,
+starts at 35 degrees and moves back and forth from 23 to 47 degrees on an
+eight-second loop. Demo status and action controls are hidden. Useful serial
+commands for overriding or restarting it are `sim on`,
 `target 315`, `heading 0`, `sweep cw`, `state near`, `sweep stop`, and
 `sim off`. Simulation cannot send real BLE actions.
 

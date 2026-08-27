@@ -74,9 +74,10 @@ A physical serial boot check should show `Roll Compass board boot`, a
 
 The current development firmware starts in a phone-free visual demo and shows
 `320m`, `TONKATSU`, `PRICE -`, and a source-style 2 px needle that starts at 35
-degrees and sweeps at 18 degrees per second. Status and action controls stay
-hidden in this visual demo. Send these newline-delimited commands in the
-monitor to override or restart it:
+degrees and moves back and forth from 23 to 47 degrees on an eight-second loop.
+Status and action controls stay hidden in this visual demo, keeping the motion
+visible without drifting away from the collaborator preview. Send these
+newline-delimited commands in the monitor to override or restart it:
 
 ```text
 sim on

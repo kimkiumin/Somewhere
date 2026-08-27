@@ -481,11 +481,23 @@ static void assertVisualDemoStartsAutomatically() {
     assertNear(initialModel.targetNeedleAngleDegrees, 35.0f);
     assert(initialModel.actionMask == 0);
 
-    diagnostic.applyTo(input, 2000);
-    assertNear(input.boardMagneticHeadingDegrees, 18.0f);
-    const auto movingModel = roll_compass::reduceRuntime(input);
-    assert(movingModel.showNeedle);
-    assertNear(movingModel.targetNeedleAngleDegrees, 17.0f);
+    diagnostic.applyTo(input, 3000);
+    assertNear(input.boardMagneticHeadingDegrees, 12.0f);
+    const auto clockwiseModel = roll_compass::reduceRuntime(input);
+    assert(clockwiseModel.showNeedle);
+    assertNear(clockwiseModel.targetNeedleAngleDegrees, 23.0f);
+
+    diagnostic.applyTo(input, 5000);
+    assertNear(input.boardMagneticHeadingDegrees, 0.0f);
+    const auto centerModel = roll_compass::reduceRuntime(input);
+    assert(centerModel.showNeedle);
+    assertNear(centerModel.targetNeedleAngleDegrees, 35.0f);
+
+    diagnostic.applyTo(input, 7000);
+    assertNear(input.boardMagneticHeadingDegrees, 348.0f);
+    const auto counterClockwiseModel = roll_compass::reduceRuntime(input);
+    assert(counterClockwiseModel.showNeedle);
+    assertNear(counterClockwiseModel.targetNeedleAngleDegrees, 47.0f);
 }
 
 static void assertDiagnosticSweep() {
