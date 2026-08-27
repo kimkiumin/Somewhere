@@ -18,12 +18,8 @@ LV_FONT_DECLARE(roll_compass_korean_20)
 
 namespace {
 
-constexpr float kPi = 3.14159265358979323846f;
 constexpr int16_t kScreenSize = somewhere_artwork::SCREEN_SIZE;
 constexpr int16_t kDisplayCenter = roll_compass::kInstrumentFaceCenter;
-constexpr int16_t kNeedleLength = roll_compass::kInstrumentNeedleLength;
-constexpr uint8_t kMountRotationStepDegrees = 10;
-constexpr uint8_t kMaximumMountRotationDegrees = 30;
 constexpr uint32_t kNeedleStepMs = 25;
 constexpr uint8_t kMaximumCatchUpSteps = 4;
 constexpr uint8_t kStopAction = 1U << 0;
@@ -33,6 +29,7 @@ constexpr uint8_t kRevealAction = 1U << 3;
 // Keep the source-derived green hierarchy, but make the three fixed readout
 // labels fully legible on the small, high-contrast circular panel.
 constexpr lv_opa_t kReadoutLabelOpacity = LV_OPA_COVER;
+constexpr lv_opa_t kReadoutValueOpacity = LV_OPA_COVER;
 
 // These values are the collaborator's source SVG palette, expressed at the
 // RGB565 display boundary. The geometry is kept in compass_artwork.h.
@@ -46,6 +43,7 @@ lv_obj_t *faceBackground = nullptr;
 lv_obj_t *tickObjects[somewhere_artwork::TICK_COUNT] = {};
 lv_point_t tickPoints[somewhere_artwork::TICK_COUNT][2] = {};
 lv_obj_t *compassNeedle = nullptr;
+lv_obj_t *needleHub = nullptr;
 lv_point_t needlePoints[2] = {};
 lv_obj_t *northLabel = nullptr;
 lv_obj_t *southLabel = nullptr;
@@ -73,13 +71,8 @@ uint32_t lastTickMs = 0;
 uint32_t accumulatedNeedleMs = 0;
 uint32_t stateEnteredMs = 0;
 uint32_t displayedSequence = 0;
-uint8_t mountRotationDegrees = 0;
 bool bleEventsEnabled = false;
 bool uiAwake = true;
-
-int16_t mountRotationTenths() {
-    return static_cast<int16_t>(mountRotationDegrees) * 10;
-}
 
 void setHidden(lv_obj_t *object, bool hidden) {
     if (object == nullptr) return;
@@ -90,40 +83,16 @@ void setHidden(lv_obj_t *object, bool hidden) {
     }
 }
 
-lv_point_t mountedPoint(int16_t x, int16_t y) {
-    const float radians =
-        static_cast<float>(mountRotationDegrees) * kPi / 180.0f;
-    const float cosine = cosf(radians);
-    const float sine = sinf(radians);
-    const float deltaX = static_cast<float>(x - kDisplayCenter);
-    const float deltaY = static_cast<float>(y - kDisplayCenter);
-    return lv_point_t{
-        static_cast<lv_coord_t>(lroundf(kDisplayCenter + deltaX * cosine - deltaY * sine)),
-        static_cast<lv_coord_t>(lroundf(kDisplayCenter + deltaX * sine + deltaY * cosine)),
-    };
-}
-
-void positionMountedObject(lv_obj_t *object, const roll_compass::Rect &bounds) {
+void positionInstrumentObject(lv_obj_t *object, const roll_compass::Rect &bounds) {
     if (object == nullptr) return;
-    const lv_point_t mountedCenter = mountedPoint(
-        static_cast<int16_t>(bounds.x + bounds.width / 2),
-        static_cast<int16_t>(bounds.y + bounds.height / 2)
-    );
-    lv_obj_set_pos(
-        object,
-        static_cast<lv_coord_t>(mountedCenter.x - bounds.width / 2),
-        static_cast<lv_coord_t>(mountedCenter.y - bounds.height / 2)
-    );
-    lv_obj_set_style_transform_pivot_x(object, bounds.width / 2, LV_PART_MAIN);
-    lv_obj_set_style_transform_pivot_y(object, bounds.height / 2, LV_PART_MAIN);
-    lv_obj_set_style_transform_angle(object, mountRotationTenths(), LV_PART_MAIN);
+    lv_obj_set_pos(object, bounds.x, bounds.y);
 }
 
 void updateTickGeometry() {
     for (size_t index = 0; index < somewhere_artwork::TICK_COUNT; ++index) {
         const somewhere_artwork::CompassTick &source = somewhere_artwork::TICKS[index];
-        tickPoints[index][0] = mountedPoint(source.x1, source.y1);
-        tickPoints[index][1] = mountedPoint(source.x2, source.y2);
+        tickPoints[index][0] = lv_point_t{source.x1, source.y1};
+        tickPoints[index][1] = lv_point_t{source.x2, source.y2};
         if (tickObjects[index] != nullptr) {
             lv_line_set_points(tickObjects[index], tickPoints[index], 2);
         }
@@ -132,41 +101,36 @@ void updateTickGeometry() {
 
 void updateNeedleGeometry(float angleDegrees) {
     if (compassNeedle == nullptr) return;
-    const float radians = angleDegrees * kPi / 180.0f;
-    const int16_t tipX = static_cast<int16_t>(lroundf(
-        kDisplayCenter + sinf(radians) * kNeedleLength
-    ));
-    const int16_t tipY = static_cast<int16_t>(lroundf(
-        kDisplayCenter - cosf(radians) * kNeedleLength
-    ));
-    needlePoints[0] = lv_point_t{kDisplayCenter, kDisplayCenter};
-    needlePoints[1] = lv_point_t{tipX, tipY};
+    const roll_compass::InstrumentNeedleGeometry geometry =
+        roll_compass::instrumentNeedleGeometry(angleDegrees);
+    needlePoints[0] = lv_point_t{geometry.center.x, geometry.center.y};
+    needlePoints[1] = lv_point_t{geometry.tip.x, geometry.tip.y};
     lv_line_set_points(compassNeedle, needlePoints, 2);
 }
 
-void applyMountRotation() {
+void applyInstrumentLayout() {
     updateTickGeometry();
-    updateNeedleGeometry(needleSpring.angleDegrees() + mountRotationDegrees);
-    positionMountedObject(northLabel, roll_compass::kInstrumentNorthBounds);
-    positionMountedObject(southLabel, roll_compass::kInstrumentSouthBounds);
-    positionMountedObject(westLabel, roll_compass::kInstrumentWestBounds);
-    positionMountedObject(eastLabel, roll_compass::kInstrumentEastBounds);
-    positionMountedObject(
+    updateNeedleGeometry(needleSpring.angleDegrees());
+    positionInstrumentObject(northLabel, roll_compass::kInstrumentNorthBounds);
+    positionInstrumentObject(southLabel, roll_compass::kInstrumentSouthBounds);
+    positionInstrumentObject(westLabel, roll_compass::kInstrumentWestBounds);
+    positionInstrumentObject(eastLabel, roll_compass::kInstrumentEastBounds);
+    positionInstrumentObject(
         remainingLabel,
         roll_compass::kInstrumentRemainingLabelBounds
     );
-    positionMountedObject(distanceValue, roll_compass::kInstrumentDistanceBounds);
-    positionMountedObject(priceLabel, roll_compass::kInstrumentPriceLabelBounds);
-    positionMountedObject(priceValue, roll_compass::kInstrumentPriceValueBounds);
-    positionMountedObject(menuLabel, roll_compass::kInstrumentMenuLabelBounds);
-    positionMountedObject(menuValue, roll_compass::kInstrumentMenuValueBounds);
-    positionMountedObject(statusLabel, roll_compass::kInstrumentStatusBounds);
-    positionMountedObject(primaryButton, roll_compass::kInstrumentPrimaryActionBounds);
-    positionMountedObject(
+    positionInstrumentObject(distanceValue, roll_compass::kInstrumentDistanceBounds);
+    positionInstrumentObject(priceLabel, roll_compass::kInstrumentPriceLabelBounds);
+    positionInstrumentObject(priceValue, roll_compass::kInstrumentPriceValueBounds);
+    positionInstrumentObject(menuLabel, roll_compass::kInstrumentMenuLabelBounds);
+    positionInstrumentObject(menuValue, roll_compass::kInstrumentMenuValueBounds);
+    positionInstrumentObject(statusLabel, roll_compass::kInstrumentStatusBounds);
+    positionInstrumentObject(primaryButton, roll_compass::kInstrumentPrimaryActionBounds);
+    positionInstrumentObject(
         pausedContinueButton,
         roll_compass::kInstrumentPausedContinueBounds
     );
-    positionMountedObject(pausedEndButton, roll_compass::kInstrumentPausedEndBounds);
+    positionInstrumentObject(pausedEndButton, roll_compass::kInstrumentPausedEndBounds);
 }
 
 lv_obj_t *makeLabel(
@@ -296,6 +260,7 @@ void renderModel() {
     );
 
     setHidden(compassNeedle, !currentModel.showNeedle);
+    setHidden(needleHub, !currentModel.showNeedle);
 
     const bool showStop =
         (currentModel.state == roll_compass::CompassOsState::Guiding ||
@@ -355,14 +320,6 @@ void pausedEndClicked(lv_event_t *) {
     dispatchAction("confirm-stop", kConfirmStopAction);
 }
 
-void displayTapped(lv_event_t *) {
-    if (!uiAwake) return;
-    mountRotationDegrees = mountRotationDegrees >= kMaximumMountRotationDegrees
-        ? 0
-        : static_cast<uint8_t>(mountRotationDegrees + kMountRotationStepDegrees);
-    applyMountRotation();
-}
-
 void animateState(uint32_t nowMs) {
     if (stateEnteredMs == 0) stateEnteredMs = nowMs;
     const bool pulseState = currentModel.state == roll_compass::CompassOsState::Pairing ||
@@ -396,7 +353,7 @@ void animateNeedle(uint32_t nowMs) {
     if (steps == kMaximumCatchUpSteps && accumulatedNeedleMs >= kNeedleStepMs) {
         accumulatedNeedleMs %= kNeedleStepMs;
     }
-    updateNeedleGeometry(needleSpring.angleDegrees() + mountRotationDegrees);
+    updateNeedleGeometry(needleSpring.angleDegrees());
 }
 
 }  // namespace
@@ -406,8 +363,7 @@ void displayUiBegin() {
     lv_obj_set_style_bg_color(screen, kBackground, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(screen, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(screen, displayTapped, LV_EVENT_CLICKED, nullptr);
+    lv_obj_clear_flag(screen, LV_OBJ_FLAG_CLICKABLE);
 
     faceBackground = lv_obj_create(screen);
     lv_obj_remove_style_all(faceBackground);
@@ -434,9 +390,30 @@ void displayUiBegin() {
     lv_obj_set_size(compassNeedle, kScreenSize, kScreenSize);
     lv_obj_set_pos(compassNeedle, 0, 0);
     lv_obj_set_style_line_color(compassNeedle, kPink, LV_PART_MAIN);
-    lv_obj_set_style_line_width(compassNeedle, 2, LV_PART_MAIN);
-    lv_obj_set_style_line_rounded(compassNeedle, false, LV_PART_MAIN);
+    lv_obj_set_style_line_width(
+        compassNeedle,
+        roll_compass::kInstrumentNeedleStrokeWidth,
+        LV_PART_MAIN
+    );
+    lv_obj_set_style_line_rounded(compassNeedle, true, LV_PART_MAIN);
     lv_obj_clear_flag(compassNeedle, LV_OBJ_FLAG_CLICKABLE);
+
+    needleHub = lv_obj_create(screen);
+    lv_obj_remove_style_all(needleHub);
+    lv_obj_set_size(
+        needleHub,
+        roll_compass::kInstrumentNeedleHubDiameter,
+        roll_compass::kInstrumentNeedleHubDiameter
+    );
+    lv_obj_set_pos(
+        needleHub,
+        kDisplayCenter - roll_compass::kInstrumentNeedleHubDiameter / 2,
+        kDisplayCenter - roll_compass::kInstrumentNeedleHubDiameter / 2
+    );
+    lv_obj_set_style_radius(needleHub, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(needleHub, kPink, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(needleHub, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_clear_flag(needleHub, LV_OBJ_FLAG_CLICKABLE);
 
     northLabel = makeLabel(
         screen,
@@ -514,7 +491,9 @@ void displayUiBegin() {
         kGreen,
         LV_TEXT_ALIGN_RIGHT
     );
-
+    lv_obj_set_style_text_opa(distanceValue, kReadoutValueOpacity, LV_PART_MAIN);
+    lv_obj_set_style_text_opa(priceValue, kReadoutValueOpacity, LV_PART_MAIN);
+    lv_obj_set_style_text_opa(menuValue, kReadoutValueOpacity, LV_PART_MAIN);
     statusLabel = makeLabel(
         screen,
         roll_compass::kInstrumentStatusBounds,
@@ -552,7 +531,7 @@ void displayUiBegin() {
     lv_obj_add_event_cb(pausedEndButton, pausedEndClicked, LV_EVENT_CLICKED, nullptr);
 
     needleSpring.reset(0.0f);
-    applyMountRotation();
+    applyInstrumentLayout();
     renderModel();
 }
 

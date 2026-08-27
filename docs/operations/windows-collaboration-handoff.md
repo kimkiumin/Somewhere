@@ -84,7 +84,7 @@ renderer/state integration:
   `univers_font_adapter.*` exposes its four sizes to LVGL.
 - `display_content.*` formats `d`/`p` values and truncates menu text on UTF-8
   codepoint boundaries. `display_ui.cpp` owns the circular layers, baselines,
-  needle animation, mount rotation, and guarded existing action buttons.
+  fixed orientation, needle animation, and guarded existing action buttons.
 
 The BLE v2 projection is unchanged:
 
@@ -97,9 +97,10 @@ The BLE v2 projection is unchanged:
 
 `route-recovery`, stale snapshots, paused state, invalid confidence, and invalid
 sensor/calibration conditions never display an exact needle. The v2 north-
-referenced target/declaration pair and the existing mount correction sequence
-`0° → 10° → 20° → 30° → 0°` are retained. The board still sends only guarded
-touch intents and never receives destination identity.
+referenced target/declaration pair is retained, while the instrument is fixed at
+`0°` and no longer treats background touches as mount-correction input. The
+board still sends only guarded action intents and never receives destination
+identity.
 
 The source font is ASCII-only. `REMAINING`, `PRICE`, `MENU`, cardinal letters,
 numeric values, and ASCII menu values use the ported Thin Condensed bitmap. A
@@ -133,9 +134,9 @@ or its panel/touch drivers into the production sketch.
 ## Current board behavior
 
 The target is the flat Waveshare `ESP32-S3-Touch-LCD-2.1`, not the 2.1B. Its
-480×480 circular face is filled by the compass UI. Touching outside an active
-action cycles the complete UI through mount corrections
-`0° → 10° → 20° → 30° → 0°` around the true display center.
+480×480 circular face is filled by the compass UI at a fixed `0°` orientation.
+Touching outside an active action has no display effect; only the explicit
+journey action controls handle touch events.
 
 A normal short press of BOOT now toggles the backlight immediately. While dark,
 touch is locked but BLE, journey state, and firmware remain alive; the next

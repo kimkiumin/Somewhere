@@ -41,6 +41,30 @@ test("uses the circular instrument palette and three source readouts", () => {
   expect(renderer).not.toContain("0xF8F3E8");
 });
 
+test("keeps the instrument fixed and gives the live needle a visible pivot", () => {
+  const renderer = readFirmwareFile("display_ui.cpp");
+  expect(renderer).not.toContain("mountRotationDegrees");
+  expect(renderer).not.toContain("displayTapped");
+  expect(renderer).not.toContain("lv_obj_add_event_cb(screen");
+  expect(renderer).toContain("needleHub");
+  expect(renderer).toContain("kInstrumentNeedleStrokeWidth");
+  expect(renderer).toContain(
+    "kReadoutValueOpacity = LV_OPA_COVER",
+  );
+  expect(renderer).toContain(
+    "lv_obj_set_style_text_opa(distanceValue, kReadoutValueOpacity",
+  );
+  expect(renderer).toContain(
+    "lv_obj_set_style_text_opa(priceValue, kReadoutValueOpacity",
+  );
+  expect(renderer).toContain(
+    "lv_obj_set_style_text_opa(menuValue, kReadoutValueOpacity",
+  );
+  expect(renderer).toContain(
+    "lv_obj_set_style_line_rounded(compassNeedle, true",
+  );
+});
+
 test("keeps v2 projected fields flowing into the board render model", () => {
   const runtime = readFirmwareFile("compass_runtime.h");
   const sketch = readFirmwareFile("roll-compass-board.ino");

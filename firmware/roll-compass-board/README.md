@@ -104,10 +104,9 @@ mode. If the PSRAM reserve or panel/LVGL initialization is insufficient, it
 falls back to two 20-row internal-RAM draw buffers. Boot logs identify the
 selected `display_mode` and current PSRAM/free-heap values.
 
-Tap anywhere outside an active action to compensate for the physical USB-port
-mount angle. The complete circular UI cycles `0° → 10° → 20° → 30° → 0°`;
-boot always starts at `0°`. The correction rotates the source ticks/cardinals,
-needle, readouts, and controls around the true 240×240 glass center.
+The circular UI uses the source artwork at a fixed `0°` orientation. Touches
+outside active actions do not change the artwork, so the physical USB-port
+mount cannot shift the source ticks, cardinals, needle, readouts, or controls.
 
 A short press of the physical BOOT button toggles the LCD backlight like a
 phone power button. BLE, the current journey state, and the firmware remain

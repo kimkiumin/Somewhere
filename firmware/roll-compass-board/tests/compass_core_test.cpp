@@ -523,6 +523,38 @@ static void assertInstrumentLayoutContainment() {
     }
 }
 
+static void assertInstrumentNeedleGeometry() {
+    const auto top = roll_compass::instrumentNeedleGeometry(0.0f);
+    assert(top.center.x == 240);
+    assert(top.center.y == 240);
+    assert(top.tip.x == 240);
+    assert(top.tip.y == 101);
+
+    const auto right = roll_compass::instrumentNeedleGeometry(90.0f);
+    assert(right.tip.x == 379);
+    assert(right.tip.y == 240);
+
+    const auto bottom = roll_compass::instrumentNeedleGeometry(180.0f);
+    assert(bottom.tip.x == 240);
+    assert(bottom.tip.y == 379);
+
+    const auto wrapped = roll_compass::instrumentNeedleGeometry(360.0f);
+    assert(wrapped.tip.x == top.tip.x);
+    assert(wrapped.tip.y == top.tip.y);
+
+    const auto invalid = roll_compass::instrumentNeedleGeometry(NAN);
+    assert(invalid.tip.x == top.tip.x);
+    assert(invalid.tip.y == top.tip.y);
+
+    const int32_t deltaX = right.tip.x - right.center.x;
+    const int32_t deltaY = right.tip.y - right.center.y;
+    assert(
+        deltaX * deltaX + deltaY * deltaY <=
+        static_cast<int32_t>(roll_compass::kInstrumentNeedleSafeRadius) *
+            roll_compass::kInstrumentNeedleSafeRadius
+    );
+}
+
 static void assertDisplayBufferPreference() {
     using roll_compass::DisplayBufferPreference;
 
@@ -637,6 +669,7 @@ int main() {
     assertDiagnosticSweep();
     assertCircularLayoutContainment();
     assertInstrumentLayoutContainment();
+    assertInstrumentNeedleGeometry();
     assertDisplayBufferPreference();
     assertDisplayContentFormatting();
     assertScreenPowerButtonRespondsOnPressEdge();

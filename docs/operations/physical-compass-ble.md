@@ -128,17 +128,17 @@ When disconnected or when the last state is stale, the board hides the arrow
 and disables touch actions. The phone's existing safety controls remain the
 authority.
 
-The board display follows the Roll Compass moodboard: a warm circular compass
-face, antique-brass shell, oxblood needle, pulsing treasure signal, and rounded
-touch actions. The iPhone remains the source of truth for the needle bearing;
-the board does not calculate its own heading.
+The board display follows the collaborator's source-derived circular instrument:
+black `#050706` face, off-white ticks/cardinals, green `#4DFF76` readouts, and
+pink-red `#FF3850` needle. The iPhone remains the source of truth for the needle
+bearing; the board does not calculate its own heading.
 
 The display prefers two full RGB565 framebuffers in PSRAM and LVGL direct mode
 to prevent visible tearing during the needle sweep. It automatically falls
 back to partial 20-row buffers when memory or initialization is insufficient.
-Touching the circular face cycles the mount correction through
-`0° → 10° → 20° → 30° → 0°`, rotating the complete UI around the 240×240
-center. It resets to `0°` after every boot.
+The source artwork is fixed at `0°`; touching outside an active action has no
+display effect, so the readouts, ticks, cardinals, and needle remain aligned to
+the physical circular face.
 
 The physical BOOT button is also the screen button after normal startup. One
 short press turns the backlight off and locks touch input; the next press wakes
