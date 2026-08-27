@@ -6,9 +6,10 @@ import rightsJson from "../../fixtures/seoul-forest/rights.json";
 import routesJson from "../../fixtures/seoul-forest/routes.json";
 import venuesJson from "../../fixtures/seoul-forest/venues.json";
 import { canonicalizeVenues } from "../provider/canonicalization";
+import { matchesHardConstraints } from "../provider/constraints";
 import { qualifyCandidates } from "../provider/evidence";
 import { parseProviderFixtureBundle } from "../provider/parser";
-import { sealPool } from "../provider/pool";
+import { digestMember, sealPool } from "../provider/pool";
 import { getReviewedRoute } from "../provider/route";
 import { type RandomUint32, selectDestination } from "../provider/selection";
 
@@ -70,6 +71,25 @@ const FIXTURE = parseProviderFixtureBundle({
   venues: venuesJson,
 });
 
+function indexFirstByCandidate<T extends Readonly<{ candidateId: string }>>(
+  values: readonly T[],
+): ReadonlyMap<string, T> {
+  const index = new Map<string, T>();
+  for (const value of values) {
+    if (!index.has(value.candidateId)) {
+      index.set(value.candidateId, value);
+    }
+  }
+  return index;
+}
+
+const CANDIDATES = canonicalizeVenues(FIXTURE.venues);
+const ROUTES_BY_CANDIDATE = indexFirstByCandidate(FIXTURE.routes.routes);
+const VENUES_BY_CANDIDATE = indexFirstByCandidate([
+  ...FIXTURE.venues.restaurants,
+  ...FIXTURE.venues.cafes,
+]);
+
 function priceBand(value: number): "low" | "medium" | "high" | "unknown" {
   if (value === 1) {
     return "low";
@@ -83,6 +103,23 @@ function priceBand(value: number): "low" | "medium" | "high" | "unknown" {
   return "unknown";
 }
 
+function currentMemberDigest(candidate: (typeof CANDIDATES)[number]): string | undefined {
+  const snapshotVersion = FIXTURE.evidence.entries.find(
+    (entry) => entry.candidateId === candidate.venue.candidateId,
+  )?.snapshotVersion;
+  if (snapshotVersion === undefined) {
+    return undefined;
+  }
+  return digestMember({
+    broadMenuCategory: candidate.venue.broadMenuCategory,
+    candidateId: candidate.venue.candidateId,
+    canonicalId: candidate.canonicalId,
+    category: candidate.venue.category,
+    priceBand: candidate.venue.priceBand,
+    snapshotVersion,
+  }).slice(7);
+}
+
 async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -93,34 +130,56 @@ export async function buildJourneyPreparation(
     body: CreateBody;
     journeyId: string;
     now: Date;
+    previousMemberDigest?: string;
     requestId: string;
     randomUint32?: RandomUint32;
+    runtimeNow?: Date;
   }>,
 ): Promise<JourneyPreparation> {
-  const candidates = canonicalizeVenues(FIXTURE.venues);
-  const evidence = qualifyCandidates({ ...FIXTURE, candidates, now: input.now });
+  const evidence = qualifyCandidates({ ...FIXTURE, candidates: CANDIDATES, now: input.now });
+  const qualifiedSnapshotsByCandidate = new Map<string, Set<string>>();
+  for (const candidate of evidence.qualified) {
+    const snapshots = qualifiedSnapshotsByCandidate.get(candidate.candidateId) ?? new Set<string>();
+    snapshots.add(candidate.snapshotVersion);
+    qualifiedSnapshotsByCandidate.set(candidate.candidateId, snapshots);
+  }
   const durationLimitSeconds = input.body.constraints.maxWalkMinutes * 60;
+  const hardEligibleCandidateIds = new Set(
+    CANDIDATES.filter((candidate) => matchesHardConstraints(candidate, input.body.constraints)).map(
+      (candidate) => candidate.venue.candidateId,
+    ),
+  );
   const qualified = evidence.qualified.filter((candidate) => {
-    if (candidate.category !== input.body.constraints.category) {
+    if (!hardEligibleCandidateIds.has(candidate.candidateId)) {
       return false;
     }
-    const route = FIXTURE.routes.routes.find((item) => item.candidateId === candidate.candidateId);
+    const route = ROUTES_BY_CANDIDATE.get(candidate.candidateId);
     return route !== undefined && route.expectedDurationSeconds <= durationLimitSeconds;
   });
-  if (qualified.length === 0) {
+  if (input.previousMemberDigest !== undefined) {
+    const matchingCandidates = CANDIDATES.filter(
+      (candidate) => currentMemberDigest(candidate) === input.previousMemberDigest,
+    );
+    if (matchingCandidates.length !== 1) {
+      return { code: "no_fit", kind: "error" };
+    }
+  }
+  const eligibleAfterRecovery =
+    input.previousMemberDigest === undefined
+      ? qualified
+      : qualified.filter((member) => digestMember(member).slice(7) !== input.previousMemberDigest);
+  if (eligibleAfterRecovery.length === 0) {
     return { code: "no_fit", kind: "error" };
   }
-  const pool = sealPool({ bundle: FIXTURE, qualified });
+  const pool = sealPool({ bundle: FIXTURE, qualified: eligibleAfterRecovery });
   const selected = await selectDestination({
     pool,
     requestId: input.requestId,
     revalidate: async (member) => {
-      const current = qualifyCandidates({ ...FIXTURE, candidates, now: input.now }).qualified.some(
-        (candidate) =>
-          candidate.candidateId === member.candidateId &&
-          candidate.snapshotVersion === member.snapshotVersion,
-      );
-      return current ? { verdict: "pass" } : { code: "POLICY_UPDATED", verdict: "reject" };
+      const currentSnapshots = qualifiedSnapshotsByCandidate.get(member.candidateId);
+      return currentSnapshots?.has(member.snapshotVersion) === true
+        ? { verdict: "pass" }
+        : { code: "POLICY_UPDATED", verdict: "reject" };
     },
     ...(input.randomUint32 === undefined ? {} : { randomUint32: input.randomUint32 }),
   });
@@ -137,9 +196,7 @@ export async function buildJourneyPreparation(
   if (reviewedRoute.kind === "unavailable") {
     return { code: "route_unavailable", kind: "error" };
   }
-  const venue = [...FIXTURE.venues.restaurants, ...FIXTURE.venues.cafes].find(
-    (item) => item.candidateId === selected.member.candidateId,
-  );
+  const venue = VENUES_BY_CANDIDATE.get(selected.member.candidateId);
   const originZoneRef = FIXTURE.routes.originZones.find((zone) =>
     reviewedRoute.route.routeId.includes(zone.zoneId.replace("seoul-forest-", "")),
   )?.zoneId;
@@ -152,9 +209,10 @@ export async function buildJourneyPreparation(
   ]);
   const receiptJson = JSON.stringify(selected.receipt);
   const receiptDigest = await sha256(receiptJson);
-  const selectedMemberDigest = await sha256(
-    `${selected.member.canonicalId}\0${selected.member.candidateId}\0${selected.member.snapshotVersion}`,
-  );
+  const selectedMemberDigest = digestMember(selected.member).slice(7);
+  const routeExpiresAt =
+    Date.parse(reviewedRoute.route.expiresAt) +
+    ((input.runtimeNow ?? input.now).getTime() - input.now.getTime());
   return {
     disclosure: {
       policyVersion: pool.evidencePolicyVersion,
@@ -175,7 +233,7 @@ export async function buildJourneyPreparation(
     },
     route: {
       encodedPolyline: Buffer.from(JSON.stringify(geometry)).toString("base64url"),
-      expiresAt: Date.parse(reviewedRoute.route.expiresAt),
+      expiresAt: routeExpiresAt,
       geometry,
       originZoneRef,
       routeDigest: reviewedRoute.route.endpointDigest,
@@ -197,7 +255,7 @@ export function projectReadyJourney(prepared: PreparedJourney, sequence: number,
       policyVersion: prepared.disclosure.policyVersion,
     },
     phase: "ready",
-    actions: ["commit", "reveal", "stop"],
+    actions: ["commit", "stop"],
     revealed,
   } as const;
 }
@@ -208,7 +266,7 @@ export function projectCommittedJourney(
   revealed: false,
 ) {
   return {
-    actions: ["reveal", "stop", "route-recover", "arrival"],
+    actions: ["stop", "route-recover", "arrival"],
     contractVersion: 1,
     disclosure: prepared.disclosure,
     guidance: {
@@ -228,10 +286,8 @@ export function projectCommittedJourney(
 export function projectRevealedJourney<
   T extends ReturnType<typeof projectReadyJourney> | ReturnType<typeof projectCommittedJourney>,
 >(projection: T, identity: PreparedJourney["identity"], sequence: number) {
-  const actions = projection.actions.filter((action) => action !== "reveal");
   return {
     ...projection,
-    actions,
     reveal: identity,
     revealed: true,
     sequence,

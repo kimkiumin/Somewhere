@@ -102,9 +102,11 @@ export async function requestOrientationPermission(
 
 export type HeadingEventEnvironment = {
   readonly add: (listener: (event: unknown) => void) => void;
+  readonly cancelFrame: (frameId: number) => void;
   readonly remove: (listener: (event: unknown) => void) => void;
   readonly permissionProvider: OrientationPermissionProvider | undefined;
   readonly nowMs: () => number;
+  readonly requestFrame: (callback: (timestampMs: number) => void) => number;
 };
 
 export function createBrowserHeadingSource(environment: HeadingEventEnvironment): HeadingSource {
@@ -112,19 +114,37 @@ export function createBrowserHeadingSource(environment: HeadingEventEnvironment)
     requestPermissionFromUserGesture: () =>
       requestOrientationPermission(environment.permissionProvider),
     subscribe(onSample, onFailure): Unsubscribe {
-      const listener = (event: unknown): void => {
-        const result = normalizeBrowserHeadingEvent(event, environment.nowMs());
+      let active = true;
+      let frameId: number | null = null;
+      let pendingResult: BrowserHeadingResult | null = null;
+      const flush = (): void => {
+        frameId = null;
+        if (!active || pendingResult === null) {
+          return;
+        }
+        const result = pendingResult;
+        pendingResult = null;
         if (result.ok) {
           onSample(result.sample);
         } else {
           onFailure(result.failure);
         }
       };
+      const listener = (event: unknown): void => {
+        pendingResult = normalizeBrowserHeadingEvent(event, environment.nowMs());
+        if (frameId === null) {
+          frameId = environment.requestFrame(flush);
+        }
+      };
       environment.add(listener);
-      let active = true;
       return () => {
         if (active) {
           active = false;
+          if (frameId !== null) {
+            environment.cancelFrame(frameId);
+            frameId = null;
+          }
+          pendingResult = null;
           environment.remove(listener);
         }
       };

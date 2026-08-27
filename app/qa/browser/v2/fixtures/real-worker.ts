@@ -5,6 +5,7 @@ import { type BrowserContext, expect, type Page } from "@playwright/test";
 const BASE_URL = process.env.SOMEWHERE_PREPARED_BASE_URL ?? "https://127.0.0.1:8787/";
 const CONTROL_URL = new URL("/api/test/v2-control", BASE_URL).href;
 const CONTROL_KEY = "somewhere-v2-local-qa";
+const FIXTURE_VALID_NOW_MS = Date.parse("2026-08-01T00:00:00Z");
 const EVIDENCE_DIR = process.env.V2_EVIDENCE_DIR ?? "../.omo/evidence/task-19";
 const LOCAL_SENSOR_CONTROL = "__somewhereV2LocalSensorControl";
 
@@ -128,32 +129,35 @@ export async function emitLocation(page: Page, coordinates: LocationCoordinates)
 }
 
 export async function installDeterministicClock(page: Page): Promise<void> {
-  await page.clock.install({ time: new Date("2026-07-29T12:00:00.000Z") });
+  // Freeze the browser at the current wall-clock epoch so its seven-day
+  // feedback-retention bound stays aligned with the live local Worker clock.
+  await page.clock.install({ time: Date.now() });
 }
 
 export async function driveCredibleArrival(page: Page): Promise<void> {
-  const routePoints = [
-    [37.5442, 127.0377],
-    [37.5446, 127.0385],
-    [37.545, 127.0393],
-    [37.5452, 127.0401],
-    [37.54555, 127.04085],
-    [37.5459, 127.0416],
-    [37.54625, 127.04235],
-    [37.54645, 127.04306],
+  const routeSamples = [
+    [37.54365, 127.0385, 98],
+    [37.54345, 127.0402, 98],
+    [37.54325, 127.042, 98],
+    [37.54305, 127.044, 98],
+    [37.54295, 127.046, 95],
+    [37.54293, 127.048, 90],
+    [37.54292, 127.05, 90],
+    [37.54292, 127.052, 90],
+    [37.542915, 127.0542, 90],
   ] as const;
-  for (const [latitude, longitude] of routePoints) {
+  for (const [latitude, longitude, heading] of routeSamples) {
     await emitLocation(page, { accuracy: 8, latitude, longitude });
-    await emitHeading(page, 0);
+    await emitHeading(page, heading);
     await page.clock.fastForward(150);
   }
   for (let sample = 0; sample < 5; sample += 1) {
     await emitLocation(page, {
       accuracy: 8,
-      latitude: 37.54645,
-      longitude: 127.04307 + sample * 0.00001,
+      latitude: 37.542915,
+      longitude: 127.05467 + sample * 0.00001,
     });
-    await emitHeading(page, 0);
+    await emitHeading(page, 90);
     if (sample < 4) {
       await page.clock.fastForward(4_100);
     }
@@ -161,6 +165,7 @@ export async function driveCredibleArrival(page: Page): Promise<void> {
 }
 
 export async function ready(page: Page): Promise<void> {
+  expect(await control(page, 0, false, FIXTURE_VALID_NOW_MS)).toMatchObject({ status: 200 });
   await page.goto(".");
   await expect(page.getByRole("heading", { name: "어딘가로 떠나볼까요?" })).toBeVisible();
   await page.getByRole("button", { name: "시작하기" }).click();
@@ -189,16 +194,19 @@ export async function verifyOfflineShell(page: Page): Promise<readonly string[]>
   });
 }
 
-export function control(page: Page, clockOffsetMs: number, grantFeedbackConsent: boolean) {
-  return page.evaluate(
-    async ({ clockOffsetMs: offset, grantFeedbackConsent: grant, key, url }) => {
-      const response = await fetch(url, {
-        body: JSON.stringify({ clockOffsetMs: offset, grantFeedbackConsent: grant }),
-        headers: { "content-type": "application/json", "x-somewhere-v2-control": key },
-        method: "PUT",
-      });
-      return { body: await response.text(), status: response.status };
+export async function control(
+  page: Page,
+  clockOffsetMs: number,
+  grantFeedbackConsent: boolean,
+  fixtureNowMs?: number,
+) {
+  const response = await page.request.put(CONTROL_URL, {
+    data: {
+      clockOffsetMs,
+      grantFeedbackConsent,
+      ...(fixtureNowMs === undefined ? {} : { fixtureNowMs }),
     },
-    { clockOffsetMs, grantFeedbackConsent, key: CONTROL_KEY, url: CONTROL_URL },
-  );
+    headers: { "x-somewhere-v2-control": CONTROL_KEY },
+  });
+  return { body: await response.text(), status: response.status() };
 }

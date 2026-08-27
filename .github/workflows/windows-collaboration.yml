@@ -1,0 +1,38 @@
+name: Somewhere Windows collaboration smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: somewhere-windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Verify Windows source and board command plans
+    runs-on: windows-latest
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pinned Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install frozen dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Exercise the WSL-free PowerShell entry point
+        shell: pwsh
+        run: |
+          .\scripts\firmware\windows-board.ps1 setup -PlanJson | Out-Null
+          .\scripts\firmware\windows-board.ps1 upload -Port COM7 -PlanJson | Out-Null
+          .\scripts\firmware\windows-board.ps1 monitor -Port COM9 -PlanJson | Out-Null
+
+      - name: Run the Windows-safe repository smoke
+        run: bun run verify:windows

@@ -18,7 +18,11 @@ export function predictSnapshot(
     case "commit":
       return { ...next, phase: snapshot.activeRoute === undefined ? "committed" : "following" };
     case "reveal":
-      return { ...next, revealed: true };
+      return snapshot.phase === "paused" ||
+        snapshot.phase === "stopped" ||
+        snapshot.phase === "completed"
+        ? { ...next, revealed: true }
+        : next;
     case "stop-request": {
       if (!("stopConfirmationId" in details)) {
         throw new TypeError("Stop command is missing confirmation ID");
@@ -85,6 +89,9 @@ function predictCompleted(
 
 function predictRouteRecovery(body: LifecycleBody, next: LifecycleSnapshot): LifecycleSnapshot {
   const external = "choice" in body && body.choice === "external-map";
+  if (external && next.phase !== "paused") {
+    return next;
+  }
   return {
     ...next,
     ...(next.phase === "paused"
@@ -119,6 +126,7 @@ function predictArrival(
         activeRoute: undefined,
         feedback: { dueAt: now + 3_600_000 },
         phase: "arrived",
+        revealed: true,
       }
     : {
         ...next,

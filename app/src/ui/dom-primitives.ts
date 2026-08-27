@@ -74,9 +74,9 @@ export function compass(
   return stage;
 }
 
-export function safetyControls(revealed: boolean): HTMLElement {
+export function safetyControls(canReveal: boolean): HTMLElement {
   const row = element("div", "safety-row");
-  if (!revealed) {
+  if (canReveal) {
     row.append(actionButton("목적지 확인", "reveal"));
   }
   row.append(actionButton("중단", "stop", "button--caution"));

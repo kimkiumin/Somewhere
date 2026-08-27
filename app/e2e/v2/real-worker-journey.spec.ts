@@ -6,7 +6,6 @@ import {
   control,
   driveCredibleArrival,
   emitHeading,
-  emitLocation,
   installDeterministicClock,
   installDeterministicLocation,
   ready,
@@ -14,6 +13,7 @@ import {
 } from "../../qa/browser/v2/fixtures/real-worker";
 
 const BASE_URL = process.env.SOMEWHERE_PREPARED_BASE_URL ?? "https://127.0.0.1:8787/";
+const RESTAURANT_NAME = "소문난성수감자탕";
 
 test("real browser session handshake reaches the Worker", async ({ page }, testInfo) => {
   // Given: an unmodified Chromium or WebKit same-origin browser request shape.
@@ -94,7 +94,7 @@ test("real Worker preserves orthogonal Reveal and guarded Stop recovery", async 
   expect(await page.evaluate(() => Reflect.has(window, "somewhereTest"))).toBe(false);
   await capture(page, "real-ready-390x844");
 
-  // When: the user follows, crosses magnetic north, reveals, pauses, and recovers a route.
+  // When: the user follows, crosses magnetic north, recovers a route, and stops before reveal.
   await page.getByRole("button", { name: "이곳으로 출발" }).click();
   await emitHeading(page, 359);
   await expect(page.locator("[data-compass-needle]")).toBeVisible();
@@ -107,40 +107,34 @@ test("real Worker preserves orthogonal Reveal and guarded Stop recovery", async 
   expect(before).not.toBe(after);
   await capture(page, "real-following-390x844");
   await expect.poll(() => apiBodies.length).toBeGreaterThanOrEqual(3);
-  expect(apiBodies.join("\n")).not.toContain("센터커피 서울숲점");
-  await page.getByRole("button", { name: "목적지 확인" }).click();
-  await expect(page.getByText("센터커피 서울숲점")).toBeVisible();
-  await expect(page.locator("[data-compass-needle]")).toBeVisible();
-  await capture(page, "real-revealed-following-390x844");
+  expect(apiBodies.join("\n")).not.toContain(RESTAURANT_NAME);
+  await expect(page.getByRole("button", { name: "목적지 확인", exact: true })).toHaveCount(0);
+
+  // Reveal is deliberately unavailable while the route is active.
   await page.getByRole("button", { name: "중단", exact: true }).click();
   await expect(page.getByRole("heading", { name: "정말 중단할까요?" })).toBeVisible();
   await capture(page, "real-stop-confirm-390x844");
-  await page.getByRole("button", { name: "계속하기" }).click();
-  await emitLocation(page, { accuracy: 8, latitude: 37.54386, longitude: 127.03696 });
-  await emitHeading(page, 2);
-  await expect(page.locator("[data-compass-needle]")).toBeVisible();
-  await emitLocation(page, { accuracy: 8, latitude: 37.55, longitude: 127.06 });
-  await expect(page.getByRole("button", { name: "안내 복구 살펴보기" })).toBeVisible();
-  await capture(page, "real-route-failure-390x844");
-  await page.getByRole("button", { name: "안내 복구 살펴보기" }).click();
-  await page.getByRole("button", { name: "확인된 경로 이어가기" }).click();
-  await emitLocation(page, { accuracy: 8, latitude: 37.54387, longitude: 127.03697 });
-  await emitHeading(page, 3);
-  await expect(page.locator("[data-compass-needle]")).toBeVisible();
-
-  // Then: stopping is explicit, reason/recommendation recovery is guarded, and no client fake leaks.
-  await page.getByRole("button", { name: "중단", exact: true }).click();
   await page.getByRole("button", { name: "중단 확정" }).click();
   await expect(page.getByRole("heading", { name: "중단한 이유가 있나요?" })).toBeVisible();
   await capture(page, "real-stop-reason-390x844");
-  await page.getByRole("button", { name: "길 안내가 불안정해요" }).click();
+  await page.getByRole("button", { name: "건너뛰기" }).click();
+  await expect(page.getByRole("heading", { name: "안전하게 마쳤어요." })).toBeVisible();
+  await page.getByRole("button", { name: "목적지 확인", exact: true }).click();
+  await expect(page.getByText(RESTAURANT_NAME)).toBeVisible();
+  await capture(page, "real-revealed-completed-390x844");
   await page.getByRole("button", { name: "새 장소 찾기" }).click();
   await expect(page.getByRole("heading", { name: "바꿀 조건을 확인해요." })).toBeVisible();
   await capture(page, "real-recovery-review-390x844");
   await page.getByRole("button", { name: "확인하고 다시 찾기" }).click();
-  await expect(page.getByRole("heading", { name: "목적지는 아직 비밀이에요." })).toBeVisible();
-  expect(apiBodies.join("\n")).toContain("센터커피 서울숲점");
-  expect(failures).toEqual([]);
+  await expect(
+    page.getByRole("heading", { name: "조건에 맞는 곳을 찾지 못했어요." }),
+  ).toBeVisible();
+  await expect(page.getByText(/검토된 식당이 없어요/)).toBeVisible();
+  expect(apiBodies.join("\n")).toContain(RESTAURANT_NAME);
+  expect(apiBodies.join("\n")).toContain('"code":"no_fit"');
+  expect(failures).toEqual([
+    "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)",
+  ]);
 });
 
 test("strong arrival retains one raw feedback capability across a context restart", async ({
@@ -169,7 +163,7 @@ test("strong arrival retains one raw feedback capability across a context restar
   await ready(page);
   expect(await control(page, 0, true)).toMatchObject({ status: 200 });
   await page.getByRole("button", { name: "이곳으로 출발" }).click();
-  await emitHeading(page, 0);
+  await emitHeading(page, 98);
   const arrivalResponse = page.waitForResponse(
     (response) => response.request().method() === "POST" && response.url().endsWith("/arrival"),
   );
@@ -251,7 +245,7 @@ test("production mobile surface is private, offline-safe, accessible, and contai
   expect(cachePathnames.some((value) => value.endsWith(".js"))).toBe(true);
   expect(cachePathnames.some((value) => value.endsWith(".css"))).toBe(true);
   expect(cacheUrls.some((url) => url.includes("/api/"))).toBe(false);
-  expect(cacheUrls.join("\n")).not.toContain("센터커피 서울숲점");
+  expect(cacheUrls.join("\n")).not.toContain(RESTAURANT_NAME);
   expect(await page.evaluate(() => Reflect.has(window, "somewhereTest"))).toBe(false);
   await capture(page, "real-offline-reload-390x844");
 });

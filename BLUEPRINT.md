@@ -1,4 +1,4 @@
-# Somewhere Full Development Blueprint
+# Roll the compass! Full Development Blueprint
 
 Status: approved written blueprint (2026-07-21)
 
@@ -8,13 +8,18 @@ Scope: product, UX, recommendation, navigation, iOS, physical product, validatio
 
 ## 1. Product Definition
 
-> Somewhere는 사용자가 정한 최소 조건 안에서 갈 만한 장소 하나를 빠르게 확정해, 여러 후보를 비교하지 않고 출발하게 만드는 숨겨진 목적지 서비스다.
+Public product name: **Roll the compass!**
+
+`Somewhere` remains the internal repository, target, bundle, and API namespace
+for compatibility. User-facing product copy and artwork use `Roll the compass!`.
+
+> Roll the compass!는 사용자가 정한 최소 조건 안에서 갈 만한 장소 하나를 빠르게 확정해, 여러 후보를 비교하지 않고 출발하게 만드는 숨겨진 목적지 서비스다.
 
 The product is not defined by a fixed party size. The first field validation prioritizes two close participants choosing a restaurant or cafe because the existing survey most clearly exposes coordination and selection burden in that context.
 
 ## 2. Core Promise
 
-Somewhere is responsible for two outcomes:
+Roll the compass! is responsible for two outcomes:
 
 1. Select one evidence-qualified destination quickly within non-negotiable constraints.
 2. Move the user from comparison to departure without presenting a candidate list.
@@ -30,13 +35,17 @@ Set minimum constraints
 → build a qualified destination pool
 → select one destination uniformly at random from the frozen retrieved pool
 → show distance, representative menu, and price band
-→ explicit commit
+→ one-tap selection and commit
 → route-aware compass guidance
 → arrive
+→ automatic destination reveal
 → request one place reaction after 60 minutes
 ```
 
-The exact venue name, address, photos, reviews, and ratings remain hidden by default. A secondary `목적지 확인` safety action can reveal the name and address without ending guidance.
+The exact venue name, address, photos, reviews, and ratings remain hidden while
+guidance is active. There is no direct Reveal action in active guidance: the
+user pauses with `멈춤`, confirms the stop flow, and can reveal from that safe
+paused/stopped state. A credible arrival reveals the destination automatically.
 
 ## 4. Product Form
 

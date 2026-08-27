@@ -36,15 +36,15 @@ const base = { contractVersion: 1, journeyId, sequence: 1 } as const;
 
 const projectionExamplesInput = [
   { ...base, phase: "finding", pollAfterSeconds: 2, actions: ["poll", "cancel"] },
-  { ...base, phase: "ready", revealed: false, disclosure, actions: ["commit", "reveal", "stop"] },
+  { ...base, phase: "ready", revealed: false, disclosure, actions: ["commit", "stop"] },
   { ...base, phase: "ready", revealed: true, disclosure, reveal, actions: ["commit", "stop"] },
-  { ...base, phase: "committed", revealed: false, disclosure, pollAfterSeconds: 2, guidance: { kind: "unavailable", reason: "route-pending" }, actions: ["poll", "reveal", "stop"] },
+  { ...base, phase: "committed", revealed: false, disclosure, pollAfterSeconds: 2, guidance: { kind: "unavailable", reason: "route-pending" }, actions: ["poll", "stop"] },
   { ...base, phase: "committed", revealed: true, disclosure, reveal, pollAfterSeconds: 2, guidance: { kind: "unavailable", reason: "route-pending" }, actions: ["poll", "stop"] },
-  { ...base, phase: "following", revealed: false, disclosure, guidance: route, actions: ["reveal", "stop", "route-recover", "arrival"] },
+  { ...base, phase: "following", revealed: false, disclosure, guidance: route, actions: ["stop", "route-recover", "arrival"] },
   { ...base, phase: "following", revealed: true, disclosure, reveal, guidance: route, actions: ["stop", "route-recover", "arrival"] },
-  { ...base, phase: "route-recovery", revealed: false, disclosure, guidance: unavailable, actions: ["reveal", "stop", "route-recover"] },
+  { ...base, phase: "route-recovery", revealed: false, disclosure, guidance: unavailable, actions: ["stop", "route-recover"] },
   { ...base, phase: "route-recovery", revealed: true, disclosure, reveal, guidance: unavailable, actions: ["stop", "route-recover"] },
-  { ...base, phase: "near", revealed: false, disclosure, guidance: route, actions: ["reveal", "stop", "route-recover", "arrival"] },
+  { ...base, phase: "near", revealed: false, disclosure, guidance: route, actions: ["stop", "route-recover", "arrival"] },
   { ...base, phase: "near", revealed: true, disclosure, reveal, guidance: route, actions: ["stop", "route-recover", "arrival"] },
   { ...base, phase: "paused", revealed: false, disclosure, phaseBeforePause: "following", stopConfirmationId: "sc_v1.AAAAAAAAAAAAAAAAAAAAAA", stopConfirmation: { copyVersion: "v1" }, routeRepair: { status: "idle" }, actions: ["continue", "route-recover", "confirm-stop", "reveal"] },
   { ...base, phase: "paused", revealed: true, disclosure, reveal, phaseBeforePause: "following", stopConfirmationId: "sc_v1.AAAAAAAAAAAAAAAAAAAAAA", stopConfirmation: { copyVersion: "v1" }, routeRepair: { status: "idle" }, actions: ["continue", "route-recover", "confirm-stop"] },
@@ -54,7 +54,6 @@ const projectionExamplesInput = [
   { ...base, phase: "completed", revealed: true, disclosure, reveal, stopReasonState: "recorded", recoveryExpiresAt: 1000, actions: ["recovery"] },
   { ...base, phase: "completed", revealed: false, disclosure, stopReasonState: "skipped", actions: ["reveal"] },
   { ...base, phase: "completed", revealed: true, disclosure, reveal, stopReasonState: "skipped", actions: [] },
-  { ...base, phase: "arrived", revealed: false, disclosure, feedbackDueAt: 1000, actions: ["reveal"] },
   { ...base, phase: "arrived", revealed: true, disclosure, reveal, feedbackDueAt: 1000, actions: [] },
   { ...base, phase: "expired", actions: [] },
 ] as const;

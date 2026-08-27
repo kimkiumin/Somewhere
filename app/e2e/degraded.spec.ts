@@ -17,7 +17,7 @@ test("removes stale guidance while keeping every safety control", async ({ page 
   await expect(page.getByRole("heading", { name: "방향을 다시 확인하고 있어요." })).toBeVisible();
   await expect(page.locator("[data-compass-needle]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "안내 복구 살펴보기" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "목적지 확인" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "목적지 확인", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "중단", exact: true })).toBeVisible();
 });
 
@@ -40,7 +40,10 @@ test("permission denial remains a safe reveal path", async ({ page }) => {
   await harnessCommand(page, "emitOrigin");
   await page.getByRole("button", { name: "이곳으로 출발" }).click();
   await expect(page.locator("[data-compass-needle]")).toHaveCount(0);
-  await page.getByRole("button", { name: "목적지 확인" }).click();
+  await page.getByRole("button", { name: "중단", exact: true }).click();
+  await page.getByRole("button", { name: "중단 확정" }).click();
+  await page.getByRole("button", { name: "건너뛰기" }).click();
+  await page.getByRole("button", { name: "목적지 확인", exact: true }).click();
   await expect(page.getByRole("heading", { name: "조용한 정원" })).toBeVisible();
 });
 

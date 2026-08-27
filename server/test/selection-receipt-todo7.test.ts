@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
-import type { SealedPool } from "../src/provider/pool";
+import { digestMember, digestMembers, type SealedPool } from "../src/provider/pool";
 import { drawUnbiasedIndex, projectPreReveal, selectDestination } from "../src/provider/selection";
 
 const POOL: SealedPool = Object.freeze({
@@ -48,6 +49,13 @@ const POOL: SealedPool = Object.freeze({
 });
 
 describe("Todo7 unbiased selection receipt", () => {
+  const remainingMembers = Object.freeze(POOL.members.slice(0, 2));
+  const recoveryPool: SealedPool = Object.freeze({
+    ...POOL,
+    members: remainingMembers,
+    orderedMemberDigest: digestMembers(remainingMembers),
+  });
+
   it("records rejected random values before accepting an unbiased index", () => {
     // Given: a three-member set and injected values at then below the rejection limit
     const values = [4_294_967_295, 4];
@@ -77,15 +85,14 @@ describe("Todo7 unbiased selection receipt", () => {
   });
 
   it("excludes the previous destination and records final revalidation attempts", async () => {
-    // Given: a prior destination and a first newly drawn candidate that becomes invalid
+    // Given: a recovery pool sealed after the prior destination was excluded
     const randomValues = [0, 0];
     let cursor = 0;
 
-    // When: selection revalidates candidates from the remaining frozen set
+    // When: selection revalidates candidates from the already-filtered pool
     const result = await selectDestination({
       requestId: "request:test",
-      pool: POOL,
-      previousCandidateId: "candidate:c",
+      pool: recoveryPool,
       randomUint32: () => randomValues[cursor++] ?? 0,
       revalidate: async (member) =>
         member.candidateId === "candidate:a"
@@ -93,7 +100,7 @@ describe("Todo7 unbiased selection receipt", () => {
           : { verdict: "pass" },
     });
 
-    // Then: selection succeeds without the prior candidate and preserves both attempts
+    // Then: selection never sees the prior candidate and preserves both attempts
     expect(result.kind).toBe("selected");
     if (result.kind !== "selected") {
       throw new TypeError("expected selected result");
@@ -108,7 +115,7 @@ describe("Todo7 unbiased selection receipt", () => {
     );
     expect(result.receipt).toEqual(
       expect.objectContaining({
-        qualifiedPoolSize: 3,
+        qualifiedPoolSize: 2,
         providerId: "provider:test",
         providerQueryVersion: "query:test",
         providerPaginationVersion: "pagination:test",
@@ -118,6 +125,17 @@ describe("Todo7 unbiased selection receipt", () => {
       }),
     );
     expect(Object.isFrozen(result.receipt.attempts)).toBe(true);
+  });
+
+  it("uses the canonical member identity tuple for digesting", () => {
+    const member = POOL.members[0];
+    if (member === undefined) {
+      throw new TypeError("fixture member is missing");
+    }
+    const expected = createHash("sha256")
+      .update("canonical:a\0candidate:a\0snapshot:a", "utf8")
+      .digest("hex");
+    expect(digestMember(member)).toBe(`sha256:${expected}`);
   });
 
   it("projects only non-identifying pre-Reveal fields", async () => {

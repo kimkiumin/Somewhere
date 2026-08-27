@@ -28,16 +28,13 @@ export function constraintsScreen(main: HTMLElement): void {
   form.id = "constraints-form";
   const category = element("fieldset", "choice-group");
   category.append(element("legend", undefined, "어디로 갈까요?"));
-  for (const [value, label] of [
-    ["restaurant", "식당"],
-    ["cafe", "카페"],
-  ] as const) {
+  for (const [value, label] of [["restaurant", "식당"]] as const) {
     const item = element("label", "choice");
     const input = element("input");
     input.type = "radio";
     input.name = "category";
     input.value = value;
-    input.checked = value === "cafe";
+    input.checked = true;
     item.append(input, element("span", undefined, label));
     category.append(item);
   }
@@ -110,7 +107,7 @@ function disclosure(snapshot: JourneyApplicationSnapshot): readonly [string, str
   }
   return [
     `약 ${snapshot.hiddenDestination?.estimatedMinutes ?? 0}분`,
-    snapshot.hiddenDestination?.hint ?? "카페",
+    snapshot.hiddenDestination?.hint ?? "식당",
     "₩₩",
   ];
 }
@@ -127,7 +124,7 @@ export function readyScreen(main: HTMLElement, snapshot: JourneyApplicationSnaps
     ),
     panel,
     actionButton("이곳으로 출발", "commit", "button--primary button--wide"),
-    safetyControls(snapshot.revealedDestination !== null),
+    safetyControls(snapshot.projection?.actions.some((action) => action === "reveal") === true),
   );
 }
 
@@ -173,7 +170,9 @@ export function guidanceScreen(main: HTMLElement, snapshot: JourneyApplicationSn
       actionButton("안내 복구 살펴보기", "open-route-recovery", "button--secondary button--wide"),
     );
   }
-  main.append(safetyControls(snapshot.revealedDestination !== null));
+  main.append(
+    safetyControls(snapshot.projection?.actions.some((action) => action === "reveal") === true),
+  );
   if (arrived) {
     main.append(
       element("p", "small-copy muted centered", "장소 평가는 60분 뒤 한 번만 여쭤볼게요."),

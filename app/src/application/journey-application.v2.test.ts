@@ -10,6 +10,7 @@ import {
 import { createSensorController } from "./controller";
 import { createDiagnosticTrace } from "./diagnostics";
 import { createV2JourneyApplication, type JourneyApplication } from "./journey-application";
+import { V2ApiError } from "./v2-api";
 import { createV2Store } from "./v2-store";
 
 function projection(phase: string, revealed: boolean): JourneyProjectionV1 {
@@ -46,6 +47,7 @@ function fixture(autoTransition = false) {
       contractVersion: 1,
       constraints: {
         accessibility: [],
+        allergies: [],
         budgetBand: "medium",
         category: "cafe",
         dietary: [],
@@ -150,7 +152,7 @@ describe("V2 journey application facade", () => {
   });
 
   test("TASK16_V2_ROUTE_ADAPTER emits guidance and submits only strong route-consistent arrival", async () => {
-    const context = fixture();
+    const context = fixture(true);
     await context.application.startAdventure();
     context.rig.advanceMs(1_000);
     context.rig.emitLocation({
@@ -207,6 +209,15 @@ describe("V2 journey application facade", () => {
           routeConsistency: "consistent",
         },
       },
+    });
+    await vi.waitFor(() =>
+      expect(context.store.snapshot().projection).toMatchObject({
+        phase: "arrived",
+        revealed: true,
+      }),
+    );
+    expect(context.application.snapshot().revealedDestination).toMatchObject({
+      name: "조용한 정원",
     });
   });
 
@@ -340,6 +351,46 @@ describe("V2 journey application facade", () => {
       kind: "create",
       body: { recoveryCapability: `rc_v1.${"A".repeat(43)}` },
     });
+    expect(context.api.calls.filter((call) => call.kind === "create")).toHaveLength(2);
+  });
+
+  test("does not auto-create a second journey after recovery has no fit", async () => {
+    const context = fixture(true);
+    await context.application.startAdventure();
+    context.rig.emitLocation({
+      accuracyM: 8,
+      capturedAtMs: context.rig.nowMs(),
+      coordinates: { latitude: 37.554, longitude: 127.039_6 },
+    });
+    await vi.waitFor(() => expect(context.store.snapshot().projection?.phase).toBe("ready"));
+    context.application.beginWalk();
+    await vi.waitFor(() => expect(context.store.snapshot().projection?.phase).toBe("following"));
+    await context.application.stop();
+    await context.application.confirmStop();
+    await context.application.recordStopReason("skip");
+
+    const intent = await context.application.requestRecovery();
+    context.api.failure = new V2ApiError(422, "no_fit", "req_v1.test", false);
+    const replacement = context.application.confirmRecovery(intent, intent.requiredReviewFields);
+    await Promise.resolve();
+    context.rig.emitLocation({
+      accuracyM: 8,
+      capturedAtMs: context.rig.nowMs() + 1,
+      coordinates: { latitude: 37.554, longitude: 127.039_6 },
+    });
+    await replacement;
+
+    expect(context.store.snapshot()).toMatchObject({
+      failure: { code: "no_fit" },
+      projection: null,
+      status: "failed",
+    });
+    context.rig.emitLocation({
+      accuracyM: 8,
+      capturedAtMs: context.rig.nowMs() + 2,
+      coordinates: { latitude: 37.554, longitude: 127.039_6 },
+    });
+    await Promise.resolve();
     expect(context.api.calls.filter((call) => call.kind === "create")).toHaveLength(2);
   });
 

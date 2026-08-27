@@ -39,7 +39,7 @@ describe("GitHub to macOS handoff contract", () => {
     const iosReadme = await read("ios/README.md");
 
     expect(iosReadme).toContain('validate-https-origin.mjs --origin "$SOMEWHERE_API_ORIGIN"');
-    expect(iosReadme.match(/SOMEWHERE_API_ORIGIN="\$SOMEWHERE_API_ORIGIN"/g)).toHaveLength(3);
+    expect(iosReadme.match(/SOMEWHERE_API_ORIGIN="\$SOMEWHERE_API_ORIGIN"/g)).toHaveLength(4);
   });
 
   test("keeps manual Playwright installation inside the frozen app workspace", async () => {

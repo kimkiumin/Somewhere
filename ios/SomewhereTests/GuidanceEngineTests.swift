@@ -2,6 +2,18 @@ import XCTest
 @testable import Somewhere
 
 final class GuidanceEngineTests: XCTestCase {
+    func testSignedAngleDeltaWrapsAcrossNorth() {
+        XCTAssertEqual(CompassAngles.normalize(-1), 359, accuracy: 0.0001)
+        XCTAssertEqual(CompassAngles.signedDelta(from: 359, to: 1), 2, accuracy: 0.0001)
+        XCTAssertEqual(CompassAngles.signedDelta(from: 1, to: 359), -2, accuracy: 0.0001)
+    }
+
+    func testCompassPulseStartsOnlyWhenEnteringPointingMode() {
+        XCTAssertTrue(SomewhereCompassMotionPolicy.shouldStartPulse(from: .ready, to: .pointing(15)))
+        XCTAssertFalse(SomewhereCompassMotionPolicy.shouldStartPulse(from: .pointing(15), to: .pointing(20)))
+        XCTAssertFalse(SomewhereCompassMotionPolicy.shouldStartPulse(from: .pointing(20), to: .paused))
+    }
+
     func testGuidanceUsesRouteLookAheadAndRejectsPoorAccuracy() throws {
         let now = Date(timeIntervalSince1970: 3_000)
         let route = TrustedRoute(
@@ -22,8 +34,8 @@ final class GuidanceEngineTests: XCTestCase {
             capturedAt: now
         )
         let heading = HeadingSample(
-            trueHeadingDegrees: 0,
-            magneticHeadingDegrees: 0,
+            trueHeadingDegrees: 90,
+            magneticHeadingDegrees: 90,
             magneticDeclinationDegreesEast: nil,
             accuracyDegrees: 5,
             capturedAt: now
@@ -31,7 +43,8 @@ final class GuidanceEngineTests: XCTestCase {
         guard case .credible(let reading) = engine.update(location: location, heading: heading, route: route, now: now) else {
             return XCTFail("expected credible route guidance")
         }
-        XCTAssertLessThan(reading.arrowDegrees, 10)
+        XCTAssertEqual(reading.arrowDegrees, 270, accuracy: 1)
+        XCTAssertEqual(reading.targetTrueBearingDegrees, 0, accuracy: 1)
 
         let poor = LocationSample(
             coordinate: location.coordinate,
@@ -46,6 +59,16 @@ final class GuidanceEngineTests: XCTestCase {
         var gate = ArrivalGate()
         for offset in [0.0, 4.0, 8.0] {
             XCTAssertFalse(gate.advance(sample: qualifyingSample(at: start.addingTimeInterval(offset))))
+        }
+        XCTAssertTrue(gate.advance(sample: qualifyingSample(at: start.addingTimeInterval(12))))
+        XCTAssertTrue(gate.arrived)
+    }
+
+    func testArrivalWorksWithOneSecondLocationUpdatesAfterTwelveSeconds() {
+        let start = Date(timeIntervalSince1970: 1_500)
+        var gate = ArrivalGate()
+        for second in 0...11 {
+            XCTAssertFalse(gate.advance(sample: qualifyingSample(at: start.addingTimeInterval(Double(second)))))
         }
         XCTAssertTrue(gate.advance(sample: qualifyingSample(at: start.addingTimeInterval(12))))
         XCTAssertTrue(gate.arrived)

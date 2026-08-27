@@ -143,7 +143,7 @@ export class DeterministicV2Api implements V2Api {
       switch (mutation.action) {
         case "arrival": {
           const arrived = JourneyProjectionV1Schema.parse({
-            ...example("arrived", revealed),
+            ...example("arrived", true),
             feedbackDueAt: Date.now() + 300,
           });
           if (arrived.phase !== "arrived") {
@@ -161,6 +161,10 @@ export class DeterministicV2Api implements V2Api {
           };
         }
         case "commit":
+          if (this.projection.phase !== "following") {
+            this.projection = example("following", revealed);
+          }
+          break;
         case "continue":
         case "route-recover":
           this.projection = example("following", revealed);

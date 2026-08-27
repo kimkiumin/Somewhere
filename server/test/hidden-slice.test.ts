@@ -88,6 +88,25 @@ describe("hidden journey composition", () => {
     expect(replay).toBe(original);
   });
 
+  it("projects historical local route validity onto the live runtime clock", async () => {
+    // Given: a fixture replayed while its reviewed route is valid and a later runtime clock.
+    const prepared = await buildJourneyPreparation({
+      body: CREATE_INPUT,
+      journeyId: "j_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      now: new Date("2026-08-01T00:00:00Z"),
+      runtimeNow: new Date("2026-08-27T00:00:00Z"),
+      randomUint32: () => 0,
+      requestId: "req_v1.AAAAAAAAAAAAAAAAAAAAAA",
+    });
+
+    // Then: the reviewed remaining lifetime is preserved instead of returning an expired route.
+    expect(prepared.kind).toBe("ready");
+    if (prepared.kind !== "ready") {
+      throw new TypeError("reviewed fixture unexpectedly failed");
+    }
+    expect(prepared.route.expiresAt).toBe(Date.parse("2026-09-21T06:00:00Z"));
+  });
+
   it("releases route only after Commit and Reveal preserves phase", async () => {
     // Given: a ready journey produced by the reviewed fixture.
     const prepared = await buildJourneyPreparation({
@@ -146,5 +165,63 @@ describe("hidden journey composition", () => {
     // Then: neither case relaxes policy or invents bearing guidance.
     expect(routeResult).toEqual({ code: "route_unavailable", kind: "error" });
     expect(fitResult).toEqual({ code: "no_fit", kind: "error" });
+  });
+
+  it("does not select a restaurant above the requested budget band", async () => {
+    const lowBudget = {
+      ...CREATE_INPUT,
+      constraints: { ...CREATE_INPUT.constraints, budgetBand: "low" as const },
+    };
+
+    const result = await buildJourneyPreparation({
+      body: lowBudget,
+      journeyId: "j_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      now: new Date("2026-07-29T00:00:00Z"),
+      requestId: "req_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      randomUint32: () => 0,
+    });
+
+    expect(result).toEqual({ code: "no_fit", kind: "error" });
+  });
+
+  it("returns no_fit when recovery excludes the only eligible restaurant", async () => {
+    const first = await buildJourneyPreparation({
+      body: CREATE_INPUT,
+      journeyId: "j_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      now: new Date("2026-07-29T00:00:00Z"),
+      requestId: "req_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      randomUint32: () => 0,
+    });
+    if (first.kind !== "ready") {
+      throw new TypeError("reviewed fixture unexpectedly failed");
+    }
+
+    const replacement = await buildJourneyPreparation({
+      body: CREATE_INPUT,
+      journeyId: "j_v1.BBBBBBBBBBBBBBBBBBBBBB",
+      now: new Date("2026-07-29T00:00:00Z"),
+      previousMemberDigest: first.receipt.selectedMemberDigest,
+      requestId: "req_v1.BBBBBBBBBBBBBBBBBBBBBB",
+      randomUint32: () => 0,
+    });
+
+    expect(replacement).toEqual({ code: "no_fit", kind: "error" });
+  });
+
+  it("fails closed when allergy evidence has not been reviewed", async () => {
+    const allergyConstrained = {
+      ...CREATE_INPUT,
+      constraints: { ...CREATE_INPUT.constraints, allergies: ["peanut"] },
+    };
+
+    const result = await buildJourneyPreparation({
+      body: allergyConstrained,
+      journeyId: "j_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      now: new Date("2026-07-29T00:00:00Z"),
+      requestId: "req_v1.AAAAAAAAAAAAAAAAAAAAAA",
+      randomUint32: () => 0,
+    });
+
+    expect(result).toEqual({ code: "no_fit", kind: "error" });
   });
 });

@@ -87,6 +87,7 @@ enum GuidanceSuppression: String, Equatable, Sendable {
 
 struct GuidanceReading: Equatable, Sendable {
     let arrowDegrees: Double
+    let targetTrueBearingDegrees: Double
     let remainingM: Double
     let endpointDistanceM: Double
     let finalCorridorDeviationM: Double
@@ -176,11 +177,12 @@ struct GuidanceEngine: Sendable {
 
         corridor = .inside
         acceptedProgressM = projection.progressM
-        let rawArrowDegrees = normalizedDegrees(targetBearing - headingDegrees)
+        let rawArrowDegrees = CompassAngles.normalize(targetBearing - headingDegrees)
         let arrowDegrees = smoothedArrow(previous: previousArrowDegrees, next: rawArrowDegrees, maximumStepDegrees: 45)
         previousArrowDegrees = arrowDegrees
         return .credible(GuidanceReading(
             arrowDegrees: arrowDegrees,
+            targetTrueBearingDegrees: targetBearing,
             remainingM: max(0, totalM - projection.progressM),
             endpointDistanceM: endpointDistanceM,
             finalCorridorDeviationM: finalProjection.deviationM,
@@ -210,23 +212,18 @@ private func decodeBase64URL(_ encoded: String) -> Data? {
     return Data(base64Encoded: standard)
 }
 
-private func normalizedDegrees(_ degrees: Double) -> Double {
-    let remainder = degrees.truncatingRemainder(dividingBy: 360)
-    return remainder >= 0 ? remainder : remainder + 360
-}
-
 private func smoothedArrow(previous: Double?, next: Double, maximumStepDegrees: Double) -> Double {
     guard let previous else { return next }
     let delta = (next - previous + 540).truncatingRemainder(dividingBy: 360) - 180
-    return normalizedDegrees(previous + max(-maximumStepDegrees, min(maximumStepDegrees, delta)))
+    return CompassAngles.normalize(previous + max(-maximumStepDegrees, min(maximumStepDegrees, delta)))
 }
 
 private func resolvedTrueHeading(_ sample: HeadingSample) -> Double? {
-    if let value = sample.trueHeadingDegrees, value.isFinite, value >= 0 { return normalizedDegrees(value) }
+    if let value = sample.trueHeadingDegrees, value.isFinite, value >= 0 { return CompassAngles.normalize(value) }
     guard sample.magneticHeadingDegrees.isFinite,
           let declination = sample.magneticDeclinationDegreesEast,
           declination.isFinite else { return nil }
-    return normalizedDegrees(sample.magneticHeadingDegrees + declination)
+    return CompassAngles.normalize(sample.magneticHeadingDegrees + declination)
 }
 
 private func distance(from: Coordinate, to: Coordinate) -> Double? {
@@ -247,7 +244,7 @@ private func bearing(from: Coordinate, to: Coordinate) -> Double? {
     let longitudeDelta = (to.longitude - from.longitude) * .pi / 180
     let x = sin(longitudeDelta) * cos(toLatitude)
     let y = cos(fromLatitude) * sin(toLatitude) - sin(fromLatitude) * cos(toLatitude) * cos(longitudeDelta)
-    return normalizedDegrees(atan2(x, y) * 180 / .pi)
+    return CompassAngles.normalize(atan2(x, y) * 180 / .pi)
 }
 
 private func project(_ point: Coordinate, toSegmentFrom start: Coordinate, to end: Coordinate) -> (fraction: Double, deviationM: Double)? {

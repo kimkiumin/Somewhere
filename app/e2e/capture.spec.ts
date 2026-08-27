@@ -42,8 +42,7 @@ test("captures every V2 product state and target viewport", async ({ page }, tes
     await page.getByRole("button", { name: "이곳으로 출발" }).click();
     await harnessCommand(page, "emitDistance", 300, 10);
     await capture(page, testInfo, viewport, "following");
-    await page.getByRole("button", { name: "목적지 확인" }).click();
-    await capture(page, testInfo, viewport, "revealed-following");
+    await expect(page.getByRole("button", { name: "목적지 확인", exact: true })).toHaveCount(0);
     await harnessCommand(page, "emitDistance", 290, 90);
     await capture(page, testInfo, viewport, "degraded");
     await page.getByRole("button", { name: "안내 복구 살펴보기" }).click();
@@ -63,6 +62,8 @@ test("captures every V2 product state and target viewport", async ({ page }, tes
     await capture(page, testInfo, viewport, "stop-reason");
     await page.getByRole("button", { name: "건너뛰기" }).click();
     await capture(page, testInfo, viewport, "completed");
+    await page.getByRole("button", { name: "목적지 확인", exact: true }).click();
+    await capture(page, testInfo, viewport, "revealed-completed");
     await page.getByRole("button", { name: "새 장소 찾기" }).click();
     await capture(page, testInfo, viewport, "recovery-review");
   }

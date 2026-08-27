@@ -16,8 +16,12 @@ export const IOS_SOURCE_REQUIREMENTS = Object.freeze({
     "ios/Somewhere/Domain/NavigationPolicy.swift",
     "ios/Somewhere/Networking/APIClient.swift",
     "ios/Somewhere/Networking/WireModels.swift",
+    "ios/Somewhere/Platform/PhysicalCompassWire.swift",
+    "ios/Somewhere/Platform/PhysicalCompassController.swift",
+    "ios/Somewhere/Resources/Info.plist",
     "ios/Somewhere/Resources/PrivacyInfo.xcprivacy",
     "ios/SomewhereTests/WireContractTests.swift",
+    "ios/SomewhereTests/PhysicalCompassWireTests.swift",
     "ios/SomewhereTests/GuidanceEngineTests.swift",
     "ios/Fixtures/projection-examples-v1.json",
     "ios/Fixtures/navigation-policy-v1.json",
@@ -176,6 +180,9 @@ export async function validateIOSSource(repositoryRoot, options = {}) {
   assert(privacyManifest.includes("NSPrivacyAccessedAPICategoryUserDefaults"), "privacy manifest must disclose UserDefaults access");
   assert(privacyManifest.includes("<string>CA92.1</string>"), "privacy manifest must declare the app-only UserDefaults reason");
   assert(/<key>NSPrivacyTracking<\/key>\s*<false\/>/.test(privacyManifest), "privacy manifest must keep tracking disabled");
+  const infoPlist = contents.get("ios/Somewhere/Resources/Info.plist");
+  assert(infoPlist.includes("NSBluetoothAlwaysUsageDescription"), "Info.plist must explain Bluetooth usage");
+  assert(!infoPlist.includes("bluetooth-central"), "native app must not promise background Bluetooth navigation");
 
   return {
     gate: "PASS",

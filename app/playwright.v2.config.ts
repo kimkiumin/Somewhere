@@ -1,6 +1,13 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { defineConfig, devices } from "@playwright/test";
 
-const evidenceDir = process.env.V2_EVIDENCE_DIR ?? "../.omo/evidence/task-19";
+const defaultEvidenceDir = fileURLToPath(new URL("../.omo/evidence/task-19", import.meta.url));
+const evidenceDir = path.resolve(process.env.V2_EVIDENCE_DIR ?? defaultEvidenceDir);
+if (process.env.V2_EVIDENCE_DIR === undefined) {
+  process.env.V2_EVIDENCE_DIR = evidenceDir;
+}
 const preparedBaseUrl = process.env.SOMEWHERE_PREPARED_BASE_URL;
 const preparedMode = preparedBaseUrl !== undefined;
 const projects = preparedMode
