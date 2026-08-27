@@ -18,6 +18,7 @@ mkdir -p "$test_output_root"
   "$project_root/firmware/roll-compass-board/compass_diagnostics.cpp" \
   "$project_root/firmware/roll-compass-board/compass_math.cpp" \
   "$project_root/firmware/roll-compass-board/compass_runtime.cpp" \
+  "$project_root/firmware/roll-compass-board/display_content.cpp" \
   "$project_root/firmware/roll-compass-board/needle_spring.cpp" \
   "$project_root/firmware/roll-compass-board/physical_compass_wire.cpp" \
   "$project_root/firmware/roll-compass-board/screen_power_button.cpp" \

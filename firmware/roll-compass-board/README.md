@@ -29,18 +29,29 @@ shell commands. The one-time setup and explicit COM-port workflow are in the
 That wrapper restores the exact generated image and font sources from the
 checked-in integrity-verified `generated-assets-v1.br` bundle, so a clean
 Windows clone does not need Python or the font/image generation dependencies.
+The source-derived circular instrument headers are tracked separately and are
+not reconstructed by that legacy bundle restore.
 
-`firmware:assets` regenerates the 520px cropped LVGL compass shell and needle
-from the shared iOS artwork. The board crop removes the transparent outer
-decoration so the circular body reaches the display edges; the image is
-intentionally clipped by the 480×480 face. The dial owns most of the display
-while status, distance, and touch actions sit on top as small rounded overlays
-rather than separate cards.
+The live renderer uses the checked-in collaborator port at
+`3022401c02e92204d2751f569b19745024724c80`: exact SVG-derived tick geometry in
+`compass_artwork.h` and the source bitmap data for `Univers Next Pro Thin
+Condensed` in `univers_next_pro_thin_condensed_font.h`. It draws a black
+480×480 circular instrument with off-white cardinals/ticks, green
+`REMAINING`/`PRICE`/`MENU` readouts, and a pink relative-bearing needle. The
+readout baselines and bounds are tested against the circular face; there is no
+scrolling or square card layer.
 
-After an intentional artwork or font change on the maintainer toolchain, run
+`firmware:assets` still regenerates the Korean fallback fonts and the legacy
+asset bundle used by the Windows restore path. It is not a regeneration step
+for the collaborator's source artwork. Refresh that artwork only from the
+exact source commit documented in the Windows handoff, then re-run the host
+tests and Arduino compile.
+
+After an intentional fallback-font change on the maintainer toolchain, run
 `bun run firmware:assets` and then
 `bun scripts/firmware/package-board-assets.mjs` so clean Windows clones receive
-the same generated inputs.
+the same generated inputs. The exact source-derived instrument headers remain
+tracked files and do not need to be packed into that legacy bundle.
 
 ## USB flashing and diagnostics
 
@@ -82,10 +93,11 @@ phone-relative arrow angle.
 ## Display behavior
 
 The official Espressif `ESP32_Display_Panel` preset initializes the 480×480
-RGB LCD and CST820 touch controller. The LVGL UI shows connection status,
+RGB LCD and CST820 touch controller. The LVGL UI shows the source instrument,
 phone-computed direction only when confidence is `credible`, approximate
-distance, safe category/price cues, and only the actions advertised by the
-phone. A stale state hides the arrow and disables actions.
+distance, the first representative menu and price cue, and only the actions
+advertised by the phone. A stale, paused, route-recovery, or otherwise
+non-credible state hides the exact arrow and disables unsafe actions.
 
 The renderer prefers two 480×480 RGB565 framebuffers in PSRAM with LVGL direct
 mode. If the PSRAM reserve or panel/LVGL initialization is insufficient, it
@@ -94,8 +106,8 @@ selected `display_mode` and current PSRAM/free-heap values.
 
 Tap anywhere outside an active action to compensate for the physical USB-port
 mount angle. The complete circular UI cycles `0° → 10° → 20° → 30° → 0°`;
-boot always starts at `0°`. The correction rotates the shell, needle, labels,
-and controls around the true 240×240 glass center.
+boot always starts at `0°`. The correction rotates the source ticks/cardinals,
+needle, readouts, and controls around the true 240×240 glass center.
 
 A short press of the physical BOOT button toggles the LCD backlight like a
 phone power button. BLE, the current journey state, and the firmware remain

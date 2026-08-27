@@ -94,6 +94,8 @@ roll_compass::RuntimeInput buildRuntimeInput(uint32_t nowMs) {
     input.magneticDeclinationDegreesEast = currentState.magneticDeclinationDegreesEast;
     input.hasDistance = currentState.hasDistance;
     input.distanceM = currentState.distanceM;
+    input.menu = currentState.menuCount > 0 ? currentState.menus[0] : nullptr;
+    input.priceBand = currentState.priceBand;
     input.actionMask = currentActionMask();
     return input;
 }

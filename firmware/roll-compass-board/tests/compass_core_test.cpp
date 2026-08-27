@@ -8,6 +8,7 @@
 #include "compass_diagnostics.h"
 #include "compass_layout.h"
 #include "compass_runtime.h"
+#include "display_content.h"
 #include "display_buffer_policy.h"
 #include "needle_spring.h"
 #include "physical_compass_wire.h"
@@ -54,12 +55,16 @@ static roll_compass::RuntimeInput credibleGuidanceInput() {
 
 static void assertRuntimePrecedence() {
     auto input = credibleGuidanceInput();
+    input.menu = "TONKATSU";
+    input.priceBand = "10000원";
     auto guiding = roll_compass::reduceRuntime(input);
     assert(guiding.state == roll_compass::CompassOsState::Guiding);
     assert(guiding.showNeedle);
     assertNear(guiding.targetNeedleAngleDegrees, 20.0f);
     assert(guiding.hasDistance);
     assertNear(guiding.distanceM, 420.0f);
+    assert(strcmp(guiding.menu, "TONKATSU") == 0);
+    assert(strcmp(guiding.priceBand, "10000원") == 0);
     assert(guiding.actionMask == (1U << 0));
 
     input.snapshotFresh = false;
@@ -93,7 +98,9 @@ static void assertRuntimePhaseMappingAndSuppression() {
     input.phase = roll_compass::JourneyPhase::RouteRecovery;
     auto recovering = roll_compass::reduceRuntime(input);
     assert(recovering.state == roll_compass::CompassOsState::Guiding);
-    assert(recovering.showNeedle);
+    assert(!recovering.showNeedle);
+    assert(recovering.needleSuppressed);
+    assert(recovering.actionMask == (1U << 0));
 
     input.hasCredibleTarget = false;
     assert(roll_compass::reduceRuntime(input).state == roll_compass::CompassOsState::Stale);
@@ -108,6 +115,7 @@ static void assertRuntimePhaseMappingAndSuppression() {
     input.phase = roll_compass::JourneyPhase::Paused;
     auto paused = roll_compass::reduceRuntime(input);
     assert(paused.state == roll_compass::CompassOsState::Paused);
+    assert(!paused.showNeedle);
     assert(paused.actionMask == ((1U << 1) | (1U << 2)));
     input.phase = roll_compass::JourneyPhase::Stopped;
     assert(roll_compass::reduceRuntime(input).state == roll_compass::CompassOsState::Paused);
@@ -493,6 +501,28 @@ static void assertCircularLayoutContainment() {
     assert(roll_compass::rectFitsCircle(roll_compass::kPausedEndBounds, 240, 240, 214));
 }
 
+static void assertInstrumentLayoutContainment() {
+    const roll_compass::Rect instrumentBounds[] = {
+        roll_compass::kInstrumentNorthBounds,
+        roll_compass::kInstrumentSouthBounds,
+        roll_compass::kInstrumentWestBounds,
+        roll_compass::kInstrumentEastBounds,
+        roll_compass::kInstrumentRemainingLabelBounds,
+        roll_compass::kInstrumentDistanceBounds,
+        roll_compass::kInstrumentPriceLabelBounds,
+        roll_compass::kInstrumentPriceValueBounds,
+        roll_compass::kInstrumentMenuLabelBounds,
+        roll_compass::kInstrumentMenuValueBounds,
+        roll_compass::kInstrumentStatusBounds,
+        roll_compass::kInstrumentPrimaryActionBounds,
+        roll_compass::kInstrumentPausedContinueBounds,
+        roll_compass::kInstrumentPausedEndBounds,
+    };
+    for (const auto &bounds : instrumentBounds) {
+        assert(roll_compass::rectFitsCircle(bounds, 240, 240, 230));
+    }
+}
+
 static void assertDisplayBufferPreference() {
     using roll_compass::DisplayBufferPreference;
 
@@ -500,6 +530,39 @@ static void assertDisplayBufferPreference() {
         DisplayBufferPreference::Partial);
     assert(roll_compass::displayBufferPreference(1'310'720U, 1'310'720U) ==
         DisplayBufferPreference::DirectDouble);
+}
+
+static void assertDisplayContentFormatting() {
+    char output[64] = {};
+
+    roll_compass::formatDistanceMeters(320.0f, output, sizeof(output));
+    assert(strcmp(output, "320 m") == 0);
+    roll_compass::formatDistanceMeters(1500.0f, output, sizeof(output));
+    assert(strcmp(output, "1.5 km") == 0);
+    roll_compass::formatDistanceMeters(10'000.0f, output, sizeof(output));
+    assert(strcmp(output, "10 km") == 0);
+    roll_compass::formatDistanceMeters(-1.0f, output, sizeof(output));
+    assert(strcmp(output, "--") == 0);
+
+    roll_compass::formatPriceBand("상관없음", output, sizeof(output));
+    assert(strcmp(output, "-") == 0);
+    roll_compass::formatPriceBand("상관 없음", output, sizeof(output));
+    assert(strcmp(output, "-") == 0);
+    roll_compass::formatPriceBand("10000원", output, sizeof(output));
+    assert(strcmp(output, "10000") == 0);
+    roll_compass::formatPriceBand("₩10,000", output, sizeof(output));
+    assert(strcmp(output, "10000") == 0);
+    roll_compass::formatPriceBand("medium", output, sizeof(output));
+    assert(strcmp(output, "medium") == 0);
+    roll_compass::formatPriceBand("₩₩", output, sizeof(output));
+    assert(strcmp(output, "-") == 0);
+
+    roll_compass::copyDisplayText(output, sizeof(output), "돈까스", 2);
+    assert(strcmp(output, "돈까") == 0);
+    assert(roll_compass::isAsciiDisplayText("TONKATSU"));
+    assert(!roll_compass::isAsciiDisplayText("돈까스"));
+    assert(roll_compass::kInstrumentNeedleLength <= roll_compass::kInstrumentNeedleSafeRadius);
+    assert(roll_compass::kInstrumentNeedleSafeRadius < roll_compass::kInstrumentFaceRadius);
 }
 
 static void assertScreenPowerButtonRespondsOnPressEdge() {
@@ -573,7 +636,9 @@ int main() {
     assertDiagnosticStateInjection();
     assertDiagnosticSweep();
     assertCircularLayoutContainment();
+    assertInstrumentLayoutContainment();
     assertDisplayBufferPreference();
+    assertDisplayContentFormatting();
     assertScreenPowerButtonRespondsOnPressEdge();
     return 0;
 }

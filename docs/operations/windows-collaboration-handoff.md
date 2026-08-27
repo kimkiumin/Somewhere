@@ -34,8 +34,10 @@ particular, V2 does not restore the historical active Reroll control.
 
 The collaboration branch is `codex/roll-compass-native-app`. BOOT-button screen
 behavior was isolated in commit `0ee5774`; use the latest remote branch tip for
-all Windows tooling and documentation in this guide. Do not transplant an
-older visual or prototype branch wholesale into this V2 tree.
+all Windows tooling and documentation in this guide. The current circular
+instrument is a selective port from `origin/codex/full-blueprint` at exact SHA
+`3022401c02e92204d2751f569b19745024724c80`; do not transplant that unrelated
+root or any prototype branch wholesale into this V2 tree.
 
 ## What is where
 
@@ -53,6 +55,81 @@ older visual or prototype branch wholesale into this V2 tree.
 Add or remove iOS files through `ios/project.yml`; do not hand-edit a generated
 `.xcodeproj`.
 
+## Circular instrument source handoff
+
+The board renderer was updated from the collaborator's source reference without
+a merge or cherry-pick. The app-side v1-to-v2 work remains a separate handoff at
+`origin/codex/ipad-board-integration` SHA
+`bf47b297f72de136fc363fa6de0da4e5bbc1758b`; this board checkout consumes the
+existing BLE contract v2 and does not alter the app wire contract.
+
+The source material inspected at
+`origin/codex/full-blueprint@3022401c02e92204d2751f569b19745024724c80` was:
+
+- `prototype/compass-ui/artboard-3-2.svg` — 480×480 visual source and layer IDs
+  `_디스플레이_배경`, `_레이어_9`, `_디스플레이_문자`, `_핑크_바늘`.
+- `prototype/compass-ui/firmware-preview.png` — the reference 480px preview.
+- `prototype/compass-ui/compass-ui.js` and `compass-ui.test.js` — distance,
+  price, menu, and shortest-bearing formatting intent.
+- `hardware/esp32-s3-touch-lcd-2.1/SomewhereDisplaySmokeTest/*` — exact SVG
+  tick export, ASCII bitmap font, and layout baselines. Its low-level panel,
+  touch, and framebuffer drivers remain an independent smoke test.
+
+The current firmware port is deliberately limited to these files and the
+renderer/state integration:
+
+- `firmware/roll-compass-board/compass_artwork.h` keeps the exact SVG-derived
+  80-tick geometry and source SVG digest.
+- `univers_next_pro_thin_condensed_font.h` keeps the source bitmap data;
+  `univers_font_adapter.*` exposes its four sizes to LVGL.
+- `display_content.*` formats `d`/`p` values and truncates menu text on UTF-8
+  codepoint boundaries. `display_ui.cpp` owns the circular layers, baselines,
+  needle animation, mount rotation, and guarded existing action buttons.
+
+The BLE v2 projection is unchanged:
+
+| v2 field | Board visual | Safety rule |
+| --- | --- | --- |
+| `d` / `remainingDistanceM` | top `REMAINING` value | Shows `--` when absent or invalid |
+| `m[0]` | lower-right `MENU` value | Only the first representative menu is shown |
+| `p` / `priceBand` | lower-left `PRICE` value | Won markers are removed; no-preference is `-` |
+| `tb` + `md` + board heading | pink needle | Relative angle is shown only for a fresh, credible state |
+
+`route-recovery`, stale snapshots, paused state, invalid confidence, and invalid
+sensor/calibration conditions never display an exact needle. The v2 north-
+referenced target/declaration pair and the existing mount correction sequence
+`0° → 10° → 20° → 30° → 0°` are retained. The board still sends only guarded
+touch intents and never receives destination identity.
+
+The source font is ASCII-only. `REMAINING`, `PRICE`, `MENU`, cardinal letters,
+numeric values, and ASCII menu values use the ported Thin Condensed bitmap. A
+Korean menu/value/status/action keeps the existing Korean LVGL fallback font;
+the app/server strings and v2 JSON are not silently translated to English. If a
+character is absent from that fallback font, it is allowed to render as the
+font's normal missing-glyph result rather than exposing a different label.
+The host core test covers UTF-8-safe menu truncation and the visual contract test
+covers the explicit ASCII/Korean split.
+
+No artwork regeneration is needed for an ordinary Windows checkout: both source
+headers are tracked. If the source branch is intentionally refreshed, first
+inspect the exact file and digest, then selectively export only the two source
+headers from PowerShell (the command below writes the Git blob bytes through
+`cmd.exe`; it does not merge branches):
+
+```powershell
+$source = '3022401c02e92204d2751f569b19745024724c80'
+cmd /d /c "git show $source`:hardware/esp32-s3-touch-lcd-2.1/SomewhereDisplaySmokeTest/compass_artwork.h > firmware\roll-compass-board\compass_artwork.h"
+cmd /d /c "git show $source`:hardware/esp32-s3-touch-lcd-2.1/SomewhereDisplaySmokeTest/univers_next_pro_thin_condensed_font.h > firmware\roll-compass-board\univers_next_pro_thin_condensed_font.h"
+Get-FileHash firmware\roll-compass-board\compass_artwork.h -Algorithm SHA256
+Get-FileHash firmware\roll-compass-board\univers_next_pro_thin_condensed_font.h -Algorithm SHA256
+bun test scripts/firmware/visual-instrument.test.mjs
+```
+
+The reference SVG digest is recorded in `compass_artwork.h`; the font source
+digest is recorded in `univers_next_pro_thin_condensed_font.h`. Re-run the
+Arduino compile after any refresh. Do not copy `SomewhereDisplaySmokeTest.ino`
+or its panel/touch drivers into the production sketch.
+
 ## Current board behavior
 
 The target is the flat Waveshare `ESP32-S3-Touch-LCD-2.1`, not the 2.1B. Its
@@ -69,9 +146,9 @@ unless firmware download mode is intended.
 The board's QMI8658 measures acceleration and angular velocity but is not a
 magnetometer. Rotating the standalone board therefore does not rotate the
 journey needle; the iPhone supplies heading. An external magnetometer would be
-a separate hardware milestone. The current firmware compile occupies about 56%
-of the app flash partition and 9% of global RAM, so a microSD card is not needed
-for the current executable and would not enlarge that partition.
+a separate hardware milestone. The latest source-derived renderer compile uses
+about 32% of the app flash partition and 10% of global RAM, so a microSD card is
+not needed for the current executable and would not enlarge that partition.
 
 The BLE endpoints are:
 

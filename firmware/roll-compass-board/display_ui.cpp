@@ -3,20 +3,25 @@
 #include <lvgl.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
-#include "compass_asset_metrics.h"
-#include "compass_assets.h"
+#include "compass_artwork.h"
 #include "compass_layout.h"
 #include "compass_math.h"
+#include "display_content.h"
 #include "lvgl_v8_port.h"
 #include "needle_spring.h"
+#include "univers_font_adapter.h"
 
-LV_FONT_DECLARE(roll_compass_wordmark_font)
 LV_FONT_DECLARE(roll_compass_korean_16)
 LV_FONT_DECLARE(roll_compass_korean_20)
 
 namespace {
 
+constexpr float kPi = 3.14159265358979323846f;
+constexpr int16_t kScreenSize = somewhere_artwork::SCREEN_SIZE;
+constexpr int16_t kDisplayCenter = roll_compass::kInstrumentFaceCenter;
+constexpr int16_t kNeedleLength = roll_compass::kInstrumentNeedleLength;
 constexpr uint8_t kMountRotationStepDegrees = 10;
 constexpr uint8_t kMaximumMountRotationDegrees = 30;
 constexpr uint32_t kNeedleStepMs = 25;
@@ -25,26 +30,32 @@ constexpr uint8_t kStopAction = 1U << 0;
 constexpr uint8_t kContinueAction = 1U << 1;
 constexpr uint8_t kConfirmStopAction = 1U << 2;
 constexpr uint8_t kRevealAction = 1U << 3;
+constexpr lv_opa_t kReadoutLabelOpacity = 168;
 
-const lv_color_t kCanvas = lv_color_hex(0xF8F3E8);
-const lv_color_t kInk = lv_color_hex(0x2A211A);
-const lv_color_t kMutedInk = lv_color_hex(0x77685B);
-const lv_color_t kBrass = lv_color_hex(0xB6863A);
-const lv_color_t kBrassLight = lv_color_hex(0xD9BB78);
-const lv_color_t kOxblood = lv_color_hex(0x8E1E22);
-const lv_color_t kPaperBright = lv_color_hex(0xFFF9ED);
-const lv_color_t kSage = lv_color_hex(0x35685E);
+// These values are the collaborator's source SVG palette, expressed at the
+// RGB565 display boundary. The geometry is kept in compass_artwork.h.
+const lv_color_t kBackground = lv_color_hex(0x050706);
+const lv_color_t kOffWhite = lv_color_hex(0xE4ECE8);
+const lv_color_t kCardinalWhite = lv_color_hex(0xE8ECE8);
+const lv_color_t kGreen = lv_color_hex(0x4DFF76);
+const lv_color_t kPink = lv_color_hex(0xFF3850);
 
-lv_obj_t *compassShell = nullptr;
-lv_obj_t *glowRing = nullptr;
+lv_obj_t *faceBackground = nullptr;
+lv_obj_t *tickObjects[somewhere_artwork::TICK_COUNT] = {};
+lv_point_t tickPoints[somewhere_artwork::TICK_COUNT][2] = {};
 lv_obj_t *compassNeedle = nullptr;
-lv_obj_t *ghostNeedle = nullptr;
-lv_obj_t *calibrationArc = nullptr;
-lv_obj_t *brandLabel = nullptr;
-lv_obj_t *statusLabel = nullptr;
-lv_obj_t *mountAngleLabel = nullptr;
-lv_obj_t *distanceGroup = nullptr;
+lv_point_t needlePoints[2] = {};
+lv_obj_t *northLabel = nullptr;
+lv_obj_t *southLabel = nullptr;
+lv_obj_t *westLabel = nullptr;
+lv_obj_t *eastLabel = nullptr;
+lv_obj_t *remainingLabel = nullptr;
 lv_obj_t *distanceValue = nullptr;
+lv_obj_t *priceLabel = nullptr;
+lv_obj_t *priceValue = nullptr;
+lv_obj_t *menuLabel = nullptr;
+lv_obj_t *menuValue = nullptr;
+lv_obj_t *statusLabel = nullptr;
 lv_obj_t *primaryButton = nullptr;
 lv_obj_t *primaryButtonLabel = nullptr;
 lv_obj_t *pausedContinueButton = nullptr;
@@ -68,12 +79,6 @@ int16_t mountRotationTenths() {
     return static_cast<int16_t>(mountRotationDegrees) * 10;
 }
 
-int16_t mountedImageAngle(float contentAngleDegrees) {
-    const int32_t angle = static_cast<int32_t>(lroundf(contentAngleDegrees * 10.0f)) +
-        mountRotationTenths();
-    return static_cast<int16_t>((angle % 3600 + 3600) % 3600);
-}
-
 void setHidden(lv_obj_t *object, bool hidden) {
     if (object == nullptr) return;
     if (hidden) {
@@ -83,68 +88,104 @@ void setHidden(lv_obj_t *object, bool hidden) {
     }
 }
 
-void positionMountedObject(lv_obj_t *object, const roll_compass::Rect &bounds) {
-    if (object == nullptr) return;
-    constexpr float displayCenter = 240.0f;
+lv_point_t mountedPoint(int16_t x, int16_t y) {
     const float radians =
-        static_cast<float>(mountRotationDegrees) * static_cast<float>(M_PI) / 180.0f;
+        static_cast<float>(mountRotationDegrees) * kPi / 180.0f;
     const float cosine = cosf(radians);
     const float sine = sinf(radians);
-    const float centerX =
-        static_cast<float>(bounds.x) + static_cast<float>(bounds.width) * 0.5f;
-    const float centerY =
-        static_cast<float>(bounds.y) + static_cast<float>(bounds.height) * 0.5f;
-    const float deltaX = centerX - displayCenter;
-    const float deltaY = centerY - displayCenter;
-    const float mountedCenterX = displayCenter + deltaX * cosine - deltaY * sine;
-    const float mountedCenterY = displayCenter + deltaX * sine + deltaY * cosine;
+    const float deltaX = static_cast<float>(x - kDisplayCenter);
+    const float deltaY = static_cast<float>(y - kDisplayCenter);
+    return lv_point_t{
+        static_cast<lv_coord_t>(lroundf(kDisplayCenter + deltaX * cosine - deltaY * sine)),
+        static_cast<lv_coord_t>(lroundf(kDisplayCenter + deltaX * sine + deltaY * cosine)),
+    };
+}
+
+void positionMountedObject(lv_obj_t *object, const roll_compass::Rect &bounds) {
+    if (object == nullptr) return;
+    const lv_point_t mountedCenter = mountedPoint(
+        static_cast<int16_t>(bounds.x + bounds.width / 2),
+        static_cast<int16_t>(bounds.y + bounds.height / 2)
+    );
     lv_obj_set_pos(
         object,
-        static_cast<lv_coord_t>(lroundf(mountedCenterX - bounds.width * 0.5f)),
-        static_cast<lv_coord_t>(lroundf(mountedCenterY - bounds.height * 0.5f))
+        static_cast<lv_coord_t>(mountedCenter.x - bounds.width / 2),
+        static_cast<lv_coord_t>(mountedCenter.y - bounds.height / 2)
     );
     lv_obj_set_style_transform_pivot_x(object, bounds.width / 2, LV_PART_MAIN);
     lv_obj_set_style_transform_pivot_y(object, bounds.height / 2, LV_PART_MAIN);
     lv_obj_set_style_transform_angle(object, mountRotationTenths(), LV_PART_MAIN);
 }
 
+void updateTickGeometry() {
+    for (size_t index = 0; index < somewhere_artwork::TICK_COUNT; ++index) {
+        const somewhere_artwork::CompassTick &source = somewhere_artwork::TICKS[index];
+        tickPoints[index][0] = mountedPoint(source.x1, source.y1);
+        tickPoints[index][1] = mountedPoint(source.x2, source.y2);
+        if (tickObjects[index] != nullptr) {
+            lv_line_set_points(tickObjects[index], tickPoints[index], 2);
+        }
+    }
+}
+
+void updateNeedleGeometry(float angleDegrees) {
+    if (compassNeedle == nullptr) return;
+    const float radians = angleDegrees * kPi / 180.0f;
+    const int16_t tipX = static_cast<int16_t>(lroundf(
+        kDisplayCenter + sinf(radians) * kNeedleLength
+    ));
+    const int16_t tipY = static_cast<int16_t>(lroundf(
+        kDisplayCenter - cosf(radians) * kNeedleLength
+    ));
+    needlePoints[0] = lv_point_t{kDisplayCenter, kDisplayCenter};
+    needlePoints[1] = lv_point_t{tipX, tipY};
+    lv_line_set_points(compassNeedle, needlePoints, 2);
+}
+
 void applyMountRotation() {
-    if (compassShell != nullptr) lv_img_set_angle(compassShell, mountRotationTenths());
-    if (compassNeedle != nullptr) {
-        lv_img_set_angle(compassNeedle, mountedImageAngle(needleSpring.angleDegrees()));
-    }
-    positionMountedObject(brandLabel, roll_compass::kBrandBounds);
-    positionMountedObject(statusLabel, roll_compass::kStatusBounds);
-    positionMountedObject(distanceGroup, roll_compass::kDistanceBounds);
-    positionMountedObject(primaryButton, roll_compass::kPrimaryActionBounds);
-    positionMountedObject(pausedContinueButton, roll_compass::kPausedContinueBounds);
-    positionMountedObject(pausedEndButton, roll_compass::kPausedEndBounds);
-    positionMountedObject(mountAngleLabel, roll_compass::Rect{176, 110, 128, 18});
-    if (mountAngleLabel != nullptr) {
-        char copy[24];
-        snprintf(copy, sizeof(copy), "MOUNT %u DEG", mountRotationDegrees);
-        lv_label_set_text(mountAngleLabel, copy);
-    }
+    updateTickGeometry();
+    updateNeedleGeometry(needleSpring.angleDegrees() + mountRotationDegrees);
+    positionMountedObject(northLabel, roll_compass::kInstrumentNorthBounds);
+    positionMountedObject(southLabel, roll_compass::kInstrumentSouthBounds);
+    positionMountedObject(westLabel, roll_compass::kInstrumentWestBounds);
+    positionMountedObject(eastLabel, roll_compass::kInstrumentEastBounds);
+    positionMountedObject(
+        remainingLabel,
+        roll_compass::kInstrumentRemainingLabelBounds
+    );
+    positionMountedObject(distanceValue, roll_compass::kInstrumentDistanceBounds);
+    positionMountedObject(priceLabel, roll_compass::kInstrumentPriceLabelBounds);
+    positionMountedObject(priceValue, roll_compass::kInstrumentPriceValueBounds);
+    positionMountedObject(menuLabel, roll_compass::kInstrumentMenuLabelBounds);
+    positionMountedObject(menuValue, roll_compass::kInstrumentMenuValueBounds);
+    positionMountedObject(statusLabel, roll_compass::kInstrumentStatusBounds);
+    positionMountedObject(primaryButton, roll_compass::kInstrumentPrimaryActionBounds);
+    positionMountedObject(
+        pausedContinueButton,
+        roll_compass::kInstrumentPausedContinueBounds
+    );
+    positionMountedObject(pausedEndButton, roll_compass::kInstrumentPausedEndBounds);
 }
 
 lv_obj_t *makeLabel(
     lv_obj_t *parent,
     const roll_compass::Rect &bounds,
     const lv_font_t *font,
-    lv_color_t color
+    lv_color_t color,
+    lv_text_align_t align = LV_TEXT_ALIGN_CENTER
 ) {
     lv_obj_t *label = lv_label_create(parent);
     lv_obj_set_size(label, bounds.width, bounds.height);
     lv_obj_set_pos(label, bounds.x, bounds.y);
     lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
     lv_obj_set_style_text_color(label, color, LV_PART_MAIN);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_style_text_align(label, align, LV_PART_MAIN);
     lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
     lv_obj_clear_flag(label, LV_OBJ_FLAG_CLICKABLE);
     return label;
 }
 
-lv_obj_t *makeSoftKey(
+lv_obj_t *makeActionKey(
     lv_obj_t *parent,
     const roll_compass::Rect &bounds,
     lv_obj_t **labelOutput
@@ -153,19 +194,20 @@ lv_obj_t *makeSoftKey(
     lv_obj_set_size(button, bounds.width, bounds.height);
     lv_obj_set_pos(button, bounds.x, bounds.y);
     lv_obj_set_style_radius(button, bounds.height / 2, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(button, kPaperBright, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(button, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(button, kBackground, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(button, LV_OPA_20, LV_PART_MAIN);
     lv_obj_set_style_border_width(button, 1, LV_PART_MAIN);
-    lv_obj_set_style_border_color(button, kBrassLight, LV_PART_MAIN);
-    lv_obj_set_style_shadow_width(button, 9, LV_PART_MAIN);
-    lv_obj_set_style_shadow_color(button, kBrass, LV_PART_MAIN);
-    lv_obj_set_style_shadow_opa(button, LV_OPA_20, LV_PART_MAIN);
+    lv_obj_set_style_border_color(button, kGreen, LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(button, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(button, 0, LV_PART_MAIN);
     lv_obj_clear_flag(button, LV_OBJ_FLAG_EVENT_BUBBLE);
 
     lv_obj_t *label = lv_label_create(button);
-    lv_obj_set_style_text_font(label, &roll_compass_korean_16, LV_PART_MAIN);
-    lv_obj_set_style_text_color(label, kInk, LV_PART_MAIN);
+    lv_obj_set_style_text_font(label, &somewhere_font_small, LV_PART_MAIN);
+    lv_obj_set_style_text_color(label, kGreen, LV_PART_MAIN);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
+    lv_obj_set_width(label, bounds.width - 8);
     lv_obj_center(label);
     *labelOutput = label;
     return button;
@@ -194,35 +236,64 @@ bool modelEquals(
     const roll_compass::CompassRenderModel &right
 ) {
     return left.state == right.state && left.showNeedle == right.showNeedle &&
+        left.needleSuppressed == right.needleSuppressed &&
         left.targetNeedleAngleDegrees == right.targetNeedleAngleDegrees &&
         left.hasDistance == right.hasDistance && left.distanceM == right.distanceM &&
-        left.actionMask == right.actionMask;
+        left.actionMask == right.actionMask && strcmp(left.menu, right.menu) == 0 &&
+        strcmp(left.priceBand, right.priceBand) == 0;
+}
+
+void setDataLabelText(lv_obj_t *label, const char *text, const lv_font_t *asciiFont) {
+    lv_label_set_text(label, text);
+    lv_obj_set_style_text_font(
+        label,
+        roll_compass::isAsciiDisplayText(text) ? asciiFont : &roll_compass_korean_16,
+        LV_PART_MAIN
+    );
 }
 
 void renderModel() {
-    lv_label_set_text(statusLabel, stateCopy(currentModel.state));
+    char distance[24] = {};
+    char price[roll_compass::kPriceTextLimit * 4 + 1] = {};
+    char menu[roll_compass::kDisplayTextLimit * 4 + 1] = {};
+    roll_compass::formatDistanceMeters(
+        currentModel.hasDistance ? currentModel.distanceM : -1.0f,
+        distance,
+        sizeof(distance)
+    );
+    roll_compass::formatPriceBand(currentModel.priceBand, price, sizeof(price));
+    roll_compass::copyDisplayText(
+        menu,
+        sizeof(menu),
+        currentModel.menu[0] == '\0' ? "--" : currentModel.menu
+    );
+    setDataLabelText(distanceValue, distance, &somewhere_font_distance);
+    setDataLabelText(priceValue, price, &somewhere_font_small);
+    setDataLabelText(menuValue, menu, &somewhere_font_small);
+
+    const bool showStatus = currentModel.needleSuppressed ||
+        (currentModel.state != roll_compass::CompassOsState::Ready &&
+        currentModel.state != roll_compass::CompassOsState::Guiding &&
+        currentModel.state != roll_compass::CompassOsState::Near);
+    setHidden(statusLabel, !showStatus);
     const bool alert = currentModel.state == roll_compass::CompassOsState::SensorMissing ||
         currentModel.state == roll_compass::CompassOsState::MagneticAnomaly ||
         currentModel.state == roll_compass::CompassOsState::UpdateRequired;
-    const bool success = currentModel.state == roll_compass::CompassOsState::Near ||
-        currentModel.state == roll_compass::CompassOsState::Arrived;
+    const bool success = currentModel.state == roll_compass::CompassOsState::Arrived;
+    lv_label_set_text(
+        statusLabel,
+        currentModel.needleSuppressed &&
+                currentModel.state == roll_compass::CompassOsState::Guiding
+            ? "경로를 확인하는 중"
+            : stateCopy(currentModel.state)
+    );
     lv_obj_set_style_text_color(
         statusLabel,
-        alert ? kOxblood : success ? kSage : kInk,
+        alert ? kPink : success ? kGreen : kOffWhite,
         LV_PART_MAIN
     );
 
     setHidden(compassNeedle, !currentModel.showNeedle);
-    setHidden(distanceGroup, !currentModel.hasDistance);
-    if (currentModel.hasDistance) {
-        char distance[24];
-        if (currentModel.distanceM >= 1000.0f) {
-            snprintf(distance, sizeof(distance), "%.1f km", currentModel.distanceM / 1000.0f);
-        } else {
-            snprintf(distance, sizeof(distance), "%.0f m", currentModel.distanceM);
-        }
-        lv_label_set_text(distanceValue, distance);
-    }
 
     const bool showStop =
         (currentModel.state == roll_compass::CompassOsState::Guiding ||
@@ -233,9 +304,9 @@ void renderModel() {
     setHidden(primaryButton, !showStop && !showReveal);
     if (showStop) {
         lv_label_set_text(primaryButtonLabel, "STOP");
-        lv_obj_set_style_text_font(primaryButtonLabel, &lv_font_montserrat_14, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(primaryButton, kOxblood, LV_PART_MAIN);
-        lv_obj_set_style_text_color(primaryButtonLabel, kPaperBright, LV_PART_MAIN);
+        lv_obj_set_style_text_font(primaryButtonLabel, &somewhere_font_small, LV_PART_MAIN);
+        lv_obj_set_style_border_color(primaryButton, kPink, LV_PART_MAIN);
+        lv_obj_set_style_text_color(primaryButtonLabel, kPink, LV_PART_MAIN);
     } else if (showReveal) {
         lv_label_set_text(primaryButtonLabel, "아이폰에서 확인하기");
         lv_obj_set_style_text_font(
@@ -243,8 +314,8 @@ void renderModel() {
             &roll_compass_korean_16,
             LV_PART_MAIN
         );
-        lv_obj_set_style_bg_color(primaryButton, kBrass, LV_PART_MAIN);
-        lv_obj_set_style_text_color(primaryButtonLabel, kPaperBright, LV_PART_MAIN);
+        lv_obj_set_style_border_color(primaryButton, kGreen, LV_PART_MAIN);
+        lv_obj_set_style_text_color(primaryButtonLabel, kGreen, LV_PART_MAIN);
     }
 
     const bool paused = currentModel.state == roll_compass::CompassOsState::Paused;
@@ -256,14 +327,6 @@ void renderModel() {
         pausedEndButton,
         !paused || (currentModel.actionMask & kConfirmStopAction) == 0
     );
-    setHidden(
-        calibrationArc,
-        currentModel.state != roll_compass::CompassOsState::Calibrating
-    );
-    const bool showGhost = currentModel.state == roll_compass::CompassOsState::Boot ||
-        currentModel.state == roll_compass::CompassOsState::Calibrating ||
-        currentModel.state == roll_compass::CompassOsState::Arrived;
-    setHidden(ghostNeedle, !showGhost);
 }
 
 void dispatchAction(const char *action, uint8_t requiredMask) {
@@ -300,54 +363,17 @@ void displayTapped(lv_event_t *) {
 
 void animateState(uint32_t nowMs) {
     if (stateEnteredMs == 0) stateEnteredMs = nowMs;
-    const uint32_t stateAgeMs = nowMs - stateEnteredMs;
+    const bool pulseState = currentModel.state == roll_compass::CompassOsState::Pairing ||
+        currentModel.state == roll_compass::CompassOsState::Calibrating ||
+        currentModel.state == roll_compass::CompassOsState::Stale;
     const float wave = (sinf(static_cast<float>(nowMs) / 520.0f) + 1.0f) * 0.5f;
-    const lv_opa_t shellOpacity = currentModel.state == roll_compass::CompassOsState::Boot
-        ? static_cast<lv_opa_t>(fminf(255.0f, stateAgeMs * 0.3f))
+    const lv_opa_t opacity = pulseState
+        ? static_cast<lv_opa_t>(150.0f + wave * 105.0f)
         : static_cast<lv_opa_t>(LV_OPA_COVER);
-    lv_obj_set_style_img_opa(compassShell, shellOpacity, LV_PART_MAIN);
-
-    lv_opa_t ringOpacity = LV_OPA_20;
-    if (currentModel.state == roll_compass::CompassOsState::Pairing) {
-        ringOpacity = static_cast<lv_opa_t>(45 + wave * 90);
-    } else if (currentModel.showNeedle) {
-        ringOpacity = static_cast<lv_opa_t>(95 + wave * 70);
-    }
-    lv_obj_set_style_arc_opa(glowRing, ringOpacity, LV_PART_MAIN);
-
-    if (currentModel.state == roll_compass::CompassOsState::Boot) {
-        const float sweep =
-            fminf(1.0f, static_cast<float>(stateAgeMs) / 900.0f) * 120.0f - 60.0f;
-        lv_img_set_angle(ghostNeedle, mountedImageAngle(sweep));
-        lv_obj_set_style_img_opa(ghostNeedle, LV_OPA_50, LV_PART_MAIN);
-    } else if (currentModel.state == roll_compass::CompassOsState::Calibrating) {
-        lv_img_set_angle(
-            ghostNeedle,
-            mountedImageAngle(static_cast<float>(nowMs % 2400U) * 0.15f)
-        );
-        lv_obj_set_style_img_opa(
-            ghostNeedle,
-            static_cast<lv_opa_t>(55 + wave * 80),
-            LV_PART_MAIN
-        );
-        const uint16_t start = static_cast<uint16_t>((nowMs / 12U) % 360U);
-        lv_arc_set_angles(
-            calibrationArc,
-            start,
-            static_cast<uint16_t>((start + 82U) % 360U)
-        );
-    } else if (currentModel.state == roll_compass::CompassOsState::Arrived) {
-        if (stateAgeMs < 1200U) {
-            setHidden(ghostNeedle, false);
-            lv_img_set_angle(ghostNeedle, mountedImageAngle(0.0f));
-            lv_obj_set_style_img_opa(
-                ghostNeedle,
-                static_cast<lv_opa_t>(70 + wave * 70),
-                LV_PART_MAIN
-            );
-        } else {
-            setHidden(ghostNeedle, true);
-        }
+    if (statusLabel != nullptr && !pulseState) {
+        lv_obj_set_style_text_opa(statusLabel, LV_OPA_COVER, LV_PART_MAIN);
+    } else if (statusLabel != nullptr) {
+        lv_obj_set_style_text_opa(statusLabel, opacity, LV_PART_MAIN);
     }
 }
 
@@ -368,157 +394,152 @@ void animateNeedle(uint32_t nowMs) {
     if (steps == kMaximumCatchUpSteps && accumulatedNeedleMs >= kNeedleStepMs) {
         accumulatedNeedleMs %= kNeedleStepMs;
     }
-    if (compassNeedle != nullptr) {
-        lv_img_set_angle(
-            compassNeedle,
-            mountedImageAngle(needleSpring.angleDegrees())
-        );
-    }
+    updateNeedleGeometry(needleSpring.angleDegrees() + mountRotationDegrees);
 }
 
 }  // namespace
 
 void displayUiBegin() {
     lv_obj_t *screen = lv_scr_act();
-    lv_obj_set_style_bg_color(screen, kCanvas, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(screen, kBackground, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(screen, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(screen, displayTapped, LV_EVENT_CLICKED, nullptr);
 
-    compassShell = lv_img_create(screen);
-    lv_img_set_src(compassShell, &rollCompassShellImage);
-    lv_obj_set_pos(compassShell, 0, 0);
-    lv_img_set_pivot(
-        compassShell,
-        roll_compass_assets::kScreenHubX,
-        roll_compass_assets::kScreenHubY
-    );
-    lv_img_set_angle(compassShell, 0);
-    lv_img_set_antialias(compassShell, true);
-    lv_obj_clear_flag(compassShell, LV_OBJ_FLAG_CLICKABLE);
+    faceBackground = lv_obj_create(screen);
+    lv_obj_remove_style_all(faceBackground);
+    lv_obj_set_size(faceBackground, kScreenSize, kScreenSize);
+    lv_obj_set_pos(faceBackground, 0, 0);
+    lv_obj_set_style_radius(faceBackground, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(faceBackground, kBackground, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(faceBackground, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_clear_flag(faceBackground, LV_OBJ_FLAG_CLICKABLE);
 
-    glowRing = lv_arc_create(screen);
-    lv_obj_remove_style_all(glowRing);
-    lv_obj_set_size(glowRing, 438, 438);
-    lv_obj_center(glowRing);
-    lv_arc_set_bg_angles(glowRing, 0, 359);
-    lv_arc_set_angles(glowRing, 0, 359);
-    lv_obj_set_style_arc_color(glowRing, kBrassLight, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(glowRing, 4, LV_PART_MAIN);
-    lv_obj_set_style_arc_rounded(glowRing, true, LV_PART_MAIN);
-    lv_obj_clear_flag(glowRing, LV_OBJ_FLAG_CLICKABLE);
+    for (size_t index = 0; index < somewhere_artwork::TICK_COUNT; ++index) {
+        tickObjects[index] = lv_line_create(screen);
+        lv_obj_remove_style_all(tickObjects[index]);
+        lv_obj_set_size(tickObjects[index], kScreenSize, kScreenSize);
+        lv_obj_set_pos(tickObjects[index], 0, 0);
+        lv_obj_set_style_line_color(tickObjects[index], kOffWhite, LV_PART_MAIN);
+        lv_obj_set_style_line_width(tickObjects[index], 1, LV_PART_MAIN);
+        lv_obj_set_style_line_rounded(tickObjects[index], false, LV_PART_MAIN);
+        lv_obj_clear_flag(tickObjects[index], LV_OBJ_FLAG_CLICKABLE);
+    }
 
-    ghostNeedle = lv_img_create(screen);
-    lv_img_set_src(ghostNeedle, &rollCompassNeedleImage);
-    lv_obj_set_pos(
-        ghostNeedle,
-        roll_compass_assets::kNeedleScreenX,
-        roll_compass_assets::kNeedleScreenY
-    );
-    lv_img_set_pivot(
-        ghostNeedle,
-        roll_compass_assets::kNeedlePivotX,
-        roll_compass_assets::kNeedlePivotY
-    );
-    lv_img_set_antialias(ghostNeedle, true);
-    lv_obj_set_style_img_recolor(ghostNeedle, kBrass, LV_PART_MAIN);
-    lv_obj_set_style_img_recolor_opa(ghostNeedle, LV_OPA_80, LV_PART_MAIN);
-    lv_obj_clear_flag(ghostNeedle, LV_OBJ_FLAG_CLICKABLE);
-
-    compassNeedle = lv_img_create(screen);
-    lv_img_set_src(compassNeedle, &rollCompassNeedleImage);
-    lv_obj_set_pos(
-        compassNeedle,
-        roll_compass_assets::kNeedleScreenX,
-        roll_compass_assets::kNeedleScreenY
-    );
-    lv_img_set_pivot(
-        compassNeedle,
-        roll_compass_assets::kNeedlePivotX,
-        roll_compass_assets::kNeedlePivotY
-    );
-    lv_img_set_angle(compassNeedle, 0);
-    lv_img_set_antialias(compassNeedle, true);
+    compassNeedle = lv_line_create(screen);
+    lv_obj_remove_style_all(compassNeedle);
+    lv_obj_set_size(compassNeedle, kScreenSize, kScreenSize);
+    lv_obj_set_pos(compassNeedle, 0, 0);
+    lv_obj_set_style_line_color(compassNeedle, kPink, LV_PART_MAIN);
+    lv_obj_set_style_line_width(compassNeedle, 2, LV_PART_MAIN);
+    lv_obj_set_style_line_rounded(compassNeedle, false, LV_PART_MAIN);
     lv_obj_clear_flag(compassNeedle, LV_OBJ_FLAG_CLICKABLE);
 
-    calibrationArc = lv_arc_create(screen);
-    lv_obj_remove_style_all(calibrationArc);
-    lv_obj_set_size(calibrationArc, 390, 390);
-    lv_obj_center(calibrationArc);
-    lv_obj_set_style_arc_color(calibrationArc, kBrass, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(calibrationArc, 5, LV_PART_MAIN);
-    lv_obj_set_style_arc_rounded(calibrationArc, true, LV_PART_MAIN);
-    lv_obj_clear_flag(calibrationArc, LV_OBJ_FLAG_CLICKABLE);
-
-    brandLabel = makeLabel(
+    northLabel = makeLabel(
         screen,
-        roll_compass::kBrandBounds,
-        &roll_compass_wordmark_font,
-        kInk
+        roll_compass::kInstrumentNorthBounds,
+        &somewhere_font_direction,
+        kCardinalWhite
     );
-    lv_label_set_text(brandLabel, "Roll the compass");
+    southLabel = makeLabel(
+        screen,
+        roll_compass::kInstrumentSouthBounds,
+        &somewhere_font_direction,
+        kCardinalWhite
+    );
+    westLabel = makeLabel(
+        screen,
+        roll_compass::kInstrumentWestBounds,
+        &somewhere_font_direction,
+        kCardinalWhite
+    );
+    eastLabel = makeLabel(
+        screen,
+        roll_compass::kInstrumentEastBounds,
+        &somewhere_font_direction,
+        kCardinalWhite
+    );
+    lv_label_set_text(northLabel, "N");
+    lv_label_set_text(southLabel, "S");
+    lv_label_set_text(westLabel, "W");
+    lv_label_set_text(eastLabel, "E");
+
+    remainingLabel = makeLabel(
+        screen,
+        roll_compass::kInstrumentRemainingLabelBounds,
+        &somewhere_font_label,
+        kGreen
+    );
+    priceLabel = makeLabel(
+        screen,
+        roll_compass::kInstrumentPriceLabelBounds,
+        &somewhere_font_label,
+        kGreen,
+        LV_TEXT_ALIGN_LEFT
+    );
+    menuLabel = makeLabel(
+        screen,
+        roll_compass::kInstrumentMenuLabelBounds,
+        &somewhere_font_label,
+        kGreen,
+        LV_TEXT_ALIGN_RIGHT
+    );
+    lv_label_set_text(remainingLabel, "REMAINING");
+    lv_label_set_text(priceLabel, "PRICE");
+    lv_label_set_text(menuLabel, "MENU");
+    lv_obj_set_style_text_opa(remainingLabel, kReadoutLabelOpacity, LV_PART_MAIN);
+    lv_obj_set_style_text_opa(priceLabel, kReadoutLabelOpacity, LV_PART_MAIN);
+    lv_obj_set_style_text_opa(menuLabel, kReadoutLabelOpacity, LV_PART_MAIN);
+
+    distanceValue = makeLabel(
+        screen,
+        roll_compass::kInstrumentDistanceBounds,
+        &somewhere_font_distance,
+        kGreen
+    );
+    priceValue = makeLabel(
+        screen,
+        roll_compass::kInstrumentPriceValueBounds,
+        &somewhere_font_small,
+        kGreen,
+        LV_TEXT_ALIGN_LEFT
+    );
+    menuValue = makeLabel(
+        screen,
+        roll_compass::kInstrumentMenuValueBounds,
+        &somewhere_font_small,
+        kGreen,
+        LV_TEXT_ALIGN_RIGHT
+    );
 
     statusLabel = makeLabel(
         screen,
-        roll_compass::kStatusBounds,
+        roll_compass::kInstrumentStatusBounds,
         &roll_compass_korean_20,
-        kInk
+        kOffWhite
     );
-    mountAngleLabel = makeLabel(
+    primaryButton = makeActionKey(
         screen,
-        roll_compass::Rect{176, 110, 128, 18},
-        &lv_font_montserrat_10,
-        kBrass
-    );
-    lv_obj_set_style_text_letter_space(mountAngleLabel, 1, LV_PART_MAIN);
-
-    distanceGroup = lv_obj_create(screen);
-    lv_obj_remove_style_all(distanceGroup);
-    lv_obj_set_size(
-        distanceGroup,
-        roll_compass::kDistanceBounds.width,
-        roll_compass::kDistanceBounds.height
-    );
-    lv_obj_set_pos(
-        distanceGroup,
-        roll_compass::kDistanceBounds.x,
-        roll_compass::kDistanceBounds.y
-    );
-    lv_obj_clear_flag(distanceGroup, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_t *distanceCaption = makeLabel(
-        distanceGroup,
-        roll_compass::Rect{0, 0, roll_compass::kDistanceBounds.width, 20},
-        &roll_compass_korean_16,
-        kMutedInk
-    );
-    lv_label_set_text(distanceCaption, "남은 거리");
-    distanceValue = makeLabel(
-        distanceGroup,
-        roll_compass::Rect{0, 21, roll_compass::kDistanceBounds.width, 34},
-        &lv_font_montserrat_24,
-        kInk
-    );
-
-    primaryButton = makeSoftKey(
-        screen,
-        roll_compass::kPrimaryActionBounds,
+        roll_compass::kInstrumentPrimaryActionBounds,
         &primaryButtonLabel
     );
-    pausedContinueButton = makeSoftKey(
+    pausedContinueButton = makeActionKey(
         screen,
-        roll_compass::kPausedContinueBounds,
+        roll_compass::kInstrumentPausedContinueBounds,
         &pausedContinueLabel
     );
-    lv_label_set_text(pausedContinueLabel, "계속하기");
-    pausedEndButton = makeSoftKey(
+    pausedEndButton = makeActionKey(
         screen,
-        roll_compass::kPausedEndBounds,
+        roll_compass::kInstrumentPausedEndBounds,
         &pausedEndLabel
     );
+    lv_label_set_text(pausedContinueLabel, "계속하기");
+    lv_obj_set_style_text_font(pausedContinueLabel, &roll_compass_korean_16, LV_PART_MAIN);
     lv_label_set_text(pausedEndLabel, "여정 끝내기");
-    lv_obj_set_style_bg_color(pausedEndButton, kOxblood, LV_PART_MAIN);
-    lv_obj_set_style_text_color(pausedEndLabel, kPaperBright, LV_PART_MAIN);
+    lv_obj_set_style_text_font(pausedEndLabel, &roll_compass_korean_16, LV_PART_MAIN);
+    lv_obj_set_style_border_color(pausedEndButton, kPink, LV_PART_MAIN);
+    lv_obj_set_style_text_color(pausedEndLabel, kPink, LV_PART_MAIN);
     lv_obj_add_event_cb(primaryButton, primaryClicked, LV_EVENT_CLICKED, nullptr);
     lv_obj_add_event_cb(
         pausedContinueButton,

@@ -24,6 +24,19 @@ bool hasValidDirection(const RuntimeInput &input) {
         input.boardMagneticHeadingDegrees >= 0.0f && input.boardMagneticHeadingDegrees < 360.0f;
 }
 
+void copyDisplayText(char *destination, const char *source) {
+    if (source == nullptr) {
+        destination[0] = '\0';
+        return;
+    }
+    size_t index = 0;
+    while (source[index] != '\0' && index + 1 < kCompassDisplayTextBytes) {
+        destination[index] = source[index];
+        ++index;
+    }
+    destination[index] = '\0';
+}
+
 uint8_t allowedActionMask(CompassOsState state) {
     constexpr uint8_t stop = 1U << 0;
     constexpr uint8_t continueJourney = 1U << 1;
@@ -64,6 +77,9 @@ JourneyPhase journeyPhaseFromWire(const char *phase) {
 
 CompassRenderModel reduceRuntime(const RuntimeInput &input) {
     CompassRenderModel model;
+    model.needleSuppressed = input.phase == JourneyPhase::RouteRecovery;
+    copyDisplayText(model.menu, input.menu);
+    copyDisplayText(model.priceBand, input.priceBand);
     if (input.hasDistance && isfinite(input.distanceM) && input.distanceM >= 0.0f) {
         model.hasDistance = true;
         model.distanceM = input.distanceM;
@@ -115,7 +131,7 @@ CompassRenderModel reduceRuntime(const RuntimeInput &input) {
 
     const bool pointingState =
         model.state == CompassOsState::Guiding || model.state == CompassOsState::Near;
-    if (pointingState && hasValidDirection(input)) {
+    if (pointingState && !model.needleSuppressed && hasValidDirection(input)) {
         model.showNeedle = true;
         model.targetNeedleAngleDegrees = relativeNeedleAngle(
             input.boardMagneticHeadingDegrees,
