@@ -355,6 +355,10 @@ lifecycle, native projection decoder, SwiftUI screens, and regression tests:
 - The compass needle rotates around the measured artwork hub, not the image
   bounding-box center, and uses an unwrapped shortest-angle target so a
   `359° → 1°` change takes the two-degree path.
+- Launch and selection keep the red needle visible at one fixed artwork scale.
+  Only its rotation changes during credible guidance; the removed pulse no longer
+  makes the needle appear to grow and shrink. Paused and recovery states still
+  hide it because no defensible route-relative direction is available.
 
 Final evidence from this review:
 
@@ -476,9 +480,10 @@ session, arrival, recovery, or feedback-wire behavior was removed or replaced.
 Implementation decisions:
 
 - Active guidance keeps the approved red needle and existing live relative
-  rotation. Paused, recovery, reveal-placeholder, and no-fit states reuse the
-  approved shell without a needle so they never imply a direction that the app
-  cannot currently justify.
+  rotation. Paused, recovery, and no-fit states reuse the approved shell without
+  a needle so they never imply a direction that the app cannot currently
+  justify. After an approved arrival reveal, the known curated restaurant may
+  instead show its documented representative menu image.
 - Route recovery is a fixed one-viewport safety surface rather than a scrolling
   form. Its compact accessibility layout preserves every recovery choice and
   the fixed `멈춤` control without clipped labels at large text sizes.
@@ -511,6 +516,42 @@ Review captures:
 - [No-fit recovery](../assets/roll-compass-vnext-no-fit-2026-08-25.jpg)
 
 ![Native full-surface route recovery](../assets/roll-compass-vnext-route-recovery-2026-08-25.jpg)
+
+## iPad arrival reveal scale and menu image (2026-08-28)
+
+The portrait iPad arrival state no longer reuses a small phone-width reveal
+card or a compass placeholder after the destination is public. The bounded
+surface now takes the full 762 pt content width on the 834 × 1194 target and
+uses a 620 pt-high representative gamjatang hero. Name, address, selection
+rationale, external-map action, and delayed feedback remain wired to the same
+V2 projection and store actions; backend, selection, arrival, and disclosure
+contracts are unchanged.
+
+The bundled image is explicitly representative rather than an asserted exact
+restaurant photograph. Its generation brief, dimensions, hash, accessibility
+copy, and usage boundary are recorded in
+[`../../ios/Somewhere/Resources/README.md`](../../ios/Somewhere/Resources/README.md).
+The image is never rendered before reveal.
+
+Focused Build iOS Apps verification:
+
+- Exact `Somewhere iPad Pro 11 2nd Gen` / iOS 26.5 complete scheme: 127
+  passed, 0 failed, 3 expected local-Worker/device skips.
+- Exact `Somewhere iPad Pro 11 2nd Gen` / iOS 26.5 Simulator: the new layout
+  metric and large-food-reveal UI tests pass, with zero scroll views.
+- Exact `Somewhere iPhone 13` / iOS 26.5 Simulator: arrival automatic reveal
+  and compact-guidance regression tests pass.
+- Physical iPad Pro 11-inch (2nd generation, `iPad8,10`) / iPadOS 26.6:
+  development-signed arm64 build, in-place install, and launch passed on
+  2026-08-28 with the fixed launch needle and final arrival asset included.
+  This is exhibition-device evidence, not TestFlight or release authority.
+- Same-viewport before/after inspection confirms the compass placeholder was
+  replaced, the card expanded from 88% to 100% of the bounded iPad width, and
+  the generated bowl stays inside the rounded crop.
+
+[Review capture](../assets/roll-compass-vnext-arrival-gamjatang-2026-08-28.jpg)
+
+![iPad arrival with representative gamjatang hero](../assets/roll-compass-vnext-arrival-gamjatang-2026-08-28.jpg)
 
 ## Simulator build and automated tests
 

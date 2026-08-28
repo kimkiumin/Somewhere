@@ -2,9 +2,9 @@ import XCTest
 @testable import Somewhere
 
 final class SomewhereCompassTests: XCTestCase {
-    func testNeedleIsVisibleOnlyForCrediblePointingMode() {
-        XCTAssertFalse(SomewhereCompassPresentationPolicy.showsNeedle(for: .ready))
-        XCTAssertFalse(SomewhereCompassPresentationPolicy.showsNeedle(for: .searching))
+    func testNeedleRemainsVisibleUntilGuidanceIsPaused() {
+        XCTAssertTrue(SomewhereCompassPresentationPolicy.showsNeedle(for: .ready))
+        XCTAssertTrue(SomewhereCompassPresentationPolicy.showsNeedle(for: .searching))
         XCTAssertTrue(SomewhereCompassPresentationPolicy.showsNeedle(for: .pointing(45)))
         XCTAssertFalse(SomewhereCompassPresentationPolicy.showsNeedle(for: .paused))
     }

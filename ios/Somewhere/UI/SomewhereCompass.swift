@@ -9,12 +9,18 @@ enum SomewhereCompassMode: Equatable {
 
 enum SomewhereCompassPresentationPolicy {
     static func showsNeedle(for mode: SomewhereCompassMode) -> Bool {
-        if case .pointing = mode { return true }
-        return false
+        switch mode {
+        case .ready, .searching, .pointing:
+            true
+        case .paused:
+            false
+        }
     }
 }
 
 enum SomewhereCompassMotionPolicy {
+    static let needleFrameScale: CGFloat = 0.44
+
     static func shortestSignedDelta(from current: Double, to next: Double) -> Double {
         let delta = (next - current).truncatingRemainder(dividingBy: 360)
         if delta > 180 {
@@ -41,14 +47,6 @@ enum SomewhereCompassMotionPolicy {
         )
     }
 
-    static func shouldStartPulse(
-        from previousMode: SomewhereCompassMode?,
-        to nextMode: SomewhereCompassMode
-    ) -> Bool {
-        guard case .pointing = nextMode else { return false }
-        if let previousMode, case .pointing = previousMode { return false }
-        return true
-    }
 }
 
 struct CompassDirectionCue: Equatable {
@@ -82,8 +80,7 @@ struct SomewhereCompass: View {
     let onActivate: (() -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var animatedNeedleTarget = -18.0
-    @State private var needlePulse = false
+    @State private var animatedNeedleTarget = 0.0
 
     init(
         mode: SomewhereCompassMode,
@@ -110,10 +107,10 @@ struct SomewhereCompass: View {
             }
         }
         .onAppear {
-            syncMotion(from: nil, to: mode)
+            syncMotion(to: mode)
         }
-        .onChange(of: mode) { oldMode, newMode in
-            syncMotion(from: oldMode, to: newMode)
+        .onChange(of: mode) { _, newMode in
+            syncMotion(to: newMode)
         }
     }
 
@@ -134,17 +131,19 @@ struct SomewhereCompass: View {
                         .interpolation(.high)
                         .antialiased(true)
                         .scaledToFit()
-                        .frame(width: size * 0.44, height: size * 0.44)
+                        .frame(
+                            width: size * SomewhereCompassMotionPolicy.needleFrameScale,
+                            height: size * SomewhereCompassMotionPolicy.needleFrameScale
+                        )
                         .offset(
                             SomewhereCompassMotionPolicy.hubCorrection(
                                 displaySize: size,
-                                frameScale: 0.44
+                                frameScale: SomewhereCompassMotionPolicy.needleFrameScale
                             )
                         )
                 }
                 .frame(width: size, height: size)
                 .rotationEffect(.degrees(needleAngle))
-                .scaleEffect(needlePulse ? 1.025 : 0.985)
                 .shadow(color: SomewherePalette.ink.opacity(0.20), radius: size * 0.012, y: size * 0.008)
                 .animation(
                     reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.76),
@@ -160,7 +159,7 @@ struct SomewhereCompass: View {
         .shadow(color: SomewherePalette.ink.opacity(0.13), radius: size * 0.045, y: size * 0.025)
     }
 
-    private func syncMotion(from previousMode: SomewhereCompassMode?, to newMode: SomewhereCompassMode) {
+    private func syncMotion(to newMode: SomewhereCompassMode) {
         if case .pointing(let bearing) = newMode {
             let target = SomewhereCompassMotionPolicy.unwrappedTarget(
                 from: animatedNeedleTarget,
@@ -168,21 +167,14 @@ struct SomewhereCompass: View {
             )
             if reduceMotion {
                 animatedNeedleTarget = target
-                needlePulse = false
             } else {
                 withAnimation(.spring(response: 0.42, dampingFraction: 0.76)) {
                     animatedNeedleTarget = target
                 }
-                if SomewhereCompassMotionPolicy.shouldStartPulse(from: previousMode, to: newMode) {
-                    withAnimation(.easeInOut(duration: 1.15).repeatForever(autoreverses: true)) {
-                        needlePulse = true
-                    }
-                }
             }
         } else {
-            needlePulse = false
+            animatedNeedleTarget = 0
         }
-
     }
 
     private var needleAngle: Double {

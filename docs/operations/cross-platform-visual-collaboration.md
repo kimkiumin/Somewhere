@@ -170,12 +170,15 @@ Appetize는 iOS Simulator `.app`을 담은 ZIP/TAR.GZ만 지원하며 ARM Simula
 | Direction unavailable | 필수 | 필수 | 거짓 바늘을 숨기고 복구 설명·뒤로가기 제공 |
 | Near | 필수 | 필수 | 가까워짐이 명확하되 목적지 정체는 숨김 |
 | Paused | 필수 | 필수 | 즉시 멈춤 뒤 Continue와 종료 확인이 구분됨 |
-| Arrived/Revealed | 필수 | 필수 | 도착 전 정체 비노출, 허용된 공개 뒤 이름·주소 표시 |
+| Arrived/Revealed | 필수 | 필수 | 도착 전 정체·사진 비노출, 허용된 공개 뒤 이름·주소와 출처가 명확한 장소/메뉴 이미지 표시; iPad는 전폭 카드 |
 | Settings | 필수 | 필수 | 식이·알레르기 지속 저장, BLE 상태와 권한 문구 구분 |
 
 Guiding은 걷는 중 사용하는 화면이므로 세로 기기에서 스크롤해 Stop이나 거리를
 찾게 만들지 않는다. iPad는 휴대폰 크기 카드를 가운데 작게 띄우지 않고 가용
 세로 공간을 사용하되, iPhone과 정보 위계와 조작 순서를 동일하게 유지한다.
+공개 화면의 생성 이미지는 정확한 매장 사진이라고 주장하지 않고 `대표 메뉴`
+성격과 자산 출처를 함께 남긴다. 현재 `소문난성수감자탕` 상태의 기준 캡처는
+[`../assets/roll-compass-vnext-arrival-gamjatang-2026-08-28.jpg`](../assets/roll-compass-vnext-arrival-gamjatang-2026-08-28.jpg)다.
 
 ## 시안 전달 형식
 

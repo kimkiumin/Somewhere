@@ -81,6 +81,10 @@ lines, maps, and destination identity remain absent from active guidance.
 
 - Reuse the compass visual language while the server qualifies and selects one
   place.
+- Launch and selection show the approved red needle at a neutral angle and one
+  fixed scale as part of the instrument design. This is not presented as live
+  route guidance; credible following samples may rotate it, while paused and
+  recovery states hide it.
 - Do not expose provider payloads, pool members, venue identity, or route data.
 - Avoid an extra confirmation screen when the one-tap start has already
   expressed intent.
@@ -122,6 +126,14 @@ lines, maps, and destination identity remain absent from active guidance.
 - A credible arrival reveals the destination automatically.
 - Reveal content may include the approved name, address, descriptive fallback,
   and server-provided detail fields.
+- The reveal surface may replace the guidance compass with a source-backed or
+  clearly representative place/menu image only after identity disclosure. A
+  generated representative image must not be presented as an exact restaurant
+  photograph.
+- On portrait iPad, the revealed destination uses the full bounded content width
+  and a prominent image rather than a phone-sized card floating in unused space.
+  The primary arrival content remains non-scrolling at the target exhibition
+  text size; compact and accessibility layouts may scroll to preserve content.
 - Place reaction is delayed and remains one small, non-blocking question.
 
 ## Sensor and lifecycle requirements
@@ -140,8 +152,8 @@ lines, maps, and destination identity remain absent from active guidance.
 - Interactive targets are at least 44 pt and expose stable accessibility labels
   and identifiers.
 - Dynamic Type must not hide Stop or make the journey impossible to exit.
-- Reduce Motion disables continuous searching/pulse movement while preserving
-  the directional value.
+- Reduce Motion resolves directional rotation without continuous decorative
+  movement while preserving the directional value.
 - The warm visual surface uses an intentional light appearance until a tested
   dark palette exists; white-on-white text is not acceptable.
 - Native back navigation is present where a reversible local screen transition

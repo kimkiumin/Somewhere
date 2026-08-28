@@ -8,10 +8,8 @@ final class GuidanceEngineTests: XCTestCase {
         XCTAssertEqual(CompassAngles.signedDelta(from: 1, to: 359), -2, accuracy: 0.0001)
     }
 
-    func testCompassPulseStartsOnlyWhenEnteringPointingMode() {
-        XCTAssertTrue(SomewhereCompassMotionPolicy.shouldStartPulse(from: .ready, to: .pointing(15)))
-        XCTAssertFalse(SomewhereCompassMotionPolicy.shouldStartPulse(from: .pointing(15), to: .pointing(20)))
-        XCTAssertFalse(SomewhereCompassMotionPolicy.shouldStartPulse(from: .pointing(20), to: .paused))
+    func testCompassNeedleUsesOneFixedArtworkFrameScale() {
+        XCTAssertEqual(SomewhereCompassMotionPolicy.needleFrameScale, 0.44, accuracy: 0.0001)
     }
 
     func testGuidanceUsesRouteLookAheadAndRejectsPoorAccuracy() throws {

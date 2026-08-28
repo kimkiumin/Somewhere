@@ -289,7 +289,7 @@ final class JourneyFlowUITests: XCTestCase {
         XCTAssertLessThanOrEqual(compassWidthRatio, 0.70)
     }
 
-    func testIPadArrivalUsesCenteredRevealAtPresentationWidth() throws {
+    func testIPadArrivalUsesLargeFoodRevealWithoutScrolling() throws {
         guard UIDevice.current.userInterfaceIdiom == .pad else {
             throw XCTSkip("The proportional arrival composition is iPad-specific")
         }
@@ -297,20 +297,34 @@ final class JourneyFlowUITests: XCTestCase {
         let app = launchHarness("arrived-rich")
         let window = app.windows.firstMatch
         let map = app.buttons["somewhere.external-map"]
-        let reveal = app.otherElements["공개된 목적지 소문난성수감자탕"]
+        let reveal = app.otherElements["somewhere.reveal-card"]
+        let hero = app.otherElements["somewhere.revealed-photo"]
+        let generatedImageDisclosure = app.staticTexts["대표 메뉴 이미지 · 생성 예시"]
         let completion = app.staticTexts["한 시간 뒤 이 장소가 어땠는지 한 번만 물어볼게요."]
 
         XCTAssertTrue(map.waitForExistence(timeout: 3))
         XCTAssertTrue(reveal.waitForExistence(timeout: 3))
+        XCTAssertEqual(reveal.label, "공개된 목적지 소문난성수감자탕")
+        XCTAssertTrue(hero.waitForExistence(timeout: 3))
+        XCTAssertTrue(generatedImageDisclosure.exists)
+        XCTAssertTrue(hero.label.contains("감자탕"))
         XCTAssertTrue(completion.exists)
         XCTAssertLessThan(map.frame.maxY, reveal.frame.minY)
         XCTAssertLessThan(reveal.frame.maxY, completion.frame.minY)
         XCTAssertEqual(app.scrollViews.count, 0)
 
-        let availableWidth = window.frame.width - (36 * 2)
-        let revealWidthRatio = reveal.frame.width / availableWidth
-        XCTAssertGreaterThanOrEqual(revealWidthRatio, 0.84)
-        XCTAssertLessThanOrEqual(revealWidthRatio, 0.90)
+        // The exact overlay marker excludes the visual shadow, so its width is
+        // the 834 pt iPad stage minus the intended 36 pt margins on each side.
+        let revealWidthRatio = reveal.frame.width / window.frame.width
+        XCTAssertGreaterThanOrEqual(revealWidthRatio, 0.90)
+        XCTAssertLessThanOrEqual(revealWidthRatio, 0.93)
+
+        // The portrait exhibit should read as a staged full-screen moment, not a
+        // phone-sized card floating between large empty bands.
+        XCTAssertGreaterThanOrEqual(hero.frame.width, window.frame.width * 0.82)
+        XCTAssertLessThanOrEqual(hero.frame.width, window.frame.width * 0.90)
+        XCTAssertGreaterThanOrEqual(hero.frame.height, window.frame.height * 0.50)
+        XCTAssertGreaterThanOrEqual(reveal.frame.height, window.frame.height * 0.68)
 
         let revealCenterRatio = reveal.frame.midY / window.frame.height
         XCTAssertGreaterThanOrEqual(revealCenterRatio, 0.35)

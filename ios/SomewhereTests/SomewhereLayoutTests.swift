@@ -21,7 +21,7 @@ final class SomewhereLayoutTests: XCTestCase {
         XCTAssertLessThanOrEqual(compassWidthRatio, 0.73)
         XCTAssertGreaterThanOrEqual(value.compassDiameter, 530)
         XCTAssertLessThanOrEqual(value.compassDiameter, 570)
-        XCTAssertEqual(value.arrivalContentMaxWidth, value.contentMaxWidth * 0.88, accuracy: 0.5)
+        XCTAssertEqual(value.arrivalContentMaxWidth, value.contentMaxWidth, accuracy: 0.5)
         XCTAssertEqual(value.sheetMaxWidth, 620)
     }
 
