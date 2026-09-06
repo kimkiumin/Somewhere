@@ -17,8 +17,10 @@ Mac/Xcode 개발과 AI 협업 절차는
 사용하세요.
 
 실물 원형 LCD를 이어받는 협업자는
-[보드 규격·회전 동작·화면 지글거림 확인 안내](docs/operations/board-display-handoff.md)를
-먼저 보면 현재 펌웨어 상태와 남은 실기기 작업을 확인할 수 있습니다.
+[AI와 함께 보드 작업 시작하기](docs/operations/board-collaborator-start-here.md)를
+먼저 보면 됩니다. 파일별 수정 위치, Windows 명령, 한글 추가 방법과 AI에게
+전달할 문장이 들어 있습니다. 세부 규격과 지글거림 확인은
+[보드 인수인계](docs/operations/board-display-handoff.md)에 정리했습니다.
 
 ```text
 최소 조건 → 숨겨진 목적지 하나를 한 번에 확정 → 경로 기반 안내

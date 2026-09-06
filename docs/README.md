@@ -68,6 +68,9 @@ For the current native implementation, use these two focused documents:
 - [Circular board display handoff](operations/board-display-handoff.md)
   records hardware/pixel specifications, rotating cardinals, the five needle
   styles, renderer verification, and the unresolved physical shimmer report.
+- [Start here for AI-assisted board work](operations/board-collaborator-start-here.md)
+  explains source/build/upload, maps changes to files, gives Windows font
+  generation commands, and includes a reusable collaborator prompt.
 
 ## Historical v0.2 application
 

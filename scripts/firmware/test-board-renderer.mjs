@@ -31,3 +31,18 @@ await run([process.env.CXX || "c++", "-std=c++17", "-Wall", "-Wextra", "-Werror"
   ...includes, resolve(firmware, "tests/instrument_line_test.cpp"),
   ...objects, "-lm", "-o", binary]);
 await run([binary]);
+
+const fontObjects = [];
+for (const name of ["roll_compass_korean_16", "roll_compass_korean_20"]) {
+  const object = resolve(output, `${name}.o`);
+  await run([process.env.CC || "cc", "-std=c99", "-O2", ...includes,
+    "-c", resolve(firmware, `${name}.c`), "-o", object]);
+  fontObjects.push(object);
+}
+const textBinary = resolve(output, "instrument-text-test");
+await run([process.env.CXX || "c++", "-std=c++17", "-Wall", "-Wextra", "-Werror",
+  ...includes, resolve(firmware, "tests/instrument_text_test.cpp"),
+  resolve(firmware, "instrument_text.cpp"), resolve(firmware, "display_content.cpp"),
+  resolve(firmware, "univers_font_adapter.cpp"),
+  ...fontObjects, ...objects, "-lm", "-o", textBinary]);
+await run([textBinary, resolve(firmware, "font-text.txt")]);

@@ -8,6 +8,7 @@ use only the section that matches the work at hand. Commands assume ordinary
 64-bit Windows PowerShell and do not require WSL or Git Bash.
 
 For the physical board, start with the Korean
+[AI-assisted quickstart](board-collaborator-start-here.md), then the
 [display specifications and troubleshooting handoff](board-display-handoff.md).
 It records the handed-off firmware, rotating cardinals, the unresolved left-side
 shimmer report, and the exact Windows serial commands for stationary/moving comparisons.
@@ -117,9 +118,13 @@ The source font is ASCII-only. `REMAINING`, `PRICE`, `MENU`, cardinal letters,
 numeric values, and ASCII menu values use the ported Thin Condensed bitmap. A
 Korean menu/value/status/action selects the existing Korean LVGL fallback font;
 the app/server strings and v2 JSON are not silently translated to English. If a
-character is absent from that limited status-copy subset, it can still show a
-missing glyph. Arbitrary Korean menus are not fully supported; extend
-`korean_symbols` and regenerate/package the fallback before using new menu copy.
+character is absent from the curated subset, the whole value shows `ON PHONE`
+using the source ASCII font. The original BLE text is retained. Extend
+`firmware/roll-compass-board/font-text.txt` and run `bun run firmware:fonts`
+on Windows or macOS to regenerate/package the font before using new menu copy.
+The checked-in subset includes Korean status text, preview menu/price phrases,
+and ASCII for mixed values. `instrument_text.*` fits actual font width with
+`...` and accommodates the font's line height.
 The host core test covers UTF-8-safe menu truncation and the visual contract test
 covers the explicit ASCII/Korean split.
 
@@ -279,7 +284,9 @@ iPhone; the Simulator cannot prove a connection to this board.
 GitHub Actions divides evidence by platform:
 
 - `windows-collaboration.yml` runs the PowerShell entry point in dry-plan mode
-  and executes `verify:windows` on a Windows runner. CI has no connected board,
+  and executes `verify:windows` on a Windows runner. It also regenerates the
+  fonts using Bun and compares the result with the checked-in bundle. No WSL or
+  Python is required for font generation. CI has no connected board,
   so it does not flash hardware.
 - `v2-ci.yml` is the Ubuntu repository gate for the larger service slice and
   operations checks.

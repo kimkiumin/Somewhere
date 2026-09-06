@@ -6,6 +6,8 @@ renders safe guidance and emits touch intents over BLE.
 
 For the latest physical-device handoff, read the Korean
 [board specifications and display troubleshooting guide](../../docs/operations/board-display-handoff.md).
+For an accessible introduction and a prompt to give your coding AI, start with
+[AI-assisted board work](../../docs/operations/board-collaborator-start-here.md).
 The September 6 renderer changes have not been flashed to the handed-off board.
 
 ## Local setup
@@ -57,11 +59,19 @@ for the collaborator's source artwork. Refresh that artwork only from the
 exact source commit documented in the Windows handoff, then re-run the host
 tests and Arduino compile.
 
-After an intentional fallback-font change on the maintainer toolchain, run
-`bun run firmware:assets` and then
-`bun scripts/firmware/package-board-assets.mjs` so clean Windows clones receive
-the same generated inputs. The exact source-derived instrument headers remain
-tracked files and do not need to be packed into that legacy bundle.
+For a new Korean phrase, add it to `font-text.txt` and run
+`bun run firmware:fonts`. This cross-platform Bun command verifies/downloads the
+pinned font, generates 16/20px Korean+ASCII subsets, and repacks the Windows
+bundle. No Python, WSL, or image regeneration is needed for text-only changes.
+Commit the phrase list and bundle together. Windows CI checks reproducibility.
+The exact source-derived instrument headers remain tracked separately.
+
+Readouts use actual LVGL font metrics to fit their fixed width with `...` when
+necessary. Unknown glyphs show `ON PHONE` using the source ASCII font; the
+original BLE value is unchanged. The supported Korean phrases include the
+app's `따뜻한 한식`/`보통 가격대` preview and route-recovery status text.
+This is a curated glyph subset, not a complete Korean font. `instrument_text.*`
+also fits the font line height so mixed Korean/ASCII values are not clipped.
 
 ## USB flashing and diagnostics
 

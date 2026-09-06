@@ -82,11 +82,12 @@ test("keeps v2 projected fields flowing into the board render model", () => {
 
 test("documents a Korean display fallback instead of changing the v2 wire contract", () => {
   const renderer = readFirmwareFile("display_ui.cpp");
+  const textPolicy = readFirmwareFile("instrument_text.cpp");
   const handoff = readFileSync(
     resolve(repositoryRoot, "docs/operations/windows-collaboration-handoff.md"),
     "utf8",
   );
-  expect(renderer).toContain("isAsciiDisplayText");
+  expect(textPolicy).toContain("isAsciiDisplayText");
   expect(renderer).toContain("roll_compass_korean_16");
   expect(handoff).toContain("ASCII");
   expect(handoff).toContain("Korean");

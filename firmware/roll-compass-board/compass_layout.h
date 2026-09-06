@@ -115,9 +115,11 @@ constexpr Rect kInstrumentEastBounds{394, 221, 40, 25};
 constexpr Rect kInstrumentRemainingLabelBounds{180, 111, 120, 8};
 constexpr Rect kInstrumentDistanceBounds{100, 122, 280, 31};
 constexpr Rect kInstrumentPriceLabelBounds{125, 311, 100, 10};
-constexpr Rect kInstrumentPriceValueBounds{125, 325, 120, 16};
+// Preserve the source's left/right text anchors, but reserve a 14px gap for
+// long readouts. The old 120px rectangles overlapped by 10px at the centre.
+constexpr Rect kInstrumentPriceValueBounds{125, 325, 108, 16};
 constexpr Rect kInstrumentMenuLabelBounds{255, 311, 100, 10};
-constexpr Rect kInstrumentMenuValueBounds{235, 325, 120, 16};
+constexpr Rect kInstrumentMenuValueBounds{247, 325, 108, 16};
 constexpr Rect kInstrumentStatusBounds{120, 182, 240, 24};
 constexpr Rect kInstrumentPrimaryActionBounds{176, 397, 128, 28};
 constexpr Rect kInstrumentPausedContinueBounds{95, 388, 140, 30};

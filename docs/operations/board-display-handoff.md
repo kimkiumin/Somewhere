@@ -6,22 +6,25 @@
 남아 있다.** 이번 변경은 확인된 과도한 화면 갱신을 줄였지만 증상 해결을
 실기기에서 확인한 것은 아니다.
 
+처음 이어받았거나 AI와 작업한다면
+[쉬운 시작 안내](board-collaborator-start-here.md)에서 파일별 역할과 Windows 명령을 먼저 보면 된다.
+
 ## 코드와 실물의 기준
 
 | 구분 | 기준 |
 | --- | --- |
 | 보드 작업 브랜치 | `codex/roll-compass-native-app` — 이 문서가 포함된 최신 커밋 사용 |
-| 이번 변경 직전 원격 | `a41867ff0375e34c995f0aa86d48d1b979559933` |
-| 회전/그리기 개선 코드 | `de52405cc75a04e13ac6f18416d81e99b2c75b59` |
-| 마지막 실물 플래시 | 2026-08-28, 위 커밋 + 당시 미커밋 방위판 회전 변경. 단일 커밋 SHA로 식별할 수 없었음 |
-| 이번 펌웨어 식별 로그 | `display_revision=bounded-lines-v1 contract=2 built=...` |
+| 회전/그리기 개선 전 원격 | `a41867ff0375e34c995f0aa86d48d1b979559933` |
+| 회전/그리기 개선 기준 커밋 | `de52405cc75a04e13ac6f18416d81e99b2c75b59` |
+| 마지막 실물 플래시 | 2026-08-28, `a41867f` + 당시 미커밋 방위판 회전 변경. 단일 커밋 SHA로 식별할 수 없었음 |
+| 최신 펌웨어 식별 로그 | `display_revision=fitted-text-v2 contract=2 built=...` (선 갱신 개선판은 `bounded-lines-v1`) |
 | 협업자 원형 시안 | `codex/full-blueprint@3022401c02e92204d2751f569b19745024724c80` |
 | 확인한 앱 통합 기준 | `codex/ipad-board-integration@7eeffafb348e9a7285892424f3e438b90035d9ef` |
 
 `full-blueprint`는 별도 Git root이므로 통째로 merge/cherry-pick하지 않는다.
 시안 SVG/폰트의 출처와 선택적 재생성 방법은
 [Windows 인수인계](windows-collaboration-handoff.md#circular-instrument-source-handoff)에 있다.
-이번에는 보드 렌더러와 문서만 수정했다. 앱 브랜치의 새 화면 전체를 보드에
+이번에는 보드 렌더러·폰트 생성 도구·검증·문서를 수정했다. 앱 브랜치의 새 화면 전체를 보드에
 복제한 것은 아니다.
 
 ## 하드웨어와 화면 규격
@@ -92,11 +95,15 @@ microSD는 현재 UI에 필요 없으며 실행 파티션이나 화면 해상도
 `physical_compass_wire.*`를 참고한다. 목적지 이름/주소는 전송하지 않는다.
 
 ASCII는 원본 Univers Thin Condensed bitmap을 사용한다. 한국어는 Noto Sans KR
-16/20px **제한된 글리프 집합**으로 분기한다. `generate-board-fonts.sh`의
-`korean_symbols`에는 상태 문구 위주로만 들어 있어 **임의의 한국어 메뉴 전체를
-지원한다고 보장할 수 없다**. UTF-8 잘림 방지는 글리프 지원과 별개다.
-발표에 쓸 메뉴의 글자가 빠졌다면 원본 한글 계약을 유지하면서 해당 글리프를
-추가·재생성한 뒤 `package-board-assets.mjs`로 Windows용 번들도 갱신해야 한다.
+16/20px **제한된 글리프 집합**으로 분기한다. 현재 `font-text.txt`의 상태 문구,
+`따뜻한 한식`, `보통 가격대`, `돈까스`와 혼합 표시용 ASCII를 포함한다.
+**임의의 한국어 메뉴 전체 지원은 아니다.** 미지원 글자가 포함된 값은 `ON PHONE`
+(휴대폰에서 확인)으로 안내하고 BLE 원문은 그대로 둔다. 긴 값은 실제 글꼴 너비로
+측정해 `...`를 붙이며 한글을 바이트 중간에서 끊지 않는다. 폰트 높이도 표시
+영역에 반영한다. 새 문구를 `font-text.txt`에 추가하고 `bun run firmware:fonts`를
+실행하면 Windows에서도 폰트와 번들을 함께 갱신할 수 있다.
+PRICE의 왼쪽 x=125와 MENU의 오른쪽 x=355는 원본과 같고, 두 값의 최대 표시
+영역 사이에는 14px를 비워 긴 값끼리 겹치지 않게 한다.
 
 ## 왼쪽 지글거림: 확인된 부분과 확인할 부분
 
@@ -168,13 +175,14 @@ USB 포트·전원 정보를 남기면 다음 작업자가 이어서 판단할 �
 ## 이번 검증과 남은 작업
 
 - `bun run firmware:test`: 각도/편각/상태 억제, 360° 눈금 원형 경계와 기존 BLE/5종 바늘 테스트.
-- `bun run firmware:test-renderer`: 실제 LVGL의 픽셀 동일성·잔상·갱신 영역 검사.
+- `bun run firmware:test-renderer`: 실제 LVGL의 픽셀 동일성·잔상·갱신 영역,
+  문구 너비·줄임표·미지원 글자 fallback·21개 문구의 16/20px 글리프 검사.
   macOS/Linux C/C++ 컴파일러와 `firmware:setup`의 LVGL 설치를 사용한다.
 - `bun run firmware:compile`: 고정 Arduino 도구로 전체 펌웨어 컴파일.
 - `bun run verify:windows`: 기존 Windows 공유 검증. Windows CI는 실제 LCD나 Arduino 업로드를 검사하지 않는다.
 
 2026-09-06 로컬에서 위 네 검증을 통과했다. 전체 Arduino 빌드는 실행 이미지
-1,017,849바이트(앱 파티션 32%), 전역 RAM 34,884바이트(10%)였다.
+1,032,865바이트(앱 파티션 32%), 전역 RAM 34,884바이트(10%)였다.
 전역 RAM 비율은 LVGL/PSRAM 동적 할당까지 포함한 총 메모리 사용률이 아니다.
 Windows 공유 검증은 로컬 macOS에서 실행했으며 실제 Windows 결과는 해당 커밋의
 GitHub Actions `Somewhere Windows collaboration smoke`에서 별도로 확인한다.
@@ -183,7 +191,10 @@ GitHub Actions `Somewhere Windows collaboration smoke`에서 별도로 확인한
 설정 충돌로 실행되지 않았다. 위 공유 검증 안의 각 패키지 lint와는 별개이며,
 이번 보드 작업에서 저장소 전체 Biome 설정을 변경하지 않았다.
 
-이번 변경의 가설은 “불필요한 redraw를 줄이면 같은 시안의 움직임 안정성을
-높일 수 있다”이다. 테스트는 화면 부하 개선을 뒷받침하지만, **실보드 지글거림
+렌더링 개선의 가설은 “불필요한 redraw를 줄이면 같은 시안의 움직임 안정성을
+높일 수 있다”이다. 추가 글자 개선은 “한글 지원 여부와 실제 너비를 검사하면
+값이 깨지거나 겹치는 문제를 줄일 수 있다”를 검증한다.
+테스트는 화면 부하와 글자 배치 개선을 뒷받침하지만, **실보드 지글거림
 해결 여부·회전 체감·터치/BOOT 반응 재확인은 협업자에게 남긴다.**
-실제 방향 센서 연동·임의 한국어 메뉴 지원·독립 데모 거리 감소는 별도 미완성 항목이다.
+실제 방향 센서 연동·독립 데모 거리 감소는 별도 미완성 항목이다. 새 한국어 문구는
+글리프 목록을 갱신해야 하며, 미지원 글자는 위의 명시적 fallback을 사용한다.

@@ -36,3 +36,9 @@ jobs:
 
       - name: Run the Windows-safe repository smoke
         run: bun run verify:windows
+
+      - name: Regenerate board fonts without WSL
+        run: bun run firmware:fonts
+
+      - name: Verify generated fonts match the checked-in bundle
+        run: git diff --exit-code -- firmware/roll-compass-board/generated-assets-v1.br

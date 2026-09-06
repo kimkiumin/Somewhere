@@ -10,6 +10,7 @@
 #include "compass_math.h"
 #include "display_content.h"
 #include "instrument_line.h"
+#include "instrument_text.h"
 #include "lvgl_v8_port.h"
 #include "needle_spring.h"
 #include "needle_styles.h"
@@ -306,33 +307,36 @@ bool contentEquals(
         strcmp(left.priceBand, right.priceBand) == 0;
 }
 
-void setDataLabelText(lv_obj_t *label, const char *text, const lv_font_t *asciiFont) {
-    lv_label_set_text(label, text);
-    lv_obj_set_style_text_font(
-        label,
-        roll_compass::isAsciiDisplayText(text) ? asciiFont : &roll_compass_korean_16,
-        LV_PART_MAIN
+void setDataLabelText(
+    lv_obj_t *label, const char *text, const lv_font_t *asciiFont,
+    const roll_compass::Rect &bounds
+) {
+    const auto fitted = roll_compass::fitInstrumentText(
+        text, asciiFont, &roll_compass_korean_16, bounds
     );
+    lv_label_set_text(label, fitted.text);
+    lv_obj_set_style_text_font(label, fitted.font, LV_PART_MAIN);
+    lv_obj_set_size(label, fitted.bounds.width, fitted.bounds.height);
+    lv_obj_set_pos(label, fitted.bounds.x, fitted.bounds.y);
 }
 
 void renderModel() {
     char distance[24] = {};
     char price[roll_compass::kPriceTextLimit * 4 + 1] = {};
-    char menu[roll_compass::kDisplayTextLimit * 4 + 1] = {};
     roll_compass::formatDistanceMeters(
         currentModel.hasDistance ? currentModel.distanceM : -1.0f,
         distance,
         sizeof(distance)
     );
     roll_compass::formatPriceBand(currentModel.priceBand, price, sizeof(price));
-    roll_compass::copyDisplayText(
-        menu,
-        sizeof(menu),
-        currentModel.menu[0] == '\0' ? "--" : currentModel.menu
+    setDataLabelText(distanceValue, distance, &somewhere_font_distance,
+        roll_compass::kInstrumentDistanceBounds);
+    setDataLabelText(priceValue, price, &somewhere_font_small,
+        roll_compass::kInstrumentPriceValueBounds);
+    setDataLabelText(
+        menuValue, currentModel.menu, &somewhere_font_small,
+        roll_compass::kInstrumentMenuValueBounds
     );
-    setDataLabelText(distanceValue, distance, &somewhere_font_distance);
-    setDataLabelText(priceValue, price, &somewhere_font_small);
-    setDataLabelText(menuValue, menu, &somewhere_font_small);
 
     const bool showStatus = currentModel.needleSuppressed ||
         (currentModel.state != roll_compass::CompassOsState::Ready &&

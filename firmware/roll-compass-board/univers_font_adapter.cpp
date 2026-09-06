@@ -30,6 +30,9 @@ bool getGlyphDsc(
 ) {
     if (descriptor == nullptr) return false;
     const somewhere_font::BitmapGlyph *glyph = glyphFor(font, letter);
+    // The source lookup substitutes '?'. Report unsupported glyphs honestly so
+    // the readout layer can choose its documented fallback before rendering.
+    if (glyph->codepoint != letter) return false;
     descriptor->resolved_font = font;
     descriptor->adv_w = glyph->advance;
     descriptor->box_w = glyph->width;
@@ -46,6 +49,7 @@ bool getGlyphDsc(
 
 const uint8_t *getGlyphBitmap(const lv_font_t *font, uint32_t letter) {
     const somewhere_font::BitmapGlyph *glyph = glyphFor(font, letter);
+    if (glyph->codepoint != letter) return nullptr;
     return &somewhere_font::BITMAP[glyph->bitmap_offset];
 }
 
