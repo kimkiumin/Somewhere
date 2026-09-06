@@ -1,11 +1,16 @@
 # Windows collaboration handoff
 
-Status: 2026-08-27 operational guide for the current `Roll the compass!` V2
+Status: 2026-09-06 operational guide for the current `Roll the compass!` V2
 branch and physical compass companion
 
 This is a menu, not a mandatory checklist. Read the short context once, then
 use only the section that matches the work at hand. Commands assume ordinary
 64-bit Windows PowerShell and do not require WSL or Git Bash.
+
+For the physical board, start with the Korean
+[display specifications and troubleshooting handoff](board-display-handoff.md).
+It records the handed-off firmware, rotating cardinals, the unresolved left-side
+shimmer report, and the exact Windows serial commands for stationary/moving comparisons.
 
 ## Three-minute context
 
@@ -58,9 +63,9 @@ Add or remove iOS files through `ios/project.yml`; do not hand-edit a generated
 ## Circular instrument source handoff
 
 The board renderer was updated from the collaborator's source reference without
-a merge or cherry-pick. The app-side v1-to-v2 work remains a separate handoff at
+a merge or cherry-pick. The app-side v2 integration reference is a separate handoff at
 `origin/codex/ipad-board-integration` SHA
-`bf47b297f72de136fc363fa6de0da4e5bbc1758b`; this board checkout consumes the
+`7eeffafb348e9a7285892424f3e438b90035d9ef`; this board checkout consumes the
 existing BLE contract v2 and does not alter the app wire contract.
 
 The source material inspected at
@@ -84,7 +89,8 @@ renderer/state integration:
   `univers_font_adapter.*` exposes its four sizes to LVGL.
 - `display_content.*` formats `d`/`p` values and truncates menu text on UTF-8
   codepoint boundaries. `display_ui.cpp` owns the circular layers, baselines,
-  fixed orientation, needle animation, and guarded existing action buttons.
+  heading-driven rose/needle animation, and guarded existing action buttons.
+  `instrument_line.h` limits redraw to changed line bounds.
 - `needle_styles.*` defines five bounded vector presentations for the same
   credible bearing: source 2 px line, precision spear, dual rail, balanced
   mechanical, and curved cutlass. Their geometry stays inside the source
@@ -101,17 +107,19 @@ The BLE v2 projection is unchanged:
 
 `route-recovery`, stale snapshots, paused state, invalid confidence, and invalid
 sensor/calibration conditions never display an exact needle. The v2 north-
-referenced target/declaration pair is retained, while the instrument is fixed at
-`0°` and no longer treats background touches as mount-correction input. The
+referenced target/declination pair is retained. The screen mount is fixed at
+`0°`, but the tick/cardinal rose rotates opposite the valid true board heading.
+Background touches select needle styles, not mount correction. The
 board still sends only guarded action intents and never receives destination
 identity.
 
 The source font is ASCII-only. `REMAINING`, `PRICE`, `MENU`, cardinal letters,
 numeric values, and ASCII menu values use the ported Thin Condensed bitmap. A
-Korean menu/value/status/action keeps the existing Korean LVGL fallback font;
+Korean menu/value/status/action selects the existing Korean LVGL fallback font;
 the app/server strings and v2 JSON are not silently translated to English. If a
-character is absent from that fallback font, it is allowed to render as the
-font's normal missing-glyph result rather than exposing a different label.
+character is absent from that limited status-copy subset, it can still show a
+missing glyph. Arbitrary Korean menus are not fully supported; extend
+`korean_symbols` and regenerate/package the fallback before using new menu copy.
 The host core test covers UTF-8-safe menu truncation and the visual contract test
 covers the explicit ASCII/Korean split.
 
@@ -138,7 +146,8 @@ or its panel/touch drivers into the production sketch.
 ## Current board behavior
 
 The target is the flat Waveshare `ESP32-S3-Touch-LCD-2.1`, not the 2.1B. Its
-480×480 circular face is filled by the compass UI at a fixed `0°` orientation.
+480×480 circular face uses a fixed `0°` screen mount; the tick/cardinal rose
+counter-rotates during credible guidance or the explicit demonstration.
 Touching empty instrument space cycles the five needle presentations and wraps
 back to the source line. This gesture changes only board-local rendering and
 does not emit a BLE event. Explicit journey action controls keep touch priority,
@@ -152,8 +161,9 @@ unless firmware download mode is intended.
 
 The board's QMI8658 measures acceleration and angular velocity but is not a
 magnetometer. Rotating the standalone board therefore does not rotate the
-journey needle; the iPhone supplies heading. An external magnetometer would be
-a separate hardware milestone. The latest source-derived renderer compile uses
+journey needle in live mode. The iPhone supplies `tb`/`md`; the board heading
+requires a magnetometer driver/calibration milestone which is not implemented.
+The latest source-derived renderer compile uses
 about 32% of the app flash partition and 10% of global RAM, so a microSD card is
 not needed for the current executable and would not enlarge that partition.
 
@@ -222,7 +232,7 @@ profile.
 .\scripts\firmware\windows-board.ps1 monitor -Port COM7
 ```
 
-Replace `COM7` with the CH343P port shown by the `ports` command or Windows
+Replace `COM7` with the native USB or CH343P port shown by the `ports` command or Windows
 Device Manager. Upload always compiles first and never guesses a port. The
 monitor uses 115200 baud with DTR and RTS disabled. If opening it catches no
 startup log, leave it open and press RST once.

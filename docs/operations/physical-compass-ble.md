@@ -2,9 +2,14 @@
 
 This is the first physical-board integration for the native V2 client. It
 targets the flat Waveshare `ESP32-S3-Touch-LCD-2.1` SKU, not the 2.1B variant.
-The iPhone remains authoritative for location, heading, route guidance,
+The iPhone remains authoritative for location, route guidance,
 recommendation projection, reveal state, and guarded journey commands. The
 board is a low-screen BLE display and touch companion.
+The phone supplies true-north target bearing and declination; computing the
+relative board needle also requires the board's own calibrated heading. That
+sensor integration is not implemented in this checkpoint. See the
+[current physical display handoff](board-display-handoff.md) for specifications
+and the unresolved shimmer report.
 
 ## Transport boundaries
 
@@ -54,7 +59,8 @@ bun run firmware:upload
 bun run firmware:monitor
 ```
 
-The CH343P USB-UART normally appears as `/dev/cu.usbmodem*`. If the board
+The last verified upload used native USB-Serial/JTAG `/dev/cu.usbmodem1101`;
+the separate CH343P connector can have a different port name. If the board
 resets and receives a different port, use the new port. When more than one
 modem is connected, pass it explicitly:
 
@@ -93,6 +99,8 @@ Other accepted states are `guiding`, `paused`, `arrived`, `calibrating`,
 `sensor-missing`, and `anomaly`; `sweep ccw`, `declination -180..180`, and any
 `target`/`heading` from `0` through less than `360` are also accepted. While
 simulation is active, touch controls cannot emit BLE events.
+The first valid fresh BLE state automatically exits the demo and supplies the
+readouts. Live mode still hides the needle while the board sensor is missing.
 
 ## BLE runtime contract
 
@@ -134,8 +142,10 @@ authority.
 
 The board display follows the collaborator's source-derived circular instrument:
 black `#050706` face, off-white ticks/cardinals, green `#4DFF76` readouts, and
-pink-red `#FF3850` needle. The iPhone remains the source of truth for the needle
-bearing; the board does not calculate its own heading.
+pink-red `#FF3850` needle. The iPhone supplies the target bearing (`tb`) and
+declination (`md`); the board runtime calculates relative direction only with a
+valid board magnetic heading. The current sketch supplies `SensorHealth::Missing`
+outside simulation, so physical board rotation cannot yet drive live guidance.
 
 The renderer offers five needle presentations without changing that source of
 truth: source 2 px line, precision spear, dual rail, balanced mechanical, and
@@ -148,9 +158,10 @@ conditions.
 The display prefers two full RGB565 framebuffers in PSRAM and LVGL direct mode
 to prevent visible tearing during the needle sweep. It automatically falls
 back to partial 20-row buffers when memory or initialization is insufficient.
-The source artwork is fixed at `0°`; tapping outside an active action changes
-only the needle presentation, so the readouts, ticks, cardinals, and bearing
-remain aligned to the physical circular face.
+The screen mount stays at `0°`. Ticks and upright cardinal labels counter-rotate
+with credible true board heading; readouts and the top reference mark stay fixed.
+Tapping outside an active action changes only the needle style. Unsafe guidance
+freezes the rose and hides the needle. Lines redraw only their changed bounds.
 
 The physical BOOT button is also the screen button after normal startup. One
 short press turns the backlight off and locks touch input; the next press wakes

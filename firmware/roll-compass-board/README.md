@@ -4,6 +4,10 @@ This sketch targets the flat Waveshare `ESP32-S3-Touch-LCD-2.1` board (not the
 2.1B variant). The phone remains the journey authority; this board only
 renders safe guidance and emits touch intents over BLE.
 
+For the latest physical-device handoff, read the Korean
+[board specifications and display troubleshooting guide](../../docs/operations/board-display-handoff.md).
+The September 6 renderer changes have not been flashed to the handed-off board.
+
 ## Local setup
 
 From the repository root:
@@ -61,8 +65,10 @@ tracked files and do not need to be packed into that legacy bundle.
 
 ## USB flashing and diagnostics
 
-The connected CH343P USB-UART port is normally exposed as
-`/dev/cu.usbmodem*`. Upload compiles first and does not erase flash:
+The board exposes native USB-Serial/JTAG as well as a CH343P USB-UART path.
+The last verified macOS upload used native `/dev/cu.usbmodem1101`; port names
+depend on connector/driver and can change. Upload compiles first and rewrites
+the application sectors; it does not perform a whole-chip erase:
 
 ```sh
 bun run firmware:upload
@@ -79,7 +85,8 @@ button once; subsequent logs and commands then use the already-open port.
 This development build starts in a deterministic visual demo without a phone
 or magnetometer: it shows `320m`, `TONKATSU`, `PRICE -`, starts the source-style
 2 px needle at 35 degrees, and moves it back and forth from 23 to 47 degrees on
-an eight-second loop. This keeps the motion visible without letting the default
+an eight-second loop. The tick/cardinal rose counter-rotates with that simulated
+heading, with a fixed 12-o'clock reference mark. This keeps the motion visible without letting the default
 demo drift away from the collaborator preview's composition. Demo mode keeps
 status and action controls hidden. The first fresh, valid BLE v2 snapshot
 automatically ends this independent preview before rendering, so the app's
@@ -107,7 +114,8 @@ phone-relative arrow angle.
 
 The official Espressif `ESP32_Display_Panel` preset initializes the 480×480
 RGB LCD and CST820 touch controller. The LVGL UI shows the source instrument,
-phone-computed direction only when confidence is `credible`, approximate
+board-relative direction from v2 `tb`/`md` and a valid board heading only when
+confidence is `credible`, approximate
 distance, the first representative menu and price cue, and only the actions
 advertised by the phone. A stale, paused, route-recovery, or otherwise
 non-credible state hides the exact arrow and disables unsafe actions.
@@ -117,10 +125,17 @@ mode. If the PSRAM reserve or panel/LVGL initialization is insufficient, it
 falls back to two 20-row internal-RAM draw buffers. Boot logs identify the
 selected `display_mode` and current PSRAM/free-heap values.
 
-The circular UI uses the source artwork at a fixed `0°` orientation. Touching
-empty instrument space cycles only the five needle presentations; it cannot
-shift the source ticks, cardinals, readouts, controls, or the underlying
-bearing. Active journey actions keep priority over this local style gesture.
+The overall screen has a fixed `0°` mount orientation. The source ticks and
+upright cardinal labels rotate by the negative true board heading during
+credible guidance; readouts, controls, and the top reference mark remain fixed.
+Unsafe guidance freezes the rose and hides the needle. Touching empty instrument
+space cycles only the five needle styles. Active journey actions keep priority.
+
+Lines use tight LVGL bounds and skip identical pixel geometry. Animation runs
+on 25ms steps and pauses while the backlight is off. Heading-only updates do
+not reset readout text. `bun run firmware:test-renderer` uses the real pinned
+LVGL rasterizer on macOS/Linux to compare pixels, erase old strokes, and check
+dirty-region reduction. This does not measure physical LCD tearing or FPS.
 
 A short press of the physical BOOT button toggles the LCD backlight like a
 phone power button. BLE, the current journey state, and the firmware remain
@@ -132,5 +147,7 @@ mode instead of starting the app.
 Wi-Fi and the QMI8658 IMU are intentionally not used for heading in this
 checkpoint. Wi-Fi is reserved for a later OTA/diagnostics milestone, and the
 QMI8658 is not a magnetometer. Without a separately wired LIS2MDL, the board
-cannot react to its own physical rotation: the phone remains the heading source
-and the no-sensor state is expected outside explicit USB simulation.
+cannot react to its own physical rotation in live mode. The phone supplies the
+north-referenced target and declination, not the board heading. The current
+sketch still reports the sensor as missing; wiring a LIS2MDL also requires a
+driver and calibration integration before live pointing is possible.

@@ -65,6 +65,9 @@ For the current native implementation, use these two focused documents:
   gives a PowerShell-only repository and ESP32 workflow, defines the Windows
   smoke-test boundary, and explains when work must move to Mac, Ubuntu, or a
   physical iPhone.
+- [Circular board display handoff](operations/board-display-handoff.md)
+  records hardware/pixel specifications, rotating cardinals, the five needle
+  styles, renderer verification, and the unresolved physical shimmer report.
 
 ## Historical v0.2 application
 

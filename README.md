@@ -16,6 +16,10 @@ Mac/Xcode 개발과 AI 협업 절차는
 [`docs/operations/windows-collaboration-handoff.md`](docs/operations/windows-collaboration-handoff.md)를
 사용하세요.
 
+실물 원형 LCD를 이어받는 협업자는
+[보드 규격·회전 동작·화면 지글거림 확인 안내](docs/operations/board-display-handoff.md)를
+먼저 보면 현재 펌웨어 상태와 남은 실기기 작업을 확인할 수 있습니다.
+
 ```text
 최소 조건 → 숨겨진 목적지 하나를 한 번에 확정 → 경로 기반 안내
 → 도착 → 공개 → 60분 뒤 선택적 반응
