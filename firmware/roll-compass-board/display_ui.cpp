@@ -9,6 +9,7 @@
 #include "compass_layout.h"
 #include "compass_math.h"
 #include "display_content.h"
+#include "instrument_line.h"
 #include "lvgl_v8_port.h"
 #include "needle_spring.h"
 #include "needle_styles.h"
@@ -40,10 +41,13 @@ const lv_color_t kPink = lv_color_hex(0xFF3850);
 
 lv_obj_t *faceBackground = nullptr;
 lv_obj_t *tickObjects[somewhere_artwork::TICK_COUNT] = {};
-lv_point_t tickPoints[somewhere_artwork::TICK_COUNT][2] = {};
+roll_compass::InstrumentLine<2> tickLines[somewhere_artwork::TICK_COUNT];
+lv_obj_t *lubberLine = nullptr;
+roll_compass::InstrumentLine<3> lubberLineGeometry;
+const roll_compass::InstrumentPoint lubberLinePoints[3] = {{232, 15}, {240, 27}, {248, 15}};
 lv_obj_t *needleStrokeObjects[roll_compass::kNeedleMaximumStrokes] = {};
-lv_point_t needleStrokePoints[roll_compass::kNeedleMaximumStrokes]
-    [roll_compass::kNeedleMaximumPoints] = {};
+roll_compass::InstrumentLine<roll_compass::kNeedleMaximumPoints>
+    needleLines[roll_compass::kNeedleMaximumStrokes];
 lv_obj_t *needleDiscObjects[roll_compass::kNeedleMaximumDiscs] = {};
 lv_obj_t *northLabel = nullptr;
 lv_obj_t *southLabel = nullptr;
@@ -65,8 +69,10 @@ lv_obj_t *pausedEndLabel = nullptr;
 
 roll_compass::CompassRenderModel currentModel;
 roll_compass::NeedleSpring needleSpring;
+roll_compass::NeedleSpring compassRoseSpring;
 PhysicalCompassEventCallback eventCallback = nullptr;
 float targetNeedleAngleDegrees = 35.0f;
+float targetCompassRoseAngleDegrees = 0.0f;
 uint32_t lastTickMs = 0;
 uint32_t accumulatedNeedleMs = 0;
 uint32_t stateEnteredMs = 0;
@@ -74,9 +80,11 @@ uint32_t displayedSequence = 0;
 bool bleEventsEnabled = false;
 bool uiAwake = true;
 roll_compass::NeedleStyle activeNeedleStyle = roll_compass::NeedleStyle::Source;
+roll_compass::NeedleStyle renderedNeedleStyle = roll_compass::NeedleStyle::Count;
 
 void setHidden(lv_obj_t *object, bool hidden) {
     if (object == nullptr) return;
+    if (lv_obj_has_flag(object, LV_OBJ_FLAG_HIDDEN) == hidden) return;
     if (hidden) {
         lv_obj_add_flag(object, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -89,15 +97,60 @@ void positionInstrumentObject(lv_obj_t *object, const roll_compass::Rect &bounds
     lv_obj_set_pos(object, bounds.x, bounds.y);
 }
 
-void updateTickGeometry() {
+void positionRotatedCardinal(
+    lv_obj_t *object,
+    const roll_compass::Rect &sourceBounds,
+    float angleDegrees
+) {
+    if (object == nullptr) return;
+    const auto center = roll_compass::rotateInstrumentPoint(
+        roll_compass::InstrumentPoint{
+            static_cast<int16_t>(sourceBounds.x + sourceBounds.width / 2),
+            static_cast<int16_t>(sourceBounds.y + sourceBounds.height / 2),
+        },
+        angleDegrees
+    );
+    lv_obj_set_pos(
+        object,
+        center.x - sourceBounds.width / 2,
+        center.y - sourceBounds.height / 2
+    );
+}
+
+void updateCompassRoseGeometry(float angleDegrees) {
     for (size_t index = 0; index < somewhere_artwork::TICK_COUNT; ++index) {
         const somewhere_artwork::CompassTick &source = somewhere_artwork::TICKS[index];
-        tickPoints[index][0] = lv_point_t{source.x1, source.y1};
-        tickPoints[index][1] = lv_point_t{source.x2, source.y2};
-        if (tickObjects[index] != nullptr) {
-            lv_line_set_points(tickObjects[index], tickPoints[index], 2);
-        }
+        const auto start = roll_compass::rotateInstrumentPoint(
+            roll_compass::InstrumentPoint{source.x1, source.y1},
+            angleDegrees
+        );
+        const auto end = roll_compass::rotateInstrumentPoint(
+            roll_compass::InstrumentPoint{source.x2, source.y2},
+            angleDegrees
+        );
+        const roll_compass::InstrumentPoint points[2] = {start, end};
+        tickLines[index].update(tickObjects[index], points, 2);
     }
+    positionRotatedCardinal(
+        northLabel,
+        roll_compass::kInstrumentNorthBounds,
+        angleDegrees
+    );
+    positionRotatedCardinal(
+        southLabel,
+        roll_compass::kInstrumentSouthBounds,
+        angleDegrees
+    );
+    positionRotatedCardinal(
+        westLabel,
+        roll_compass::kInstrumentWestBounds,
+        angleDegrees
+    );
+    positionRotatedCardinal(
+        eastLabel,
+        roll_compass::kInstrumentEastBounds,
+        angleDegrees
+    );
 }
 
 lv_color_t needleToneColor(roll_compass::NeedleTone tone) {
@@ -110,24 +163,17 @@ lv_color_t needleToneColor(roll_compass::NeedleTone tone) {
 }
 
 void updateNeedleGeometry(float angleDegrees) {
+    const bool styleChanged = renderedNeedleStyle != activeNeedleStyle;
     const roll_compass::NeedleVisual visual =
         roll_compass::buildNeedleVisual(activeNeedleStyle, angleDegrees);
     for (size_t index = 0; index < roll_compass::kNeedleMaximumStrokes; ++index) {
         lv_obj_t *object = needleStrokeObjects[index];
         if (object == nullptr) continue;
         const roll_compass::NeedleStroke &stroke = visual.strokes[index];
-        if (stroke.visible) {
-            for (size_t pointIndex = 0; pointIndex < stroke.pointCount; ++pointIndex) {
-                needleStrokePoints[index][pointIndex] = lv_point_t{
-                    stroke.points[pointIndex].x,
-                    stroke.points[pointIndex].y,
-                };
-            }
-            lv_line_set_points(
-                object,
-                needleStrokePoints[index],
-                stroke.pointCount
-            );
+        if (stroke.visible && currentModel.showNeedle) {
+            needleLines[index].update(object, stroke.points, stroke.pointCount);
+        }
+        if (stroke.visible && styleChanged) {
             lv_obj_set_style_line_color(
                 object,
                 needleToneColor(stroke.tone),
@@ -143,13 +189,15 @@ void updateNeedleGeometry(float angleDegrees) {
         lv_obj_t *object = needleDiscObjects[index];
         if (object == nullptr) continue;
         const roll_compass::NeedleDisc &disc = visual.discs[index];
-        if (disc.visible) {
+        if (disc.visible && currentModel.showNeedle) {
             lv_obj_set_size(object, disc.diameter, disc.diameter);
             lv_obj_set_pos(
                 object,
                 disc.center.x - disc.diameter / 2,
                 disc.center.y - disc.diameter / 2
             );
+        }
+        if (disc.visible && styleChanged) {
             lv_obj_set_style_bg_color(
                 object,
                 needleToneColor(disc.tone),
@@ -159,15 +207,12 @@ void updateNeedleGeometry(float angleDegrees) {
         }
         setHidden(object, !disc.visible || !currentModel.showNeedle);
     }
+    renderedNeedleStyle = activeNeedleStyle;
 }
 
 void applyInstrumentLayout() {
-    updateTickGeometry();
+    updateCompassRoseGeometry(compassRoseSpring.angleDegrees());
     updateNeedleGeometry(needleSpring.angleDegrees());
-    positionInstrumentObject(northLabel, roll_compass::kInstrumentNorthBounds);
-    positionInstrumentObject(southLabel, roll_compass::kInstrumentSouthBounds);
-    positionInstrumentObject(westLabel, roll_compass::kInstrumentWestBounds);
-    positionInstrumentObject(eastLabel, roll_compass::kInstrumentEastBounds);
     positionInstrumentObject(
         remainingLabel,
         roll_compass::kInstrumentRemainingLabelBounds
@@ -250,13 +295,12 @@ const char *stateCopy(roll_compass::CompassOsState state) {
     return "";
 }
 
-bool modelEquals(
+bool contentEquals(
     const roll_compass::CompassRenderModel &left,
     const roll_compass::CompassRenderModel &right
 ) {
     return left.state == right.state && left.showNeedle == right.showNeedle &&
         left.needleSuppressed == right.needleSuppressed &&
-        left.targetNeedleAngleDegrees == right.targetNeedleAngleDegrees &&
         left.hasDistance == right.hasDistance && left.distanceM == right.distanceM &&
         left.actionMask == right.actionMask && strcmp(left.menu, right.menu) == 0 &&
         strcmp(left.priceBand, right.priceBand) == 0;
@@ -387,9 +431,8 @@ void animateState(uint32_t nowMs) {
     const lv_opa_t opacity = pulseState
         ? static_cast<lv_opa_t>(150.0f + wave * 105.0f)
         : static_cast<lv_opa_t>(LV_OPA_COVER);
-    if (statusLabel != nullptr && !pulseState) {
-        lv_obj_set_style_text_opa(statusLabel, LV_OPA_COVER, LV_PART_MAIN);
-    } else if (statusLabel != nullptr) {
+    if (statusLabel != nullptr &&
+        lv_obj_get_style_text_opa(statusLabel, LV_PART_MAIN) != opacity) {
         lv_obj_set_style_text_opa(statusLabel, opacity, LV_PART_MAIN);
     }
 }
@@ -404,14 +447,21 @@ void animateNeedle(uint32_t nowMs) {
     accumulatedNeedleMs += elapsedMs > 100U ? 100U : elapsedMs;
     uint8_t steps = 0;
     while (accumulatedNeedleMs >= kNeedleStepMs && steps < kMaximumCatchUpSteps) {
-        needleSpring.step(targetNeedleAngleDegrees, 0.025f);
+        if (currentModel.showNeedle) needleSpring.step(targetNeedleAngleDegrees, 0.025f);
+        if (currentModel.rotateCompassRose) {
+            compassRoseSpring.step(targetCompassRoseAngleDegrees, 0.025f);
+        }
         accumulatedNeedleMs -= kNeedleStepMs;
         ++steps;
     }
     if (steps == kMaximumCatchUpSteps && accumulatedNeedleMs >= kNeedleStepMs) {
         accumulatedNeedleMs %= kNeedleStepMs;
     }
-    updateNeedleGeometry(needleSpring.angleDegrees());
+    if (steps == 0) return;
+    if (currentModel.showNeedle) updateNeedleGeometry(needleSpring.angleDegrees());
+    if (currentModel.rotateCompassRose) {
+        updateCompassRoseGeometry(compassRoseSpring.angleDegrees());
+    }
 }
 
 }  // namespace
@@ -441,19 +491,25 @@ void displayUiBegin() {
     for (size_t index = 0; index < somewhere_artwork::TICK_COUNT; ++index) {
         tickObjects[index] = lv_line_create(screen);
         lv_obj_remove_style_all(tickObjects[index]);
-        lv_obj_set_size(tickObjects[index], kScreenSize, kScreenSize);
-        lv_obj_set_pos(tickObjects[index], 0, 0);
+        lv_obj_set_size(tickObjects[index], 1, 1);
         lv_obj_set_style_line_color(tickObjects[index], kOffWhite, LV_PART_MAIN);
         lv_obj_set_style_line_width(tickObjects[index], 1, LV_PART_MAIN);
         lv_obj_set_style_line_rounded(tickObjects[index], false, LV_PART_MAIN);
         lv_obj_clear_flag(tickObjects[index], LV_OBJ_FLAG_CLICKABLE);
     }
 
+    lubberLine = lv_line_create(screen);
+    lv_obj_remove_style_all(lubberLine);
+    lubberLineGeometry.update(lubberLine, lubberLinePoints, 3);
+    lv_obj_set_style_line_color(lubberLine, kOffWhite, LV_PART_MAIN);
+    lv_obj_set_style_line_width(lubberLine, 2, LV_PART_MAIN);
+    lv_obj_set_style_line_rounded(lubberLine, true, LV_PART_MAIN);
+    lv_obj_clear_flag(lubberLine, LV_OBJ_FLAG_CLICKABLE);
+
     for (size_t index = 0; index < roll_compass::kNeedleMaximumStrokes; ++index) {
         needleStrokeObjects[index] = lv_line_create(screen);
         lv_obj_remove_style_all(needleStrokeObjects[index]);
-        lv_obj_set_size(needleStrokeObjects[index], kScreenSize, kScreenSize);
-        lv_obj_set_pos(needleStrokeObjects[index], 0, 0);
+        lv_obj_set_size(needleStrokeObjects[index], 1, 1);
         lv_obj_clear_flag(needleStrokeObjects[index], LV_OBJ_FLAG_CLICKABLE);
     }
     for (size_t index = 0; index < roll_compass::kNeedleMaximumDiscs; ++index) {
@@ -583,6 +639,7 @@ void displayUiBegin() {
     lv_obj_add_event_cb(pausedEndButton, pausedEndClicked, LV_EVENT_CLICKED, nullptr);
 
     needleSpring.reset(35.0f);
+    compassRoseSpring.reset(0.0f);
     applyInstrumentLayout();
     renderModel();
 }
@@ -594,13 +651,22 @@ void displayUiSetModel(
 ) {
     if (lvgl_port_lock(-1)) {
         const bool stateChanged = model.state != currentModel.state;
-        const bool shouldRender = !modelEquals(model, currentModel);
+        // Heading changes animate geometry; they do not change readout text.
+        const bool shouldRender = !contentEquals(model, currentModel);
+        if (!model.rotateCompassRose && currentModel.rotateCompassRose) {
+            compassRoseSpring.reset(compassRoseSpring.angleDegrees());
+        }
         currentModel = model;
         displayedSequence = sourceSequence;
         bleEventsEnabled = allowBleEvents;
         if (currentModel.showNeedle) {
             targetNeedleAngleDegrees =
                 roll_compass::normalizeDegrees(currentModel.targetNeedleAngleDegrees);
+        }
+        if (currentModel.rotateCompassRose) {
+            targetCompassRoseAngleDegrees = roll_compass::normalizeDegrees(
+                currentModel.targetCompassRoseAngleDegrees
+            );
         }
         if (stateChanged) stateEnteredMs = 0;
         if (shouldRender) renderModel();
@@ -610,8 +676,10 @@ void displayUiSetModel(
 
 void displayUiTick(uint32_t nowMs) {
     if (lvgl_port_lock(-1)) {
-        animateNeedle(nowMs);
-        animateState(nowMs);
+        if (uiAwake) {
+            animateNeedle(nowMs);
+            animateState(nowMs);
+        }
         lvgl_port_unlock();
     }
 }
@@ -623,7 +691,11 @@ void displayUiSetEventCallback(PhysicalCompassEventCallback callback) {
 bool displayUiSetAwake(bool awake) {
     if (!lvgl_port_lock(-1)) return false;
     const bool updated = lvgl_port_set_touch_enabled(awake);
-    if (updated) uiAwake = awake;
+    if (updated) {
+        uiAwake = awake;
+        lastTickMs = 0;
+        accumulatedNeedleMs = 0;
+    }
     lvgl_port_unlock();
     return updated;
 }

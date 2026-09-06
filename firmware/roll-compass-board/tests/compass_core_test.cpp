@@ -8,6 +8,7 @@
 #include "compass_math.h"
 #include "compass_diagnostics.h"
 #include "compass_layout.h"
+#include "compass_artwork.h"
 #include "compass_runtime.h"
 #include "display_content.h"
 #include "display_buffer_policy.h"
@@ -72,6 +73,8 @@ static void assertRuntimePrecedence() {
     assert(guiding.state == roll_compass::CompassOsState::Guiding);
     assert(guiding.showNeedle);
     assertNear(guiding.targetNeedleAngleDegrees, 20.0f);
+    assert(guiding.rotateCompassRose);
+    assertNear(guiding.targetCompassRoseAngleDegrees, 10.0f);
     assert(guiding.hasDistance);
     assertNear(guiding.distanceM, 420.0f);
     assert(strcmp(guiding.menu, "TONKATSU") == 0);
@@ -82,6 +85,7 @@ static void assertRuntimePrecedence() {
     auto stale = roll_compass::reduceRuntime(input);
     assert(stale.state == roll_compass::CompassOsState::Stale);
     assert(!stale.showNeedle);
+    assert(!stale.rotateCompassRose);
     assert(stale.actionMask == 0);
 
     input.sensorHealth = roll_compass::SensorHealth::Missing;
@@ -110,6 +114,7 @@ static void assertRuntimePhaseMappingAndSuppression() {
     auto recovering = roll_compass::reduceRuntime(input);
     assert(recovering.state == roll_compass::CompassOsState::Guiding);
     assert(!recovering.showNeedle);
+    assert(!recovering.rotateCompassRose);
     assert(recovering.needleSuppressed);
     assert(recovering.actionMask == (1U << 0));
 
@@ -127,6 +132,7 @@ static void assertRuntimePhaseMappingAndSuppression() {
     auto paused = roll_compass::reduceRuntime(input);
     assert(paused.state == roll_compass::CompassOsState::Paused);
     assert(!paused.showNeedle);
+    assert(!paused.rotateCompassRose);
     assert(paused.actionMask == ((1U << 1) | (1U << 2)));
     input.phase = roll_compass::JourneyPhase::Stopped;
     assert(roll_compass::reduceRuntime(input).state == roll_compass::CompassOsState::Paused);
@@ -631,6 +637,49 @@ static void assertInstrumentNeedleGeometry() {
     );
 }
 
+static void assertCompassRoseGeometry() {
+    const auto east = roll_compass::rotateInstrumentPoint(
+        roll_compass::InstrumentPoint{240, 40},
+        90.0f
+    );
+    assert(east.x == 440);
+    assert(east.y == 240);
+
+    const auto west = roll_compass::rotateInstrumentPoint(
+        roll_compass::InstrumentPoint{240, 40},
+        270.0f
+    );
+    assert(west.x == 40);
+    assert(west.y == 240);
+
+    for (int angle = 0; angle < 360; ++angle) {
+        for (const auto &tick : somewhere_artwork::TICKS) {
+            for (auto point : {roll_compass::InstrumentPoint{tick.x1, tick.y1},
+                               roll_compass::InstrumentPoint{tick.x2, tick.y2}}) {
+                point = roll_compass::rotateInstrumentPoint(point, angle);
+                assert(roll_compass::pointFitsCircle(point.x, point.y, 240, 240, 230));
+            }
+        }
+    }
+    auto input = credibleGuidanceInput();
+    input.boardMagneticHeadingDegrees = 100;
+    input.magneticDeclinationDegreesEast = -8;
+    input.targetTrueBearingDegrees = 92;
+    auto model = roll_compass::reduceRuntime(input);
+    assertNear(model.targetCompassRoseAngleDegrees, 268);
+    assertNear(model.targetNeedleAngleDegrees, 0);
+    input.boardMagneticHeadingDegrees = 130;
+    model = roll_compass::reduceRuntime(input);
+    assertNear(model.targetCompassRoseAngleDegrees, 238);
+    assertNear(model.targetNeedleAngleDegrees, -30);
+    input.targetTrueBearingDegrees = 180;
+    model = roll_compass::reduceRuntime(input);
+    assertNear(model.targetCompassRoseAngleDegrees, 238);
+    assertNear(model.targetNeedleAngleDegrees, 58);
+    input.sensorHealth = roll_compass::SensorHealth::Missing;
+    assert(!roll_compass::reduceRuntime(input).rotateCompassRose);
+}
+
 static void assertDisplayBufferPreference() {
     using roll_compass::DisplayBufferPreference;
 
@@ -839,6 +888,8 @@ int main() {
     assertNear(roll_compass::shortestDeltaDegrees(1.0f, 359.0f), -2.0f);
     assertNear(roll_compass::relativeNeedleAngle(350.0f, 0.0f, 10.0f), 20.0f);
     assertNear(roll_compass::relativeNeedleAngle(100.0f, -8.0f, 92.0f), 0.0f);
+    assertNear(roll_compass::compassRoseAngle(90.0f, 0.0f), 270.0f);
+    assertNear(roll_compass::compassRoseAngle(350.0f, 20.0f), 350.0f);
 
     assertSpringSettles(0.001f, 4'000);
     assertSpringSettles(0.025f, 160);
@@ -879,6 +930,7 @@ int main() {
     assertCircularLayoutContainment();
     assertInstrumentLayoutContainment();
     assertInstrumentNeedleGeometry();
+    assertCompassRoseGeometry();
     assertDisplayBufferPreference();
     assertDisplayContentFormatting();
     assertScreenPowerButtonRespondsOnPressEdge();

@@ -9,5 +9,6 @@ float relativeNeedleAngle(
     float declinationEast,
     float targetTrueBearing
 );
+float compassRoseAngle(float magneticHeading, float declinationEast);
 
 }  // namespace roll_compass

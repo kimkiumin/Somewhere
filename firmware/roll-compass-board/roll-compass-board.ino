@@ -347,6 +347,8 @@ void setup() {
     screenPowerButton.reset(digitalRead(kBootButtonPin) == LOW, millis());
     delay(250);
     Serial.println("Roll Compass board boot");
+    Serial.printf("display_revision=bounded-lines-v1 contract=%u built=%s %s\n",
+        physical_compass::kContractVersion, __DATE__, __TIME__);
 
     pendingStateMutex = xSemaphoreCreateMutex();
     pendingStateFrame.reserve(physical_compass::kMaxFrameBytes);

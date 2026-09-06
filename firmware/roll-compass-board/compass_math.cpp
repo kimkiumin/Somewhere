@@ -25,4 +25,9 @@ float relativeNeedleAngle(
     return shortestDeltaDegrees(boardTrueHeading, targetTrueBearing);
 }
 
+float compassRoseAngle(float magneticHeading, float declinationEast) {
+    const float boardTrueHeading = normalizeDegrees(magneticHeading + declinationEast);
+    return normalizeDegrees(-boardTrueHeading);
+}
+
 }  // namespace roll_compass

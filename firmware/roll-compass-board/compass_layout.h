@@ -18,6 +18,25 @@ struct InstrumentPoint {
     int16_t y;
 };
 
+inline InstrumentPoint rotateInstrumentPoint(
+    InstrumentPoint point,
+    float angleDegrees
+) {
+    if (!isfinite(angleDegrees)) angleDegrees = 0.0f;
+    constexpr float kPi = 3.14159265358979323846f;
+    const float radians = angleDegrees * kPi / 180.0f;
+    const float deltaX = static_cast<float>(point.x - kInstrumentFaceCenter);
+    const float deltaY = static_cast<float>(point.y - kInstrumentFaceCenter);
+    return InstrumentPoint{
+        static_cast<int16_t>(lroundf(
+            kInstrumentFaceCenter + deltaX * cosf(radians) - deltaY * sinf(radians)
+        )),
+        static_cast<int16_t>(lroundf(
+            kInstrumentFaceCenter + deltaX * sinf(radians) + deltaY * cosf(radians)
+        )),
+    };
+}
+
 struct InstrumentNeedleGeometry {
     InstrumentPoint center;
     InstrumentPoint tip;

@@ -138,6 +138,11 @@ CompassRenderModel reduceRuntime(const RuntimeInput &input) {
             input.magneticDeclinationDegreesEast,
             input.targetTrueBearingDegrees
         );
+        model.rotateCompassRose = true;
+        model.targetCompassRoseAngleDegrees = compassRoseAngle(
+            input.boardMagneticHeadingDegrees,
+            input.magneticDeclinationDegreesEast
+        );
     }
     if (model.state == CompassOsState::UpdateRequired) {
         model.hasDistance = false;

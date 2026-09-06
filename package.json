@@ -37,6 +37,7 @@
     "firmware:assets": "bash scripts/firmware/generate-board-assets.sh",
     "firmware:ios": "bash scripts/firmware/generate-ios-project.sh",
     "firmware:test": "bash scripts/firmware/test-board-core.sh",
+    "firmware:test-renderer": "bun scripts/firmware/test-board-renderer.mjs",
     "firmware:compile": "bash scripts/firmware/compile-board.sh",
     "firmware:upload": "bash scripts/firmware/upload-board.sh",
     "firmware:monitor": "bash scripts/firmware/monitor-board.sh",

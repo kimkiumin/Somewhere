@@ -64,6 +64,8 @@ struct CompassRenderModel {
     bool showNeedle = false;
     bool needleSuppressed = false;
     float targetNeedleAngleDegrees = 0.0f;
+    bool rotateCompassRose = false;
+    float targetCompassRoseAngleDegrees = 0.0f;
     bool hasDistance = false;
     float distanceM = 0.0f;
     uint8_t actionMask = 0;
