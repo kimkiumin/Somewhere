@@ -66,6 +66,12 @@ bundle. No Python, WSL, or image regeneration is needed for text-only changes.
 Commit the phrase list and bundle together. Windows CI checks reproducibility.
 The exact source-derived instrument headers remain tracked separately.
 
+The Korean subset comes from Noto Sans KR at Google Fonts commit
+`6a003b5eb672dc8bf5bff5937cf5863f8b175445`; the generator pins/verifies its SHA-256.
+Keep [its OFL notice](OFL-NotoSansKR.txt) with redistributed font assets. The legacy
+wordmark uses the separately tracked
+[UnifrakturCook OFL notice](../../ios/Somewhere/Resources/Fonts/OFL-UnifrakturCook.txt).
+
 Readouts use actual LVGL font metrics to fit their fixed width with `...` when
 necessary. Unknown glyphs show `ON PHONE` using the source ASCII font; the
 original BLE value is unchanged. The supported Korean phrases include the
