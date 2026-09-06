@@ -74,7 +74,7 @@ test("TASK17_V2_LAYOUT survives 200 percent text and reduced motion", async ({ p
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
   });
-  await expect(page.getByRole("button", { name: "목적지 확인" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "목적지 확인", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "중단", exact: true })).toBeVisible();
   expect(
     await page.evaluate(

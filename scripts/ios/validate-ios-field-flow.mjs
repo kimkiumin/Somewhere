@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 export const IOS_FIELD_REQUIREMENTS = Object.freeze({
   requiredFiles: Object.freeze([
     "ios/Somewhere/Application/JourneyStore.swift",
+    "ios/Somewhere/Domain/SomewherePreferences.swift",
     "ios/Somewhere/Platform/LocationController.swift",
     "ios/Somewhere/Platform/NotificationController.swift",
     "ios/Somewhere/Platform/FeedbackCapabilityStore.swift",
@@ -17,9 +18,16 @@ export const IOS_FIELD_REQUIREMENTS = Object.freeze({
     "ios/Somewhere/UI/RevealView.swift",
     "ios/Somewhere/UI/RecoveryView.swift",
     "ios/Somewhere/UI/FeedbackView.swift",
+    "ios/Somewhere/UI/OnboardingView.swift",
+    "ios/Somewhere/UI/ProfileSettingsView.swift",
+    "ios/Somewhere/UI/JourneyReasonViews.swift",
+    "ios/Somewhere/UI/ArrivalView.swift",
+    "ios/Somewhere/UI/NoFitView.swift",
+    "ios/Somewhere/UI/SomewhereCompass.swift",
     "ios/Somewhere/Resources/Info.plist",
     "ios/SomewhereTests/JourneyStoreTests.swift",
     "ios/SomewhereUITests/JourneyFlowUITests.swift",
+    "ios/SomewhereUITests/VirtualFieldFlowUITests.swift",
   ]),
   uiFiles: Object.freeze([
     "ios/Somewhere/UI/RootView.swift",
@@ -29,6 +37,12 @@ export const IOS_FIELD_REQUIREMENTS = Object.freeze({
     "ios/Somewhere/UI/RevealView.swift",
     "ios/Somewhere/UI/RecoveryView.swift",
     "ios/Somewhere/UI/FeedbackView.swift",
+    "ios/Somewhere/UI/OnboardingView.swift",
+    "ios/Somewhere/UI/ProfileSettingsView.swift",
+    "ios/Somewhere/UI/JourneyReasonViews.swift",
+    "ios/Somewhere/UI/ArrivalView.swift",
+    "ios/Somewhere/UI/NoFitView.swift",
+    "ios/Somewhere/UI/SomewhereCompass.swift",
   ]),
 });
 
@@ -90,10 +104,14 @@ export async function validateIOSFieldFlow(repositoryRoot) {
 
   const unitTests = source.get("ios/SomewhereTests/JourneyStoreTests.swift");
   const uiTests = source.get("ios/SomewhereUITests/JourneyFlowUITests.swift");
+  const virtualFieldTests = source.get("ios/SomewhereUITests/VirtualFieldFlowUITests.swift");
   const unitScenarioCount = [...unitTests.matchAll(/func test[A-Za-z0-9_]+\(\)/g)].length;
   const uiScenarioCount = [...uiTests.matchAll(/func test[A-Za-z0-9_]+\(\)/g)].length;
   assert(unitScenarioCount >= 12, "JourneyStoreTests must define at least 12 scenarios");
   assert(uiScenarioCount >= 4, "JourneyFlowUITests must define at least 4 scenarios");
+  assert(virtualFieldTests.includes("XCUIDevice.shared.location"), "virtual field UI test must control Simulator location");
+  assert(virtualFieldTests.includes("--simulator-heading-from-course"), "virtual field UI test must opt into Debug heading replay");
+  assert(virtualFieldTests.includes("SOMEWHERE_RUN_LOCAL_E2E"), "virtual field UI test must be explicitly gated");
 
   for (const path of IOS_FIELD_REQUIREMENTS.uiFiles) {
     const value = source.get(path);

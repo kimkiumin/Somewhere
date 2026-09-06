@@ -9,9 +9,14 @@ final class WireContractTests: XCTestCase {
             .appending(path: "Fixtures/projection-examples-v1.json")
         let data = try Data(contentsOf: fixture)
         let projections = try JSONDecoder().decode([JourneyProjection].self, from: data)
-        XCTAssertEqual(projections.count, 22)
+        XCTAssertEqual(projections.count, 21)
         XCTAssertEqual(projections.first?.phase, .finding)
         XCTAssertEqual(projections.last?.phase, .expired)
+    }
+
+    func testUnrevealedArrivalProjectionIsRejected() throws {
+        let json = #"{"contractVersion":1,"journeyId":"j_v1.AAAAAAAAAAAAAAAAAAAAAA","sequence":1,"disclosure":{"routeDistanceM":700,"routeDurationMinutes":10,"representativeCategories":["한식 국물 요리"],"priceBand":"medium","policyVersion":"policy-v1"},"phase":"arrived","revealed":false,"feedbackDueAt":1000,"actions":["reveal"]}"#
+        XCTAssertThrowsError(try JSONDecoder().decode(JourneyProjection.self, from: Data(json.utf8)))
     }
 
     func testEndpointCatalogIsCompleteAndUniqueByMethodAndPath() {

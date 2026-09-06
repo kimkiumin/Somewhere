@@ -4,6 +4,8 @@ set -euo pipefail
 readonly BASE_URL="${SOMEWHERE_BASE_URL:-http://127.0.0.1:8787}"
 readonly ORIGIN="$BASE_URL"
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+readonly FIXTURE_VALID_NOW_MS=1785542400000
+readonly LOCAL_CONTROL_KEY=somewhere-v2-local-qa
 TMP_DIR="$(mktemp -d -t somewhere-hidden-curl.XXXXXXXX)"
 readonly TMP_DIR
 trap 'find "$TMP_DIR" -depth -mindepth 1 -delete; rmdir "$TMP_DIR"' EXIT
@@ -47,13 +49,24 @@ json_field() {
 
 readonly KEY_CREATE='ik_v1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 readonly KEY_COMMIT='ik_v1.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
-readonly KEY_REVEAL='ik_v1.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
-readonly KEY_DELETE='ik_v1.DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD'
-readonly KEY_OTHER='ik_v1.EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE'
+readonly KEY_STOP='ik_v1.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
+readonly KEY_REVEAL='ik_v1.DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD'
+readonly KEY_DELETE='ik_v1.EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE'
 readonly KEY_OFFZONE='ik_v1.FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'
 readonly KEY_NOFIT='ik_v1.GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG'
+readonly KEY_OTHER='ik_v1.HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH'
 readonly CREATE_BODY='{"contractVersion":1,"constraints":{"category":"restaurant","maxWalkMinutes":30,"budgetBand":"medium","dietary":[],"accessibility":[]},"origin":{"latitude":37.54385,"longitude":127.03695,"accuracyM":5,"capturedAt":1785283200000},"disclosureLevel":"standard","recoveryCapability":null}'
 readonly VERSION_BODY='{"contractVersion":1}'
+
+control_status="$(request local-control \
+  -H 'Content-Type: application/json' \
+  -H "X-Somewhere-V2-Control: $LOCAL_CONTROL_KEY" \
+  --data "{\"clockOffsetMs\":0,\"fixtureNowMs\":$FIXTURE_VALID_NOW_MS}" \
+  -X PUT \
+  "$BASE_URL/api/test/v2-control")"
+[[ "$control_status" == 200 ]] || fail "local control status $control_status"
+[[ "$(json_field "$TMP_DIR/local-control.body" fixtureNowMs)" == "$FIXTURE_VALID_NOW_MS" ]] \
+  || fail "local control did not freeze fixture time"
 
 health_status="$(request health "$BASE_URL/api/v1/health")"
 [[ "$health_status" == 200 ]] || fail "health status $health_status"
@@ -104,16 +117,20 @@ commit_replay_status="$(request commit-replay -b "$TMP_DIR/primary.cookies" -H "
 [[ "$commit_replay_status" == 200 ]] || fail "commit replay status"
 cmp -s "$TMP_DIR/commit.body" "$TMP_DIR/commit-replay.body" || fail "commit replay not byte-equivalent"
 
-reveal_status="$(request reveal -b "$TMP_DIR/primary.cookies" -H "Origin: $ORIGIN" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' -H "X-CSRF-Token: $csrf" -H "Idempotency-Key: $KEY_REVEAL" -H 'X-Expected-Sequence: 2' --data "$VERSION_BODY" "$BASE_URL/api/v1/journeys/$journey_id/reveal")"
+stop_status="$(request stop -b "$TMP_DIR/primary.cookies" -H "Origin: $ORIGIN" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' -H "X-CSRF-Token: $csrf" -H "Idempotency-Key: $KEY_STOP" -H 'X-Expected-Sequence: 2' --data "$VERSION_BODY" "$BASE_URL/api/v1/journeys/$journey_id/stop/request")"
+[[ "$stop_status" == 200 ]] || fail "stop status $stop_status body=$(cat "$TMP_DIR/stop.body")"
+[[ "$(json_field "$TMP_DIR/stop.body" phase)" == paused && "$(json_field "$TMP_DIR/stop.body" sequence)" == 3 ]] || fail "Stop did not pause before Reveal"
+
+reveal_status="$(request reveal -b "$TMP_DIR/primary.cookies" -H "Origin: $ORIGIN" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' -H "X-CSRF-Token: $csrf" -H "Idempotency-Key: $KEY_REVEAL" -H 'X-Expected-Sequence: 3' --data "$VERSION_BODY" "$BASE_URL/api/v1/journeys/$journey_id/reveal")"
 [[ "$reveal_status" == 200 ]] || fail "reveal status $reveal_status body=$(cat "$TMP_DIR/reveal.body")"
-[[ "$(json_field "$TMP_DIR/reveal.body" phase)" == following && "$(json_field "$TMP_DIR/reveal.body" revealed)" == true && "$(json_field "$TMP_DIR/reveal.body" sequence)" == 3 ]] || fail "Reveal changed phase"
+[[ "$(json_field "$TMP_DIR/reveal.body" phase)" == paused && "$(json_field "$TMP_DIR/reveal.body" revealed)" == true && "$(json_field "$TMP_DIR/reveal.body" sequence)" == 4 ]] || fail "Reveal changed paused phase"
 rg -q '소문난성수감자탕' "$TMP_DIR/reveal.body" || fail "Reveal omitted identity"
 
-delete_status="$(request delete -b "$TMP_DIR/primary.cookies" -H "Origin: $ORIGIN" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' -H "X-CSRF-Token: $csrf" -H "Idempotency-Key: $KEY_DELETE" -H 'X-Expected-Sequence: 3' -X DELETE "$BASE_URL/api/v1/journeys/$journey_id")"
+delete_status="$(request delete -b "$TMP_DIR/primary.cookies" -H "Origin: $ORIGIN" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' -H "X-CSRF-Token: $csrf" -H "Idempotency-Key: $KEY_DELETE" -H 'X-Expected-Sequence: 4' -X DELETE "$BASE_URL/api/v1/journeys/$journey_id")"
 [[ "$delete_status" == 204 && ! -s "$TMP_DIR/delete.body" ]] || fail "DELETE status/body"
-delete_replay_status="$(request delete-replay -b "$TMP_DIR/primary.cookies" -H "Origin: $ORIGIN" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' -H "X-CSRF-Token: $csrf" -H "Idempotency-Key: $KEY_DELETE" -H 'X-Expected-Sequence: 3' -X DELETE "$BASE_URL/api/v1/journeys/$journey_id")"
+delete_replay_status="$(request delete-replay -b "$TMP_DIR/primary.cookies" -H "Origin: $ORIGIN" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' -H "X-CSRF-Token: $csrf" -H "Idempotency-Key: $KEY_DELETE" -H 'X-Expected-Sequence: 4' -X DELETE "$BASE_URL/api/v1/journeys/$journey_id")"
 [[ "$delete_replay_status" == 204 ]] || fail "DELETE replay"
-delete_other_status="$(request delete-other -b "$TMP_DIR/primary.cookies" -H "Origin: $ORIGIN" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' -H "X-CSRF-Token: $csrf" -H "Idempotency-Key: $KEY_OTHER" -H 'X-Expected-Sequence: 3' -X DELETE "$BASE_URL/api/v1/journeys/$journey_id")"
+delete_other_status="$(request delete-other -b "$TMP_DIR/primary.cookies" -H "Origin: $ORIGIN" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' -H "X-CSRF-Token: $csrf" -H "Idempotency-Key: $KEY_OTHER" -H 'X-Expected-Sequence: 4' -X DELETE "$BASE_URL/api/v1/journeys/$journey_id")"
 [[ "$delete_other_status" == 410 ]] || fail "new DELETE key after tombstone"
 
 null_origin_status="$(request null-origin -H 'Origin:' -H 'Sec-Fetch-Site: same-origin' "$BASE_URL/api/v1/session")"
@@ -140,7 +157,7 @@ if rg -q '소문난성수감자탕|연무장길 45|manual:seongsu-gamjatang' "$R
 fi
 bun run --cwd "$ROOT_DIR/server" test -- provider route >/dev/null
 
-printf 'PASS session→create→GET→commit→reveal→DELETE\n'
+printf 'PASS session→create→GET→commit→Stop pause→reveal→DELETE\n'
 printf 'PASS byte-equivalent create/commit/delete replay\n'
 printf 'NEGATIVE_PASS csrf origin foreign-session changed-body tombstone\n'
 printf 'NEGATIVE_PASS no-fit off-zone-route provider-rights-policy\n'

@@ -1,5 +1,9 @@
-import { describe, expect, test } from "vitest";
-import { normalizeBrowserHeadingEvent, requestOrientationPermission } from "./browser-heading";
+import { describe, expect, test, vi } from "vitest";
+import {
+  createBrowserHeadingSource,
+  normalizeBrowserHeadingEvent,
+  requestOrientationPermission,
+} from "./browser-heading";
 
 describe("browser heading adapter", () => {
   test("prefers iOS WebKit magnetic heading and exposes measured accuracy", () => {
@@ -53,5 +57,33 @@ describe("browser heading adapter", () => {
     await expect(
       requestOrientationPermission({ requestPermission: () => Promise.resolve("denied") }),
     ).resolves.toEqual({ status: "denied" });
+  });
+
+  test("coalesces orientation bursts to the latest sample in one animation frame", () => {
+    let listener: ((event: unknown) => void) | undefined;
+    const frames: FrameRequestCallback[] = [];
+    const samples: number[] = [];
+    const source = createBrowserHeadingSource({
+      add(next) {
+        listener = next;
+      },
+      cancelFrame: vi.fn(),
+      nowMs: () => 1_000,
+      permissionProvider: undefined,
+      remove: vi.fn(),
+      requestFrame(callback) {
+        frames.push(callback);
+        return frames.length;
+      },
+    });
+    source.subscribe((sample) => samples.push(sample.degrees), vi.fn());
+
+    listener?.({ webkitCompassHeading: 10, webkitCompassAccuracy: 5 });
+    listener?.({ webkitCompassHeading: 20, webkitCompassAccuracy: 5 });
+
+    expect(samples).toEqual([]);
+    expect(frames).toHaveLength(1);
+    frames[0]?.(0);
+    expect(samples).toEqual([20]);
   });
 });

@@ -5,6 +5,11 @@ requirements, change the approved blueprint, or promote any completion or
 release gate. When this page conflicts with product authority, follow
 [`../README.md`](../README.md).
 
+For the current `Roll the compass!` source map, Xcode GUI quickstart, Simulator
+demo states, local Worker/GPS test, physical-iPhone setup, and copyable AI
+context, continue with
+[`native-ios-collaboration-handoff.md`](native-ios-collaboration-handoff.md).
+
 ## 1. Load only the context needed for the task
 
 For a new macOS checkout, read these files in order:

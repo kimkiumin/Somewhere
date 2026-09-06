@@ -19,7 +19,7 @@ describe("native iOS source gate", () => {
       gate: "PASS",
       deploymentTarget: 17,
       bundleIdentifier: "example.somewhere.field",
-      projectionExampleCount: 22,
+      projectionExampleCount: 21,
       endpointCount: 17,
       actionCount: 12,
       navigationPolicyVersion: "navigation-v2-calibration-1",

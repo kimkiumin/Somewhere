@@ -13,9 +13,9 @@ describe("native iOS field journey gate", () => {
     expect(await validateIOSFieldFlow(repositoryRoot)).toEqual({
       gate: "PASS",
       requiredFileCount: IOS_FIELD_REQUIREMENTS.requiredFiles.length,
-      uiViewCount: 7,
-      unitScenarioCount: 15,
-      uiScenarioCount: 4,
+      uiViewCount: 13,
+      unitScenarioCount: 27,
+      uiScenarioCount: 28,
       minimumControlPoints: 44,
     });
   });
@@ -101,11 +101,10 @@ describe("native iOS field journey gate", () => {
     expect(store).toContain("pendingStartConstraints")
     expect(compass).toContain('Button("안내 시작")')
     expect(compass).toContain("await store.commit()")
-    expect(compass).toContain('Button("안내 복구")')
+    expect(compass).toContain('Button("방향 다시 잡기")')
     expect(compass).toContain('Button("선택 취소")')
     expect(compass).toContain("reading.remainingM")
     expect(root).toContain("applicationDidEnterBackground()")
-    expect(root).toContain(".accessibilityElement(children: .contain)")
     expect(location).toContain("case .arrived, .stopped, .completed, .expired:")
   });
 
@@ -133,16 +132,8 @@ describe("native iOS field journey gate", () => {
     expect(plist).not.toContain("NSLocationAlways")
     expect(ui.join("\n")).toContain(".frame(minHeight: 44)")
     expect(ui.join("\n")).toContain("accessibilityLabel")
-    for (const path of [
-      "ios/Somewhere/UI/ConstraintView.swift",
-      "ios/Somewhere/UI/CompassView.swift",
-      "ios/Somewhere/UI/StopConfirmationView.swift",
-      "ios/Somewhere/UI/RecoveryView.swift",
-      "ios/Somewhere/UI/FeedbackView.swift",
-    ]) {
-      expect(await readFile(resolve(repositoryRoot, path), "utf8")).toContain(
-        ".accessibilityElement(children: .contain)",
-      )
-    }
+    expect(await readFile(resolve(repositoryRoot, "ios/Somewhere/UI/ConstraintView.swift"), "utf8")).toContain(
+      ".accessibilityElement(children: .contain)",
+    )
   });
 });

@@ -3,6 +3,7 @@ import {
   ArrivalBodyV1Schema,
   EndpointContractV1Schema,
   ErrorResponseV1Schema,
+  JourneyCreateBodyV1Schema,
   JourneyProjectionV1Schema,
   contractDocumentV1,
   IdempotencyKeySchema,
@@ -28,10 +29,38 @@ const disclosure = {
 describe("phase-exact journey projections", () => {
   test("accepts every frozen phase/action tuple", () => {
     const fixtures = contractDocumentV1.projectionExamples;
-    expect(fixtures.length).toBe(22);
+    expect(fixtures.length).toBe(21);
     for (const fixture of fixtures) {
       expect(JourneyProjectionV1Schema.safeParse(fixture).success).toBe(true);
     }
+  });
+
+  test("keeps Reveal behind the Stop-first safety path", () => {
+    const fixtures = contractDocumentV1.projectionExamples;
+    type UnrevealedProjection = Extract<(typeof fixtures)[number], { revealed: false }>;
+    const unrevealed = (phase: string): UnrevealedProjection | undefined =>
+      fixtures.find(
+        (value): value is UnrevealedProjection =>
+          "revealed" in value && value.phase === phase && value.revealed === false,
+      );
+
+    expect(unrevealed("ready")?.actions).toEqual(["commit", "stop"]);
+    expect(unrevealed("committed")?.actions).toEqual(["poll", "stop"]);
+    expect(unrevealed("following")?.actions).toEqual(["stop", "route-recover", "arrival"]);
+    expect(unrevealed("route-recovery")?.actions).toEqual(["stop", "route-recover"]);
+    expect(unrevealed("near")?.actions).toEqual(["stop", "route-recover", "arrival"]);
+    expect(unrevealed("paused")?.actions).toContain("reveal");
+    expect(unrevealed("stopped")?.actions).toContain("reveal");
+    expect(unrevealed("completed")?.actions).toContain("reveal");
+    expect(unrevealed("arrived")).toBeUndefined();
+
+    const following = unrevealed("following");
+    expect(
+      JourneyProjectionV1Schema.safeParse({
+        ...following,
+        actions: ["reveal", ...(following?.actions ?? [])],
+      }).success,
+    ).toBe(false);
   });
 
   test("rejects an action legal only in another phase", () => {
@@ -145,6 +174,33 @@ describe("HTTP and primitive contracts", () => {
         details: { venueId: "leak" },
       },
     }).success).toBe(false);
+  });
+
+  test("accepts allergy constraints as a separate hard-filter input", () => {
+    const result = JourneyCreateBodyV1Schema.safeParse({
+      contractVersion: 1,
+      constraints: {
+        category: "restaurant",
+        maxWalkMinutes: 25,
+        budgetBand: "medium",
+        dietary: ["lacto_ovo"],
+        allergies: ["peanut"],
+        accessibility: [],
+      },
+      origin: {
+        latitude: 37.54385,
+        longitude: 127.03695,
+        accuracyM: 5,
+        capturedAt: 1_785_283_200_000,
+      },
+      disclosureLevel: "standard",
+      recoveryCapability: null,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.constraints.allergies).toEqual(["peanut"]);
+    }
   });
 });
 

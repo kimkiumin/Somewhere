@@ -146,6 +146,18 @@ describe("public release authority", () => {
   test("writes one owner-only decision through the fixed CLI", async () => {
     const state = await fixture();
     try {
+      const clock = Date.now();
+      const issuedAt = new Date(clock - 60_000).toISOString();
+      const expiresAt = new Date(clock + 60 * 60 * 1_000).toISOString();
+      state.signer.record.validFrom = new Date(clock - 24 * 60 * 60 * 1_000).toISOString();
+      state.signer.record.validUntil = new Date(clock + 24 * 60 * 60 * 1_000).toISOString();
+      for (const receipt of state.receipts) {
+        receipt.value = signedReceipt(receipt.value.payload.purpose, state.signer, {
+          expiresAt,
+          issuedAt,
+        });
+        await writeFile(receipt.path, `${JSON.stringify(receipt.value)}\n`, { mode: 0o600 });
+      }
       const trustPath = resolve(state.root, "trusted.json");
       const output = resolve(state.root, "decision.json");
       await writeFile(trustPath, `${JSON.stringify(state.trustStore)}\n`, { mode: 0o600 });

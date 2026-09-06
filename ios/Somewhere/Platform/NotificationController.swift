@@ -7,17 +7,24 @@ final class NotificationController: NSObject, ObservableObject, UNUserNotificati
     @Published private(set) var inAppFallbackRequired = false
     private let center: UNUserNotificationCenter
     private let defaults: UserDefaults
+    private let suppressScheduling: Bool
     private let fallbackDueKey = "somewhere.feedback.fallback-due-v1"
 
-    init(center: UNUserNotificationCenter = .current(), defaults: UserDefaults = .standard) {
+    init(
+        center: UNUserNotificationCenter = .current(),
+        defaults: UserDefaults = .standard,
+        suppressScheduling: Bool = false
+    ) {
         self.center = center
         self.defaults = defaults
+        self.suppressScheduling = suppressScheduling
         super.init()
         center.delegate = self
         refreshFallback()
     }
 
     func scheduleDelayedFeedback(dueAt: Date) async {
+        guard !suppressScheduling else { return }
         let settings = await center.notificationSettings()
         var authorized = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
         if settings.authorizationStatus == .notDetermined {

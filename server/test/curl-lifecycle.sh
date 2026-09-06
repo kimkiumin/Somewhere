@@ -80,15 +80,15 @@ journey_id="$(json_field "$TMP_DIR/create.body" journeyId)"
 
 [[ "$(mutate commit commit 1 B "$VERSION")" == 200 ]] || fail "commit"
 [[ "$(json_field "$TMP_DIR/commit.body" phase)" == following ]] || fail "following phase"
-[[ "$(mutate reveal reveal 2 C "$VERSION")" == 200 ]] || fail "reveal"
-[[ "$(json_field "$TMP_DIR/reveal.body" revealed)" == true ]] || fail "reveal flag"
-
-[[ "$(mutate stop-one stop/request 3 D "$VERSION")" == 200 ]] || fail "first Stop"
+[[ "$(mutate stop-one stop/request 2 C "$VERSION")" == 200 ]] || fail "first Stop"
 stop_one_id="$(json_field "$TMP_DIR/stop-one.body" stopConfirmationId)"
 [[ "$(json_field "$TMP_DIR/stop-one.body" phase)" == paused ]] || fail "Stop did not pause"
 if rg -q '"guidance"' "$TMP_DIR/stop-one.body"; then
   fail "paused response retained guidance"
 fi
+[[ "$(mutate reveal reveal 3 D "$VERSION")" == 200 ]] || fail "paused reveal"
+[[ "$(json_field "$TMP_DIR/reveal.body" phase)" == paused ]] || fail "Reveal changed paused phase"
+[[ "$(json_field "$TMP_DIR/reveal.body" revealed)" == true ]] || fail "reveal flag"
 
 cancel_body='{"contractVersion":1,"stopConfirmationId":"'"$stop_one_id"'"}'
 [[ "$(mutate continue stop/cancel 4 E "$cancel_body")" == 200 ]] || fail "Continue"
@@ -174,8 +174,9 @@ recovery_create_status="$(request recovery-create \
   -H "Idempotency-Key: $(key M)" \
   --data "$recovery_create_body" \
   "$BASE_URL/api/v1/journeys")"
-[[ "$recovery_create_status" == 201 ]] || fail "recovery create status $recovery_create_status"
-journey_id="$(json_field "$TMP_DIR/recovery-create.body" journeyId)"
+[[ "$recovery_create_status" == 422 ]] || fail "recovery create status $recovery_create_status"
+[[ "$(json_field "$TMP_DIR/recovery-create.body" error.code)" == no_fit ]] \
+  || fail "recovery did not exclude the only reviewed restaurant"
 
 reuse_status="$(request reuse \
   -b "$TMP_DIR/cookies" \
@@ -186,7 +187,23 @@ reuse_status="$(request reuse \
   -H "Idempotency-Key: $(key N)" \
   --data "$recovery_create_body" \
   "$BASE_URL/api/v1/journeys")"
-[[ "$reuse_status" == 409 || "$reuse_status" == 404 ]] || fail "capability reuse status $reuse_status"
+[[ "$reuse_status" == 404 ]] || fail "capability reuse status $reuse_status"
+
+fresh_session_status="$(request fresh-session -c "$TMP_DIR/fresh.cookies" -H "Origin: $ORIGIN" -H 'Sec-Fetch-Site: same-origin' "$BASE_URL/api/v1/session")"
+[[ "$fresh_session_status" == 200 ]] || fail "fresh arrival session"
+csrf="$(json_field "$TMP_DIR/fresh-session.body" csrfToken)"
+cp "$TMP_DIR/fresh.cookies" "$TMP_DIR/cookies"
+fresh_create_status="$(request fresh-create \
+  -b "$TMP_DIR/cookies" \
+  -H "Origin: $ORIGIN" \
+  -H 'Sec-Fetch-Site: same-origin' \
+  -H 'Content-Type: application/json' \
+  -H "X-CSRF-Token: $csrf" \
+  -H "Idempotency-Key: $(key X)" \
+  --data "$create_body" \
+  "$BASE_URL/api/v1/journeys")"
+[[ "$fresh_create_status" == 201 ]] || fail "fresh arrival create status $fresh_create_status"
+journey_id="$(json_field "$TMP_DIR/fresh-create.body" journeyId)"
 
 [[ "$(mutate recovery-commit commit 1 O "$VERSION")" == 200 ]] || fail "recovery commit"
 invalid_arrival='{"contractVersion":1,"endpointDistanceBand":"within-arrival-threshold","accuracyBand":"good","consecutiveSamples":101,"dwellMs":12000,"routeConsistency":"consistent"}'
@@ -199,7 +216,8 @@ poor_arrival='{"contractVersion":1,"endpointDistanceBand":"within-arrival-thresh
 arrival='{"contractVersion":1,"endpointDistanceBand":"within-arrival-threshold","accuracyBand":"good","consecutiveSamples":4,"dwellMs":12000,"routeConsistency":"consistent"}'
 [[ "$(mutate arrival arrival 3 R "$arrival")" == 200 ]] || fail "arrival"
 [[ "$(json_field "$TMP_DIR/arrival.body" result.phase)" == arrived ]] || fail "arrival phase"
-[[ "$(json_field "$TMP_DIR/arrival.body" result.actions)" == '["reveal"]' ]] || fail "arrived actions"
+[[ "$(json_field "$TMP_DIR/arrival.body" result.actions)" == '[]' ]] || fail "arrived actions"
+[[ "$(json_field "$TMP_DIR/arrival.body" result.revealed)" == true ]] || fail "arrival reveal"
 
 delete_status="$(request delete \
   -b "$TMP_DIR/cookies" \
@@ -212,20 +230,10 @@ delete_status="$(request delete \
   -X DELETE \
   "$BASE_URL/api/v1/journeys/$journey_id")"
 [[ "$delete_status" == 204 ]] || fail "delete"
-reused_after_delete_status="$(request reused-after-delete \
-  -b "$TMP_DIR/cookies" \
-  -H "Origin: $ORIGIN" \
-  -H 'Sec-Fetch-Site: same-origin' \
-  -H 'Content-Type: application/json' \
-  -H "X-CSRF-Token: $csrf" \
-  -H "Idempotency-Key: $(key W)" \
-  --data "$recovery_create_body" \
-  "$BASE_URL/api/v1/journeys")"
-[[ "$reused_after_delete_status" == 404 ]] || fail "consumed capability status $reused_after_delete_status"
 deleted_status="$(mutate deleted reveal 4 T "$VERSION")"
 [[ "$deleted_status" == 410 || "$deleted_status" == 404 ]] || fail "deleted journey status $deleted_status"
 
-printf 'PASS ready→commit→follow→reveal→stop→continue\n'
-printf 'PASS confirm→reason→recovery→arrival→delete\n'
-printf 'NEGATIVE_PASS 409 Stop race, 404 capability omission/session/constraint/reuse, 410 tombstone, 422 arrival schema\n'
+printf 'PASS ready→commit→follow→Stop pause→reveal→continue\n'
+printf 'PASS confirm→reason→guarded recovery review; fresh journey→arrival→delete\n'
+printf 'NEGATIVE_PASS 409 Stop race, 404 capability omission/session/constraint/reuse, 410 tombstone, 422 no-fit/arrival schema\n'
 printf 'NEGATIVE_PASS poor arrival evidence remained following\n'

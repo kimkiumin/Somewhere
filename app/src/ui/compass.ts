@@ -10,10 +10,14 @@ export function createCompassAnimator(root: HTMLElement): CompassAnimator {
   let displayedDegrees: number | null = null;
   let targetDegrees: number | null = null;
   let animationFrame: number | null = null;
+  let cachedNeedle: HTMLElement | null = null;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-  function needle(): HTMLElement | null {
-    return root.querySelector<HTMLElement>("[data-compass-needle]");
+  function needle(refresh = false): HTMLElement | null {
+    if (refresh || cachedNeedle === null) {
+      cachedNeedle = root.querySelector<HTMLElement>("[data-compass-needle]");
+    }
+    return cachedNeedle;
   }
 
   function apply(): void {
@@ -45,7 +49,7 @@ export function createCompassAnimator(root: HTMLElement): CompassAnimator {
     },
     applyCurrent() {
       if (displayedDegrees !== null) {
-        needle()?.style.setProperty("--needle-angle", `${displayedDegrees}deg`);
+        needle(true)?.style.setProperty("--needle-angle", `${displayedDegrees}deg`);
       }
     },
     destroy() {
@@ -53,6 +57,7 @@ export function createCompassAnimator(root: HTMLElement): CompassAnimator {
         window.cancelAnimationFrame(animationFrame);
         animationFrame = null;
       }
+      cachedNeedle = null;
     },
   };
 }

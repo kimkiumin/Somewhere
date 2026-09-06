@@ -38,8 +38,9 @@ export function createProductionComposition(): SomewhereComposition {
       contractVersion: 1,
       constraints: {
         accessibility: [],
+        allergies: [],
         budgetBand: "medium",
-        category: "cafe",
+        category: "restaurant",
         dietary: [],
         maxWalkMinutes: 30,
       },

@@ -119,8 +119,11 @@ export function createBrowserSensorPorts(): SensorControllerPorts {
         headingListeners.delete(listener);
       }
     },
+    cancelFrame: (frameId: number) => window.cancelAnimationFrame(frameId),
     permissionProvider: orientationPermissionProvider(),
     nowMs: () => Date.now(),
+    requestFrame: (callback: (timestampMs: number) => void) =>
+      window.requestAnimationFrame(callback),
   };
   const visibilityEnvironment = {
     visibilityState: () => document.visibilityState,

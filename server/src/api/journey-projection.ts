@@ -49,20 +49,19 @@ export function projectLifecycleJourney(
     sequence: snapshot.sequence,
     ...(snapshot.revealed ? { reveal: prepared.identity } : {}),
   } as const;
-  const canReveal = snapshot.revealed ? [] : ["reveal"];
   let projection: unknown;
   switch (snapshot.phase) {
     case "ready":
       projection = {
         ...selected,
-        actions: snapshot.revealed ? ["commit", "stop"] : ["commit", "reveal", "stop"],
+        actions: ["commit", "stop"],
         phase: "ready",
       };
       break;
     case "committed":
       projection = {
         ...selected,
-        actions: snapshot.revealed ? ["poll", "stop"] : ["poll", "reveal", "stop"],
+        actions: ["poll", "stop"],
         guidance: { kind: "unavailable", reason: "route-pending" },
         phase: "committed",
         pollAfterSeconds: 1,
@@ -72,7 +71,7 @@ export function projectLifecycleJourney(
     case "near":
       projection = {
         ...selected,
-        actions: [...canReveal, "stop", "route-recover", "arrival"],
+        actions: ["stop", "route-recover", "arrival"],
         guidance: routeGuidance(prepared),
         phase: snapshot.phase,
       };
@@ -80,7 +79,7 @@ export function projectLifecycleJourney(
     case "route-recovery":
       projection = {
         ...selected,
-        actions: [...canReveal, "stop", "route-recover"],
+        actions: ["stop", "route-recover"],
         guidance: { kind: "unavailable", reason: routeFailure(snapshot.routeRepair) },
         phase: "route-recovery",
       };

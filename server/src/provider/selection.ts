@@ -113,13 +113,10 @@ function sealReceipt(
 export async function selectDestination(input: {
   readonly requestId: string;
   readonly pool: SealedPool;
-  readonly previousCandidateId?: string;
   readonly randomUint32?: RandomUint32;
   readonly revalidate: (member: PoolMember) => Promise<Revalidation>;
 }): Promise<SelectionResult> {
-  const remaining = input.pool.members.filter(
-    (member) => member.candidateId !== input.previousCandidateId,
-  );
+  const remaining = [...input.pool.members];
   const attempts: SelectionAttempt[] = [];
   const randomUint32 = input.randomUint32 ?? cryptoUint32;
   while (remaining.length > 0) {

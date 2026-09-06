@@ -156,7 +156,7 @@ describe("confirm-stop replay guard repair", () => {
     ).toMatchObject({
       active_journey_digest: null,
       last_stopped_at: NOW + 1,
-      previous_candidate_digest: journey.receipt.receiptDigest,
+      previous_candidate_digest: journey.receipt.selectedMemberDigest,
       recovery_capability_digest: "f".repeat(64),
     });
     expect(await third.text()).toBe(secondBody);

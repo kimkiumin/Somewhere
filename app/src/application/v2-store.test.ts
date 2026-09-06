@@ -25,6 +25,7 @@ const CREATE_BODY: JourneyCreateBody = {
   contractVersion: 1,
   constraints: {
     accessibility: [],
+    allergies: [],
     budgetBand: "medium",
     category: "cafe",
     dietary: [],

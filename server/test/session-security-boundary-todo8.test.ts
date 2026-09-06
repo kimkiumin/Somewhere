@@ -47,16 +47,25 @@ describe("security session boundary", () => {
     expect(response.status).toBe(200);
   });
 
-  it.each([
-    [
-      "no Referer",
-      {
+  it("accepts the no-referrer browser GET shape when Referrer-Policy hides Referer", async () => {
+    // Given: the Fetch Metadata emitted by a same-origin fetch under no-referrer.
+    const request = new Request("https://example.test/api/v1/session", {
+      headers: {
         host: "example.test",
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-origin",
       },
-    ],
+    });
+
+    // When: the real session boundary validates the privacy-preserving browser request.
+    const response = await handleRequest(request);
+
+    // Then: the no-referrer policy does not break same-origin session bootstrap.
+    expect(response.status).toBe(200);
+  });
+
+  it.each([
     [
       "foreign Referer",
       {

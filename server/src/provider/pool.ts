@@ -28,12 +28,12 @@ function digest(value: string): string {
   return `sha256:${createHash("sha256").update(value, "utf8").digest("hex")}`;
 }
 
+export function digestMember(member: PoolMember): string {
+  return digest(`${member.canonicalId}\0${member.candidateId}\0${member.snapshotVersion}`);
+}
+
 export function digestMembers(members: readonly PoolMember[]): string {
-  return digest(
-    members
-      .map((member) => `${member.canonicalId}\0${member.candidateId}\0${member.snapshotVersion}`)
-      .join("\n"),
-  );
+  return digest(members.map(digestMember).join("\n"));
 }
 
 export function sealPool(input: {

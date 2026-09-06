@@ -7,7 +7,7 @@ import { describe, expect, test } from "vitest";
 const SCRIPT = path.resolve(import.meta.dirname, "../../../scripts/release/curl-v2-contract.sh");
 
 function run(args: readonly string[], env?: NodeJS.ProcessEnv) {
-  return spawnSync("/usr/bin/bash", [SCRIPT, ...args], { encoding: "utf8", env });
+  return spawnSync("/bin/bash", [SCRIPT, ...args], { encoding: "utf8", env });
 }
 
 describe("curl V2 contract CLI", () => {

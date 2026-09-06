@@ -162,6 +162,7 @@ describe("journey-do serialized aggregate", () => {
 
     // Then: route data is gone and only a due-event identifier and time remain.
     expect(arrived.state.activeRoute).toBeUndefined();
+    expect(arrived.state.revealed).toBe(true);
     expect(arrived.state.feedback).toEqual({
       dueAt: 3_603_000,
       eventId: `event_${"4".repeat(48)}`,

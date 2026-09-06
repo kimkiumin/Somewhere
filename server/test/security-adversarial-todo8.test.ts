@@ -37,6 +37,38 @@ function mutationAt(
 }
 
 describe("security adversarial boundary", () => {
+  it("keeps local requests loopback-only unless a QA origin is explicit", () => {
+    // Given: the local Worker with and without an explicitly configured tunnel origin.
+    const loopback = requestPolicyForEnvironment(
+      new URL("http://127.0.0.1:8788/api/v1/session"),
+      "local",
+      undefined,
+    );
+    const tunnel = requestPolicyForEnvironment(
+      new URL("https://qa.example.test/api/v1/session"),
+      "local",
+      "https://qa.example.test",
+    );
+    const publicWithoutConfiguration = requestPolicyForEnvironment(
+      new URL("https://qa.example.test/api/v1/session"),
+      "local",
+      undefined,
+    );
+
+    // Then: the default remains loopback-only, while the opt-in binds one HTTPS origin exactly.
+    expect(loopback).toEqual({
+      canonicalHost: "127.0.0.1:8788",
+      canonicalOrigin: "http://127.0.0.1:8788",
+      kind: "valid",
+    });
+    expect(tunnel).toEqual({
+      canonicalHost: "qa.example.test",
+      canonicalOrigin: "https://qa.example.test",
+      kind: "valid",
+    });
+    expect(publicWithoutConfiguration).toEqual({ kind: "invalid" });
+  });
+
   it("binds deployed requests only to one normalized configured HTTPS origin", async () => {
     // Given: one trusted deployment origin and an attacker-selected paired Host and Origin.
     const configured = requestPolicyForEnvironment(

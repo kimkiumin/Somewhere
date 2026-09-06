@@ -122,21 +122,20 @@ describe("Task 14 feedback write epoch", () => {
   it("rejects missing, stale, future, and closed-mode write authority", async () => {
     // Given: a current epoch-four production fence and four independent capability attempts.
     const fixture = migratedDatabase();
-    const inputs = [1, 3, 5].map((epoch, index) =>
-      new FeedbackRepository(fixture.database, epoch).issue({
+    for (const [index, epoch] of [1, 3, 5].entries()) {
+      const input = new FeedbackRepository(fixture.database, epoch).issue({
         capabilityDigest: String(index + 1).repeat(64),
         consentGranted: true,
         dueAt: 10,
         expiresAt: 1_000,
         feedbackId: `fid_v1.${String.fromCharCode(65 + index).repeat(22)}`,
         journeyDigest: String(index + 4).repeat(64),
-      }),
-    );
+      });
 
-    // When: stale/future writers run, then the matching writer runs under a closed fence mode.
-    for (const input of inputs) {
+      // When: each stale/future writer runs, its rejection is observed immediately.
       await expect(input).rejects.toThrow(/stale feedback write epoch/u);
     }
+    // Then the matching writer runs under a closed fence mode.
     executeSql(
       fixture.path,
       "UPDATE operations_write_fence SET mode = 'ADMISSION_CLOSED' WHERE environment = 'production'",
